@@ -1,5 +1,5 @@
 import sqlite3
-from client import Client
+from serveur.client import Client
 
 class DatabaseManager:
     def __init__(self, db_name='ma_base.db'):
