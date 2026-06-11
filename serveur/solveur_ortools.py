@@ -70,7 +70,7 @@ def sauvegarder_en_csv(data, manager, routing, solution, time_dimension):
             
             print(f"{nom_chauffeur} : Temps de travail total estimé = {minutes_en_heure(temps_total_minutes)}")
 
-    print(f"\n✅ Fichier '{fichier_csv}' généré avec succès ! Vous pouvez l'importer dans Google My Maps.")
+    print(f"\n Fichier '{fichier_csv}' généré avec succès ! Vous pouvez l'importer dans Google My Maps.")
 
 def resoudre_et_exporter(data):
     """Configuration et exécution du solveur OR-Tools"""
