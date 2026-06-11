@@ -64,6 +64,8 @@ CREATE TABLE tournees_jour (
     date_tournee TEXT NOT NULL,
     chauffeur_id INTEGER NOT NULL REFERENCES chauffeurs(id) ON DELETE CASCADE,
     camion_id INTEGER NOT NULL REFERENCES camions(id) ON DELETE CASCADE,
+    heure_debut_service TEXT NOT NULL, -- NOUVELLE COLONNE
+    heure_fin_service TEXT NOT NULL,   -- NOUVELLE COLONNE
     statut TEXT DEFAULT 'brouillon' CHECK (statut IN ('brouillon', 'affectee', 'demarree', 'terminee'))
 );
 
@@ -73,6 +75,7 @@ CREATE TABLE taches_collecte (
     tournee_id INTEGER REFERENCES tournees_jour(id) ON DELETE SET NULL, 
     date_planifiee TEXT NOT NULL,
     bacs_prevus INTEGER NOT NULL,
+    poids_prevu_kg INTEGER NOT NULL, -- NOUVELLE COLONNE
     bacs_reels INTEGER,
     statut TEXT DEFAULT 'en_attente' CHECK (statut IN ('en_attente', 'en_cours', 'terminee', 'annulee', 'echec_client_absent'))
 );
@@ -153,31 +156,31 @@ INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_
 (20, 1, '09:00:00', '16:00:00');
 
 -- 5. PLANIFICATION POUR LE 15 JUIN 2026
-INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, statut) VALUES 
-('2026-06-15', 1, 1, 'brouillon'),
-('2026-06-15', 2, 2, 'brouillon'),
-('2026-06-15', 3, 3, 'brouillon'),
-('2026-06-15', 4, 4, 'brouillon'),
-('2026-06-15', 5, 5, 'brouillon');
+INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, heure_debut_service, heure_fin_service, statut) VALUES 
+('2026-06-15', 1, 1, '06:00:00', '13:00:00', 'brouillon'), -- Jean : Équipe du Matin (7h)
+('2026-06-15', 2, 2, '06:00:00', '13:00:00', 'brouillon'), -- Alice : Équipe du Matin (7h)
+('2026-06-15', 3, 3, '13:00:00', '20:00:00', 'brouillon'), -- Paul : Équipe d'Après-midi (7h)
+('2026-06-15', 4, 4, '08:00:00', '16:00:00', 'brouillon'), -- Marie : Journée classique (8h)
+('2026-06-15', 5, 5, '09:00:00', '17:00:00', 'brouillon'); -- Luc : Journée décalée (8h)
 
-INSERT INTO taches_collecte (client_id, date_planifiee, bacs_prevus, statut) VALUES 
-(1, '2026-06-15', 4, 'en_attente'),
-(2, '2026-06-15', 3, 'en_attente'),
-(3, '2026-06-15', 8, 'en_attente'), 
-(4, '2026-06-15', 4, 'en_attente'),
-(5, '2026-06-15', 5, 'en_attente'),
-(6, '2026-06-15', 2, 'en_attente'),
-(7, '2026-06-15', 2, 'en_attente'),
-(8, '2026-06-15', 2, 'en_attente'),
-(9, '2026-06-15', 5, 'en_attente'),
-(10, '2026-06-15', 3, 'en_attente'),
-(11, '2026-06-15', 6, 'en_attente'),
-(12, '2026-06-15', 4, 'en_attente'),
-(13, '2026-06-15', 3, 'en_attente'),
-(14, '2026-06-15', 7, 'en_attente'),
-(15, '2026-06-15', 2, 'en_attente'),
-(16, '2026-06-15', 3, 'en_attente'),
-(17, '2026-06-15', 2, 'en_attente'),
-(18, '2026-06-15', 1, 'en_attente'),
-(19, '2026-06-15', 1, 'en_attente'),
-(20, '2026-06-15', 2, 'en_attente');
+INSERT INTO taches_collecte (client_id, date_planifiee, bacs_prevus, poids_prevu_kg, statut) VALUES 
+(1, '2026-06-15', 4, 160, 'en_attente'),
+(2, '2026-06-15', 3, 120, 'en_attente'),
+(3, '2026-06-15', 8, 320, 'en_attente'), 
+(4, '2026-06-15', 4, 160, 'en_attente'),
+(5, '2026-06-15', 5, 200, 'en_attente'),
+(6, '2026-06-15', 2, 80, 'en_attente'),
+(7, '2026-06-15', 2, 80, 'en_attente'),
+(8, '2026-06-15', 2, 80, 'en_attente'),
+(9, '2026-06-15', 5, 200, 'en_attente'),
+(10, '2026-06-15', 3, 120, 'en_attente'),
+(11, '2026-06-15', 6, 240, 'en_attente'),
+(12, '2026-06-15', 4, 160, 'en_attente'),
+(13, '2026-06-15', 3, 120, 'en_attente'),
+(14, '2026-06-15', 7, 280, 'en_attente'),
+(15, '2026-06-15', 2, 80, 'en_attente'),
+(16, '2026-06-15', 3, 120, 'en_attente'),
+(17, '2026-06-15', 2, 80, 'en_attente'),
+(18, '2026-06-15', 1, 40, 'en_attente'),
+(19, '2026-06-15', 1, 40, 'en_attente'),
+(20, '2026-06-15', 2, 80, 'en_attente');
