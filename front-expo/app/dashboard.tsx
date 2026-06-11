@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +16,10 @@ import { colors } from '../constants/colors';
 import StatCard from '../components/StatCard';
 import ActivityItem from '../components/ActivityItem';
 import Sidebar from '../components/Sidebar';
+import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activite } from '../services/dashboard';
+
+// Date des données de test — à remplacer par date.today() quand la BDD sera remplie au jour J
+const DATE_DEMO = '2026-06-15';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -95,50 +100,54 @@ function ClockIcon() {
   );
 }
 
-// ── Data ──────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STATS = [
-  {
-    iconBg: '#E8F5EE',
-    icon: <LocationIcon />,
-    value: '2 000 kg',
-    label: 'Biodéchets prévus',
-    badgeText: '↑ Journée chargée',
-    badgeStyle: 'ok' as const,
-  },
-  {
-    iconBg: '#E6F4FA',
-    icon: <CheckCircleIcon />,
-    value: '11 / 15',
-    label: 'Collectes validées',
-    badgeText: '4 en cours',
-    badgeStyle: 'info' as const,
-  },
-  {
-    iconBg: colors.coralLight,
-    icon: <WarningIcon />,
-    value: '2',
-    label: 'Alertes actives',
-    badgeText: '⚠ Action requise',
-    badgeStyle: 'warn' as const,
-  },
-  {
-    iconBg: '#E6F7F9',
-    icon: <ClockIcon />,
-    value: '~20 min',
-    label: 'Prochain camion',
-    badgeText: 'Arrivée estimée',
-    badgeStyle: 'info' as const,
-  },
-];
+function buildStats(s: DashboardStats) {
+  const enCours = s.collectes_total - s.collectes_validees;
+  return [
+    {
+      iconBg: '#E8F5EE',
+      icon: <LocationIcon />,
+      value: `${s.poids_prevu_kg.toLocaleString('fr-FR')} kg`,
+      label: 'Biodéchets prévus',
+      badgeText: '↑ Journée chargée',
+      badgeStyle: 'ok' as const,
+    },
+    {
+      iconBg: '#E6F4FA',
+      icon: <CheckCircleIcon />,
+      value: `${s.collectes_validees} / ${s.collectes_total}`,
+      label: 'Collectes validées',
+      badgeText: `${enCours} en cours`,
+      badgeStyle: 'info' as const,
+    },
+    {
+      iconBg: colors.coralLight,
+      icon: <WarningIcon />,
+      value: String(s.alertes),
+      label: 'Alertes actives',
+      badgeText: s.alertes > 0 ? '⚠ Action requise' : '✓ Aucune alerte',
+      badgeStyle: s.alertes > 0 ? ('warn' as const) : ('ok' as const),
+    },
+    {
+      iconBg: '#E6F7F9',
+      icon: <ClockIcon />,
+      value: `${s.collectes_total - s.collectes_validees - s.alertes}`,
+      label: 'Collectes restantes',
+      badgeText: 'En attente',
+      badgeStyle: 'info' as const,
+    },
+  ];
+}
 
-const ACTIVITIES = [
-  { type: 'success' as const, name: 'Marc Dubois a validé la collecte', detail: '📍 Restaurant Le Provençal — Toulon (83000)', time: '08h14' },
-  { type: 'success' as const, name: 'Sophie Martinez a validé la collecte', detail: '📍 Hôtel Ibis — La Seyne-sur-Mer (83500)', time: '08h47' },
-  { type: 'error' as const, name: "Toni Jonio n'a pas pu finir sa tournée", detail: '📍 Arrêt : Cantine Municipale — Hyères (83400)', time: '09h03' },
-  { type: 'success' as const, name: 'Zidane a validé la collecte', detail: '📍 Brasserie du Port — Sanary-sur-Mer (83110)', time: '09h31' },
-  { type: 'success' as const, name: 'Jami a validé la collecte', detail: '📍 Lycée Bonaparte — Toulon (83000)', time: '09h58' },
-];
+function buildActivities(list: Activite[]) {
+  return list.map((a) => ({
+    type: a.statut === 'terminee' ? ('success' as const) : ('error' as const),
+    name: a.statut === 'terminee' ? `Collecte validée` : `Collecte en erreur`,
+    detail: `📍 ${a.client}`,
+    time: '',
+  }));
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -146,6 +155,28 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const showSidebar = width >= 768;
   const router = useRouter();
+
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [activites, setActivites] = useState<Activite[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [s, a] = await Promise.all([
+          getDashboardStats(DATE_DEMO),
+          getActiviteRecente(DATE_DEMO),
+        ]);
+        setStats(s);
+        setActivites(a);
+      } catch (e) {
+        console.warn('Dashboard fetch error:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -192,34 +223,51 @@ export default function DashboardScreen() {
               <Text style={styles.pageSubtitle}>Vue d'ensemble en temps réel — Var (83)</Text>
             </View>
 
-            {/* Stats — 2 × 2 grid */}
-            <View style={styles.statsGrid}>
-              <View style={styles.statsRow}>
-                <StatCard {...STATS[0]} />
-                <StatCard {...STATS[1]} />
-              </View>
-              <View style={styles.statsRow}>
-                <StatCard {...STATS[2]} />
-                <StatCard {...STATS[3]} />
-              </View>
-            </View>
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
+            ) : (
+              <>
+                {/* Stats — 2 × 2 grid */}
+                {stats && (() => {
+                  const STATS = buildStats(stats);
+                  return (
+                    <View style={styles.statsGrid}>
+                      <View style={styles.statsRow}>
+                        <StatCard {...STATS[0]} />
+                        <StatCard {...STATS[1]} />
+                      </View>
+                      <View style={styles.statsRow}>
+                        <StatCard {...STATS[2]} />
+                        <StatCard {...STATS[3]} />
+                      </View>
+                    </View>
+                  );
+                })()}
 
-            {/* Activity */}
-            <View style={styles.activityCard}>
-              <View style={styles.activityHeader}>
-                <Text style={styles.activityTitle}>Activité récente</Text>
-                <View style={styles.activityCount}>
-                  <Text style={styles.activityCountText}>5 événements</Text>
+                {/* Activity */}
+                <View style={styles.activityCard}>
+                  <View style={styles.activityHeader}>
+                    <Text style={styles.activityTitle}>Activité récente</Text>
+                    <View style={styles.activityCount}>
+                      <Text style={styles.activityCountText}>
+                        {activites.length} événement{activites.length !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {activites.length === 0 ? (
+                    <Text style={styles.emptyText}>Aucune activité pour cette journée.</Text>
+                  ) : (
+                    buildActivities(activites).map((item, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && <View style={styles.divider} />}
+                        <ActivityItem {...item} />
+                      </React.Fragment>
+                    ))
+                  )}
                 </View>
-              </View>
-
-              {ACTIVITIES.map((item, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && <View style={styles.divider} />}
-                  <ActivityItem {...item} />
-                </React.Fragment>
-              ))}
-            </View>
+              </>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -388,5 +436,11 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.background,
     marginHorizontal: 14,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
 });
