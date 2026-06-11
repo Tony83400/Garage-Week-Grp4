@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Circle } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
 import StatCard from '../components/StatCard';
@@ -21,85 +21,6 @@ import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activi
 // Date des données de test — à remplacer par date.today() quand la BDD sera remplie au jour J
 const DATE_DEMO = '2026-06-15';
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
-function BellIcon() {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-      <Path
-        d="M10 2a6 6 0 00-6 6v3l-1.5 2.5h15L16 11V8a6 6 0 00-6-6z"
-        stroke={colors.primaryLight}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M8.5 16a1.5 1.5 0 003 0"
-        stroke={colors.primaryLight}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-function LocationIcon() {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-      <Path
-        d="M10 3C13.5 3 16 5.5 16 8.5C16 12 12.5 14.5 10 17C7.5 14.5 4 12 4 8.5C4 5.5 6.5 3 10 3Z"
-        stroke={colors.primaryLight}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function CheckCircleIcon() {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-      <Circle cx={10} cy={10} r={7} stroke={colors.secondary} strokeWidth={1.5} />
-      <Path
-        d="M7 10l2 2 4-4"
-        stroke={colors.secondary}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function WarningIcon() {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-      <Path d="M10 3v7" stroke={colors.coral} strokeWidth={2} strokeLinecap="round" />
-      <Circle cx={10} cy={14.5} r={1} fill={colors.coral} />
-      <Path
-        d="M10 1L18.5 16H1.5L10 1Z"
-        stroke={colors.coral}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-      <Circle cx={10} cy={10} r={7} stroke={colors.secondaryLight} strokeWidth={1.5} />
-      <Path
-        d="M10 6v4l3 2"
-        stroke={colors.secondaryLight}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function buildStats(s: DashboardStats) {
@@ -107,7 +28,7 @@ function buildStats(s: DashboardStats) {
   return [
     {
       iconBg: '#E8F5EE',
-      icon: <LocationIcon />,
+      icon: <Ionicons name="leaf-outline" size={20} color={colors.primaryLight} />,
       value: `${s.poids_prevu_kg.toLocaleString('fr-FR')} kg`,
       label: 'Biodéchets prévus',
       badgeText: '↑ Journée chargée',
@@ -115,7 +36,7 @@ function buildStats(s: DashboardStats) {
     },
     {
       iconBg: '#E6F4FA',
-      icon: <CheckCircleIcon />,
+      icon: <Ionicons name="checkmark-circle-outline" size={20} color={colors.secondary} />,
       value: `${s.collectes_validees} / ${s.collectes_total}`,
       label: 'Collectes validées',
       badgeText: `${enCours} en cours`,
@@ -123,7 +44,7 @@ function buildStats(s: DashboardStats) {
     },
     {
       iconBg: colors.coralLight,
-      icon: <WarningIcon />,
+      icon: <Ionicons name="warning-outline" size={20} color={colors.coral} />,
       value: String(s.alertes),
       label: 'Alertes actives',
       badgeText: s.alertes > 0 ? '⚠ Action requise' : '✓ Aucune alerte',
@@ -131,7 +52,7 @@ function buildStats(s: DashboardStats) {
     },
     {
       iconBg: '#E6F7F9',
-      icon: <ClockIcon />,
+      icon: <Ionicons name="time-outline" size={20} color={colors.secondaryLight} />,
       value: `${s.collectes_total - s.collectes_validees - s.alertes}`,
       label: 'Collectes restantes',
       badgeText: 'En attente',
@@ -199,7 +120,7 @@ export default function DashboardScreen() {
             <View style={styles.topbarRight}>
               <TouchableOpacity style={styles.notifBtn}>
                 <View style={styles.notifDot} />
-                <BellIcon />
+                <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
               </TouchableOpacity>
               <LinearGradient
                 colors={[colors.primaryLight, colors.secondary]}

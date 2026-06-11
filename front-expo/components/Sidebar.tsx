@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
 
@@ -15,55 +16,6 @@ function LogoIcon() {
       <Path
         d="M11 6 C14 6 16 8.5 16 11.5 C16 14 13.5 16 11 16 C8.5 16 6.5 14 6.5 11.5 C6.5 8.5 8 6 11 6Z"
         fill="rgba(255,255,255,0.3)"
-      />
-    </Svg>
-  );
-}
-
-function DashboardIcon({ active }: { active: boolean }) {
-  const stroke = active ? colors.accentLight : 'rgba(255,255,255,0.55)';
-  return (
-    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-      <Rect x={1} y={1} width={7} height={7} rx={2} stroke={stroke} strokeWidth={1.5} />
-      <Rect x={10} y={1} width={7} height={7} rx={2} stroke={stroke} strokeWidth={1.5} />
-      <Rect x={1} y={10} width={7} height={7} rx={2} stroke={stroke} strokeWidth={1.5} />
-      <Rect x={10} y={10} width={7} height={7} rx={2} stroke={stroke} strokeWidth={1.5} />
-    </Svg>
-  );
-}
-
-function PlanningIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-      <Rect
-        x={1} y={3} width={16} height={13} rx={2}
-        stroke="rgba(255,255,255,0.55)" strokeWidth={1.5}
-      />
-      <Path
-        d="M5 1V5M13 1V5M1 7H17"
-        stroke="rgba(255,255,255,0.55)"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-      <Path
-        d="M7 3H3a1 1 0 00-1 1v10a1 1 0 001 1h4"
-        stroke="rgba(231,111,81,0.7)"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
-      <Path
-        d="M12 13l4-4-4-4M16 9H7"
-        stroke="rgba(231,111,81,0.7)"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </Svg>
   );
@@ -103,15 +55,28 @@ export default function Sidebar({ activeRoute }: Props) {
           style={[styles.navItem, activeRoute === 'dashboard' && styles.navItemActive]}
           onPress={() => router.push('/dashboard')}
         >
-          <DashboardIcon active={activeRoute === 'dashboard'} />
+          <Ionicons
+            name="grid-outline"
+            size={18}
+            color={activeRoute === 'dashboard' ? colors.accentLight : 'rgba(255,255,255,0.55)'}
+          />
           <Text style={[styles.navText, activeRoute === 'dashboard' && styles.navTextActive]}>
             Tableau de Bord
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
-          <PlanningIcon />
-          <Text style={styles.navText}>Planning & Tournées</Text>
+        <TouchableOpacity
+          style={[styles.navItem, activeRoute === 'planning' && styles.navItemActive]}
+          onPress={() => router.push('/planning')}
+        >
+          <Ionicons
+            name="calendar-outline"
+            size={18}
+            color={activeRoute === 'planning' ? colors.accentLight : 'rgba(255,255,255,0.55)'}
+          />
+          <Text style={[styles.navText, activeRoute === 'planning' && styles.navTextActive]}>
+            Planning & Tournées
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -120,7 +85,7 @@ export default function Sidebar({ activeRoute }: Props) {
           style={[styles.navItem, styles.logoutItem]}
           onPress={() => router.replace('/')}
         >
-          <LogoutIcon />
+          <Ionicons name="log-out-outline" size={18} color="rgba(231,111,81,0.7)" />
           <Text style={styles.logoutText}>Déconnexion</Text>
         </TouchableOpacity>
       </View>

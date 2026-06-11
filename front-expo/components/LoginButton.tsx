@@ -1,7 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Text, View, ActivityIndicator, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 
 interface LoginButtonProps {
   onPress: () => void;
@@ -23,21 +23,10 @@ export default function LoginButton({ onPress, loading = false }: LoginButtonPro
         style={styles.gradient}
       >
         <Text style={styles.text}>Se connecter</Text>
-        {loading ? (
-          <ActivityIndicator color="#ffffff" size="small" style={styles.icon} />
-        ) : (
-          <View style={styles.icon}>
-            <Svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <Path
-                d="M3 9H15M15 9L10 4M15 9L10 14"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </View>
-        )}
+        {loading
+          ? <ActivityIndicator color="#ffffff" size="small" style={styles.icon} />
+          : <Ionicons name="arrow-forward" size={18} color="white" style={styles.icon} />
+        }
       </LinearGradient>
     </TouchableOpacity>
   );

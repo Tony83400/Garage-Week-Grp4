@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 
 interface Props {
@@ -10,40 +10,14 @@ interface Props {
   time: string;
 }
 
-function SuccessIcon() {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
-      <Circle cx={8} cy={8} r={6} stroke={colors.primaryLight} strokeWidth={1.5} />
-      <Path
-        d="M5 8l2 2 4-4"
-        stroke={colors.primaryLight}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function ErrorIcon() {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
-      <Circle cx={8} cy={8} r={6} stroke={colors.coral} strokeWidth={1.5} />
-      <Path
-        d="M5.5 5.5l5 5M10.5 5.5l-5 5"
-        stroke={colors.coral}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
 export default function ActivityItem({ type, name, detail, time }: Props) {
   return (
     <View style={styles.item}>
       <View style={[styles.iconBox, type === 'success' ? styles.iconSuccess : styles.iconError]}>
-        {type === 'success' ? <SuccessIcon /> : <ErrorIcon />}
+        {type === 'success'
+          ? <Ionicons name="checkmark-circle-outline" size={16} color={colors.primaryLight} />
+          : <Ionicons name="close-circle-outline" size={16} color={colors.coral} />
+        }
       </View>
       <View style={styles.text}>
         <Text style={styles.name}>{name}</Text>

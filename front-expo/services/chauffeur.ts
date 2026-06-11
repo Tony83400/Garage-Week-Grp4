@@ -1,15 +1,16 @@
 import { api } from './api';
 
 // Correspond à GET /api/chauffeur/<chauffeur_id>/tournee?date=YYYY-MM-DD
+// Champs exacts retournés par repo_tournees.recuperer_tournee_chauffeur()
 export interface Arret {
   tache_id: number;
-  nom_entreprise: string;
+  statut: 'en_attente' | 'en_cours' | 'terminee' | 'erreur';
+  bacs_prevus: number;
+  poids_prevu_kg: number;
+  ordre: number;
+  client_nom: string;
   latitude: number;
   longitude: number;
-  statut: 'en_attente' | 'terminee' | 'erreur';
-  bacs_prevus: number;
-  bacs_reels: number | null;
-  commentaire: string | null;
 }
 
 export function getTournee(chauffeur_id: number, date?: string) {
