@@ -12,66 +12,65 @@ import csv
 
 def sauvegarder_en_csv(data, manager, routing, solution, time_dimension):
     """
-    Parcourt la solution mathématique trouvée par OR-Tools et l'exporte en CSV.
-    Intègre les noms des chauffeurs, les volumes (bacs) et les poids (kg).
+    Parcourt la solution et exporte en CSV.
+    Ne prend en compte que les véhicules ayant effectué au moins 1 arrêt client.
     """
-    
     fichier_csv = 'tournees_ortools.csv'
-    # On récupère les infos géographiques directement depuis le dictionnaire préparé
-    infos_geo = data['infos_geo'] 
+    infos_geo = data['infos_geo']
     
     with open(fichier_csv, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        
-        # En-tête mis à jour : "Chauffeur" au lieu de "Camion", et ajout du "Poids"
         writer.writerow(['Chauffeur', 'Ordre', 'Nom_Etape', 'Latitude', 'Longitude', 'Heure_Arrivee', 'Distance_Cumulee_Unite', 'Bacs_a_Collecter', 'Poids_a_Collecter_Kg'])
         
         for vehicle_id in range(data['num_vehicles']):
             index = routing.Start(vehicle_id)
+            
+            # --- FILTRAGE : On prépare les données temporairement ---
+            tour_rows = []
+            stop_count = 0 # Compteur d'arrêts réels
             ordre = 1
             distance_cumulee = 0
-            
-            # On utilise le vrai nom du chauffeur récupéré depuis la base de données
             nom_chauffeur = f"Tournée de {data['driver_names'][vehicle_id]}"
             
-            # Parcours de tous les arrêts prévus pour ce chauffeur
+            # Parcours
             while not routing.IsEnd(index):
                 node_index = manager.IndexToNode(index)
+                
+                # Si on n'est pas au dépôt, on compte l'arrêt
+                if node_index != data['depot']:
+                    stop_count += 1
+                
                 temps_var = time_dimension.CumulVar(index)
                 heure_arrivee = minutes_en_heure(solution.Min(temps_var))
-                
                 info = infos_geo[node_index]
                 bacs = data['demands'][node_index]
                 poids = data['weight_demands'][node_index]
                 
-                # Écriture de la ligne CSV pour cet arrêt
-                writer.writerow([nom_chauffeur, ordre, info['nom'], info['lat'], info['lon'], heure_arrivee, distance_cumulee, bacs, poids])
+                tour_rows.append([nom_chauffeur, ordre, info['nom'], info['lat'], info['lon'], heure_arrivee, distance_cumulee, bacs, poids])
                 
-                # Passage au point suivant et calcul de la distance accumulée
                 previous_index = index
                 index = solution.Value(routing.NextVar(index))
                 distance_cumulee += routing.GetArcCostForVehicle(previous_index, index, vehicle_id)
                 ordre += 1
 
-            # Ajout du dernier point : Le retour au Dépôt
+            # Ajout du retour au dépôt
             node_index = manager.IndexToNode(index)
-            temps_var = time_dimension.CumulVar(index)
-            heure_arrivee = minutes_en_heure(solution.Min(temps_var))
             info = infos_geo[node_index]
-            
-            # Le retour au dépôt n'ajoute ni bac ni poids à la charge (0, 0)
-            writer.writerow([nom_chauffeur, ordre, "Retour " + info['nom'], info['lat'], info['lon'], heure_arrivee, distance_cumulee, 0, 0])
+            tour_rows.append([nom_chauffeur, ordre, "Retour " + info['nom'], info['lat'], info['lon'], minutes_en_heure(solution.Min(time_dimension.CumulVar(index))), distance_cumulee, 0, 0])
 
-            # --- AFFICHAGE DANS LA CONSOLE POUR LE SUIVI ---
-            # Calcul du temps de travail total de ce chauffeur
-            temps_debut = solution.Min(time_dimension.CumulVar(routing.Start(vehicle_id)))
-            temps_fin = solution.Min(time_dimension.CumulVar(index))
-            temps_total_minutes = temps_fin - temps_debut
-            
-            print(f"{nom_chauffeur} : Temps de travail total estimé = {minutes_en_heure(temps_total_minutes)}")
+            # --- DÉCISION : Si stop_count > 0, on écrit dans le CSV et on affiche ---
+            if stop_count > 0:
+                for row in tour_rows:
+                    writer.writerow(row)
+                
+                # Affichage console uniquement pour les tournées actives
+                temps_debut = solution.Min(time_dimension.CumulVar(routing.Start(vehicle_id)))
+                temps_fin = solution.Min(time_dimension.CumulVar(index))
+                print(f"{nom_chauffeur} : Temps de travail total = {minutes_en_heure(temps_fin - temps_debut)}")
 
-    print(f"\n Fichier '{fichier_csv}' généré avec succès ! Vous pouvez l'importer dans Google My Maps.")
+    print(f"\nFichier '{fichier_csv}' généré avec succès ! (Tournées vides masquées).")
 
+    
 def resoudre_et_exporter(data):
     """Configuration et exécution du solveur OR-Tools"""
     
@@ -153,18 +152,25 @@ def resoudre_et_exporter(data):
         index = manager.NodeToIndex(location_idx)
         time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
 
-    # NOUVEAU : Application des fenêtres horaires DES CHAUFFEURS (Planning)
+    # Application des fenêtres horaires DES CHAUFFEURS (Planning)
+    # Au lieu de (0, 1440), impose la fenêtre globale sur tous les véhicules
+    MIN_GLOBAL = 180 # 3h00
+    MAX_GLOBAL = 825 # 13h45
+
     for vehicle_id in range(data['num_vehicles']):
         index_depart = routing.Start(vehicle_id)
         index_arrivee = routing.End(vehicle_id)
-        
+        time_dimension.CumulVar(index_depart).SetRange(MIN_GLOBAL, MAX_GLOBAL)
+        time_dimension.CumulVar(index_arrivee).SetRange(MIN_GLOBAL, MAX_GLOBAL)
+
+    """    
         start_time, end_time = data['vehicle_time_windows'][vehicle_id]
         
         # Le camion ne peut pas quitter le dépôt avant le début du service
         time_dimension.CumulVar(index_depart).SetRange(start_time, end_time)
         # Le camion doit obligatoirement être rentré avant la fin du service
         time_dimension.CumulVar(index_arrivee).SetRange(start_time, end_time)
-
+    """
     # -------------------------------------------------------------
     # 4. EXÉCUTION DU MOTEUR DE RECHERCHE
     # -------------------------------------------------------------
@@ -184,3 +190,5 @@ def resoudre_et_exporter(data):
         sauvegarder_en_csv(data, manager, routing, solution, time_dimension)
     else:
         print("Aucune solution n'a pu être trouvée avec ces contraintes (Vérifiez si les camions ont assez de capacité ou si les horaires sont compatibles).")
+
+

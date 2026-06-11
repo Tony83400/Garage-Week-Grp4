@@ -194,89 +194,85 @@ class DatabaseManager:
         except sqlite3.IntegrityError:
             print(f"Erreur : L'email '{email}' existe déjà.")
             return False
+        
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
-            """
-            Extrait les données de la base et les formate pour OR-Tools.
-            Inclut les informations géographiques, les contraintes de volume (bacs) et de poids (kg),
-            ainsi que les plannings des chauffeurs pour affecter les tournées.
-            """
-            data = {}
+        """
+        Extrait les données de la base et les formate pour OR-Tools.
+        Gère le Multi-Trip en créant deux tournées virtuelles par camion.
+        """
+        data = {}
+        
+        # Constantes pour les horaires (3h00 = 180min, 13h45 = 825min)
+        MIN_GLOBAL = 180 
+        MAX_GLOBAL = 825 
+        
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
             
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
+            # 1. Récupération des camions
+            cursor.execute('''
+                SELECT c.bacs_max, c.charge_max_kg, ch.nom
+                FROM tournees_jour tj
+                JOIN camions c ON tj.camion_id = c.id
+                JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
+                WHERE tj.date_tournee = ?
+            ''', (date_jour,))
+            camions_jour = cursor.fetchall()
+            
+            # Initialisation des listes
+            data['vehicle_capacities'] = []
+            data['vehicle_weights'] = []
+            data['vehicle_time_windows'] = []
+            data['driver_names'] = []
+            
+            # DÉDOUBLAGE DES CAMIONS (Multi-Trip)
+            for c in camions_jour:
+                # Tournée 1 (T1)
+                data['vehicle_capacities'].append(c[0])
+                data['vehicle_weights'].append(c[1])
+                data['driver_names'].append(f"{c[2]} (T1)")
+                data['vehicle_time_windows'].append((MIN_GLOBAL, MAX_GLOBAL))
                 
-                # 1. Récupération des camions planifiés pour CE JOUR, 
-                # avec les capacités, les horaires du chauffeur et son nom
-                cursor.execute('''
-                    SELECT c.bacs_max, c.charge_max_kg, tj.heure_debut_service, tj.heure_fin_service, ch.nom
-                    FROM tournees_jour tj
-                    JOIN camions c ON tj.camion_id = c.id
-                    JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
-                    WHERE tj.date_tournee = ?
-                ''', (date_jour,))
-                camions_jour = cursor.fetchall()
-                
-                data['vehicle_capacities'] = [c[0] for c in camions_jour]
-                data['vehicle_weights'] = [c[1] for c in camions_jour]
-                data['num_vehicles'] = len(camions_jour)
-                data['depot'] = 0 
-                
-                # Conversion des horaires de service en minutes
-                data['vehicle_time_windows'] = []
-                data['driver_names'] = []
-                
-                for c in camions_jour:
-                    min_deb = heure_vers_minutes(c[2])
-                    min_fin = heure_vers_minutes(c[3])
-                    data['vehicle_time_windows'].append((min_deb, min_fin))
-                    data['driver_names'].append(c[4]) # Nom du chauffeur pour l'export CSV
-                
-                # 2. Récupération des tâches de collecte
-                cursor.execute('''
-                    SELECT 
-                        t.id,
-                        t.bacs_prevus, 
-                        t.poids_prevu_kg,
-                        c.latitude, c.longitude,
-                        IFNULL(d.heure_debut, '08:00:00'), 
-                        IFNULL(d.heure_fin, '18:00:00'),
-                        c.nom_entreprise
-                    FROM taches_collecte t
-                    JOIN clients c ON t.client_id = c.id
-                    LEFT JOIN disponibilites_clients d ON c.id = d.client_id
-                    WHERE t.date_planifiee = ? AND t.statut = 'en_attente'
-                ''', (date_jour,))
-                
-                taches = cursor.fetchall()
+                # Tournée 2 (T2)
+                data['vehicle_capacities'].append(c[0])
+                data['vehicle_weights'].append(c[1])
+                data['driver_names'].append(f"{c[2]} (T2)")
+                data['vehicle_time_windows'].append((MIN_GLOBAL, MAX_GLOBAL))
+            
+            data['num_vehicles'] = len(data['vehicle_capacities'])
+            data['depot'] = 0 
+            
+            # 2. Récupération des tâches
+            cursor.execute('''
+                SELECT t.id, t.bacs_prevus, t.poids_prevu_kg, c.latitude, c.longitude, c.nom_entreprise
+                FROM taches_collecte t
+                JOIN clients c ON t.client_id = c.id
+                WHERE t.date_planifiee = ? AND t.statut = 'en_attente'
+            ''', (date_jour,))
+            taches = cursor.fetchall()
 
-            # 3. Initialisation des listes avec le point de départ (Le Dépôt)
+            # 3. Initialisation des listes avec le Dépôt
             coordonnees = [(depot_lat, depot_lon)]
-            data['demands'] = [0]              # Le dépôt n'a pas de bacs à collecter
-            data['weight_demands'] = [0]       # Le dépôt ne pèse rien (0 kg)
-            data['time_windows'] = [(0, 1440)] # Le dépôt est "ouvert" de 00h00 à 23h59
+            data['demands'] = [0]
+            data['weight_demands'] = [0]
+            data['time_windows'] = [(MIN_GLOBAL, MAX_GLOBAL)] # Dépôt aussi contraint
             data['tache_ids'] = [None]
-            
             data['infos_geo'] = {
-                0: {"nom": "Dépôt / Point de départ", "lat": depot_lat, "lon": depot_lon}
+                0: {"nom": "Dépôt", "lat": depot_lat, "lon": depot_lon}
             }
-
+            
             # 4. Remplissage avec les données des clients
             for index, tache in enumerate(taches, start=1):
-                tache_id, bacs, poids, lat, lon, h_debut, h_fin, nom_entreprise = tache
-                
+                tache_id, bacs, poids, lat, lon, nom = tache
                 data['tache_ids'].append(tache_id)
                 coordonnees.append((lat, lon))
-                
                 data['demands'].append(bacs)
                 data['weight_demands'].append(poids)
-                
-                data['infos_geo'][index] = {"nom": nom_entreprise, "lat": lat, "lon": lon}
-                
-                min_debut = heure_vers_minutes(h_debut)
-                min_fin = heure_vers_minutes(h_fin)
-                data['time_windows'].append((min_debut, min_fin))
+                data['infos_geo'][index] = {"nom": nom, "lat": lat, "lon": lon}
+                # Fenêtre large pour les clients (ex: toute la journée)
+                data['time_windows'].append((MIN_GLOBAL, MAX_GLOBAL))
 
-            # 5. Calcul de la matrice de distances
+            # 5. Matrice
             data['distance_matrix'] = calculer_distance_matrice(coordonnees)
             
             return data
