@@ -114,4 +114,4 @@ def api_update_statut_tache(tache_id):
     
     
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)
