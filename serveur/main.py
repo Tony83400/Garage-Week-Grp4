@@ -6,20 +6,20 @@ app = Flask(__name__)
 db = DatabaseManager()
 
 # On ajoute quelques utilisateurs de test au démarrage du serveur
-db.ajouter_utilisateur('anthony', 'super_mdp_123')
-db.ajouter_utilisateur('admin', 'admin')
+db.ajouter_utilisateur('admin@archappli.fr', 'admin', 'admin')
+db.ajouter_utilisateur('driver@archappli.fr', 'driver', 'chauffeur')
 
 @app.route('/login', methods=['POST'])
 def login():
     """Route pour vérifier les identifiants d'un utilisateur."""
     data = request.get_json()
-    if not data or 'identifiant' not in data or 'mdp' not in data:
-        return jsonify({"erreur": "Veuillez fournir un identifiant et un mdp."}), 400
+    if not data or 'email' not in data or 'mot_de_passe' not in data:
+        return jsonify({"erreur": "Veuillez fournir un email et un mot_de_passe."}), 400
     
-    if db.verifier_login(data['identifiant'], data['mdp']):
+    if db.verifier_login(data['email'], data['mot_de_passe']):
         return jsonify({"message": "Connexion réussie !"}), 200
     else:
-        return jsonify({"erreur": "Identifiant ou mot de passe incorrect."}), 401
+        return jsonify({"erreur": "Email ou mot de passe incorrect."}), 401
 
 @app.route('/clients', methods=['GET'])
 def get_clients():
@@ -32,17 +32,17 @@ def get_clients():
 def add_client():
     """Route pour ajouter un nouveau client."""
     data = request.get_json()
-    required_fields = ['nom', 'adresse', 'x', 'y', 'nbBacs', 'poids']
+    required_fields = ['nom_entreprise', 'latitude', 'longitude']
     
     if not data or not all(field in data for field in required_fields):
-        return jsonify({"erreur": "Données manquantes. Champs requis : nom, adresse, x, y, nbBacs, poids"}), 400
+        return jsonify({"erreur": "Données manquantes. Champs requis : nom_entreprise, latitude, longitude"}), 400
     
-    nouveau_client = Client(nom=data['nom'], adresse=data['adresse'], x=data['x'], y=data['y'], nbBacs=data['nbBacs'], poids=data['poids'])
+    nouveau_client = Client(nom_entreprise=data['nom_entreprise'], latitude=data['latitude'], longitude=data['longitude'])
     
     if db.ajouter_client(nouveau_client):
-        return jsonify({"message": f"Client '{nouveau_client.nom}' ajouté avec succès."}), 201
+        return jsonify({"message": f"Client '{nouveau_client.nom_entreprise}' ajouté avec succès."}), 201
     else:
-        return jsonify({"erreur": f"Le client '{nouveau_client.nom}' existe déjà."}), 409
+        return jsonify({"erreur": f"Le client '{nouveau_client.nom_entreprise}' n'a pas pu être ajouté."}), 409
 
 if __name__ == '__main__':
     app.run(debug=True)
