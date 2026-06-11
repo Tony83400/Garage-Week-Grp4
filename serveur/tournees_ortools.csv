@@ -1,31 +1,31 @@
 Camion,Ordre,Nom_Etape,Latitude,Longitude,Heure_Arrivee,Distance_Cumulee_Unite,Bacs_a_Collecter
-Camion_0,1,Dépôt / Point de départ,43.167,6.043,08:00,0,0
-Camion_0,2,Magasin Bio,43.15,6.0833,09:00,10043,2
-Camion_0,3,Hôpital Sud,43.1205,6.1286,09:15,10097,4
-Camion_0,4,Bibliothèque Municipale,43.0833,6.0833,10:00,10155,1
-Camion_0,5,Pharmacie Littoral,43.1,6.0167,10:15,10223,1
-Camion_0,6,Usine Tech,43.1381,5.9822,10:30,10274,8
-Camion_0,7,Clinique Vallée,43.1833,6.0333,10:45,10342,3
-Camion_0,8,Retour Dépôt / Point de départ,43.167,6.043,11:00,10360,0
+Camion_0,1,Dépôt / Point de départ,43.167,6.043,00:00,0,0
+Camion_0,2,Retour Dépôt / Point de départ,43.167,6.043,00:00,0,0
 Camion_1,1,Dépôt / Point de départ,43.167,6.043,00:00,0,0
 Camion_1,2,Retour Dépôt / Point de départ,43.167,6.043,00:00,0,0
-Camion_2,1,Dépôt / Point de départ,43.167,6.043,06:30,0,0
-Camion_2,2,Lycée Campus,43.125,6.01,07:30,10053,5
-Camion_2,3,Supermarché Port,43.12,5.93,08:45,10133,4
-Camion_2,4,Restaurant Plage,43.1,5.88,10:00,10186,3
-Camion_2,5,Centre Commercial,43.0936,5.8385,10:15,10227,2
-Camion_2,6,Hôtel de la Baie,43.1167,5.8,10:30,10271,2
-Camion_2,7,Boulangerie Matin,43.1333,5.75,10:45,10323,2
-Camion_2,8,Cinéma Central,43.4,6.05,11:04,10724,5
-Camion_2,9,Mairie Centrale,43.2333,6.0833,11:20,10893,2
-Camion_2,10,Retour Dépôt / Point de départ,43.167,6.043,11:35,10970,0
-Camion_3,1,Dépôt / Point de départ,43.167,6.043,00:00,0,0
-Camion_3,2,Retour Dépôt / Point de départ,43.167,6.043,00:00,0,0
-Camion_4,1,Dépôt / Point de départ,43.167,6.043,07:57,0,0
-Camion_4,2,Entreprise Logistique,43.3833,6.3167,09:00,10348,7
-Camion_4,3,Gare Routière,43.5333,6.4667,09:17,10560,3
-Camion_4,4,Camping Les Pins,43.4333,6.7333,09:34,10844,6
-Camion_4,5,Marché Provençal,43.3167,6.6333,09:50,10997,3
-Camion_4,6,Port de Plaisance,43.2667,6.6333,10:05,11046,4
-Camion_4,7,Musée d'Art,43.15,6.35,10:23,11352,2
-Camion_4,8,Retour Dépôt / Point de départ,43.167,6.043,10:41,11659,0
+Camion_2,1,Dépôt / Point de départ,43.167,6.043,07:57,0,0
+Camion_2,2,Musée d'Art,43.15,6.35,09:00,10307,2
+Camion_2,3,Port de Plaisance,43.2667,6.6333,09:18,10613,4
+Camion_2,4,Marché Provençal,43.3167,6.6333,09:33,10662,3
+Camion_2,5,Camping Les Pins,43.4333,6.7333,09:49,10815,6
+Camion_2,6,Gare Routière,43.5333,6.4667,10:06,11099,3
+Camion_2,7,Entreprise Logistique,43.3833,6.3167,10:23,11311,7
+Camion_2,8,Retour Dépôt / Point de départ,43.167,6.043,10:41,11659,0
+Camion_3,1,Dépôt / Point de départ,43.167,6.043,07:44,0,0
+Camion_3,2,Supermarché Port,43.12,5.93,08:45,10122,4
+Camion_3,3,Restaurant Plage,43.1,5.88,10:00,10175,3
+Camion_3,4,Centre Commercial,43.0936,5.8385,10:15,10216,2
+Camion_3,5,Hôtel de la Baie,43.1167,5.8,10:30,10260,2
+Camion_3,6,Boulangerie Matin,43.1333,5.75,10:45,10312,2
+Camion_3,7,Cinéma Central,43.4,6.05,11:04,10713,5
+Camion_3,8,Mairie Centrale,43.2333,6.0833,11:20,10882,2
+Camion_3,9,Retour Dépôt / Point de départ,43.167,6.043,11:35,10959,0
+Camion_4,1,Dépôt / Point de départ,43.167,6.043,05:45,0,0
+Camion_4,2,Clinique Vallée,43.1833,6.0333,06:45,10018,3
+Camion_4,3,Usine Tech,43.1381,5.9822,08:00,10086,8
+Camion_4,4,Lycée Campus,43.125,6.01,08:15,10116,5
+Camion_4,5,Pharmacie Littoral,43.1,6.0167,08:45,10141,1
+Camion_4,6,Bibliothèque Municipale,43.0833,6.0833,10:00,10209,1
+Camion_4,7,Hôpital Sud,43.1205,6.1286,10:15,10267,4
+Camion_4,8,Magasin Bio,43.15,6.0833,10:30,10321,2
+Camion_4,9,Retour Dépôt / Point de départ,43.167,6.043,10:45,10364,0
