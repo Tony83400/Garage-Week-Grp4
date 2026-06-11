@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
-from database_manager import DatabaseManager
-from client import Client
+from serveur.database_manager import DatabaseManager
+from serveur.client import Client
 
 app = Flask(__name__)
 db = DatabaseManager()
