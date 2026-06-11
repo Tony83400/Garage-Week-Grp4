@@ -32,13 +32,18 @@ export default function LoginScreen() {
 
     setLoading(true);
 
+    // Connexion conducteur hardcodée — à remplacer quand le back retournera role='chauffeur'
+    if (email.trim().toLowerCase() === 'driver@archappli.fr') {
+      router.replace('/driver');
+      return;
+    }
+
     try {
       const { role } = await login(email, password);
       if (role === 'admin') {
         router.replace('/dashboard');
       } else {
-        // TODO: router.replace('/driver') quand l'écran conducteur sera prêt
-        router.replace('/dashboard');
+        router.replace('/driver');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur de connexion.';
