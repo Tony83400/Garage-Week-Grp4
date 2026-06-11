@@ -1,69 +1,54 @@
 import sqlite3
-from serveur.client import Client
+import os
+
+# Remplacez par votre propre import
+from serveur.client import Client 
 
 class DatabaseManager:
-    def __init__(self, db_name='ma_base.db'):
-        """Initialise la connexion et crée les tables si elles n'existent pas."""
+    def __init__(self, db_name='ma_base.db', reset_db=False):
+        """Initialise la connexion. Ne recrée les tables que si reset_db=True."""
         self.db_name = db_name
-        self.init_db()
+        if reset_db:
+            self.init_db()
 
     def _get_connection(self):
-        """Retourne une nouvelle connexion à la base de données."""
-        return sqlite3.connect(self.db_name)
+        conn = sqlite3.connect(self.db_name)
+        conn.execute("PRAGMA foreign_keys = ON;")
+        return conn
 
     def init_db(self):
-        """Crée les tables initiales de l'application."""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # Table des utilisateurs
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS utilisateur (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                identifiant TEXT NOT NULL UNIQUE,
-                mdp TEXT NOT NULL
-            )
-            ''')
-            
-            # Table des clients
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS client (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nom TEXT NOT NULL UNIQUE,
-                adresse TEXT NOT NULL,
-                x INTEGER NOT NULL,
-                y INTEGER NOT NULL,
-                nbBacs INTEGER NOT NULL,
-                poids INTEGER NOT NULL
-            )
-            ''')
-            
-            conn.commit()
+        """Lit le fichier sql et l'exécute pour initialiser/réinitialiser la base."""
+        sql_file_path = os.path.join(os.path.dirname(__file__), 'gemini-code-1781162133329.sql')
+        
+        if not os.path.exists(sql_file_path):
+            print(f"Erreur : Le fichier '{sql_file_path}' est introuvable.")
+            return
 
-    def ajouter_utilisateur(self, identifiant, mdp):
-        """Permet d'ajouter facilement un utilisateur (pour tes tests)."""
+        with open(sql_file_path, 'r', encoding='utf-8') as f:
+            sql_script = f.read()
+
         try:
             with self._get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    'INSERT INTO utilisateur (identifiant, mdp) VALUES (?, ?)', 
-                    (identifiant, mdp)
-                )
+                conn.executescript(sql_script)
                 conn.commit()
-                return True
-        except sqlite3.IntegrityError:
-            print(f"Erreur : L'identifiant '{identifiant}' existe déjà.")
-            return False
+            print("Base de données initialisée (et remise à zéro) avec succès !")
+        except sqlite3.Error as e:
+            print(f"Erreur lors de l'initialisation : {e}")
 
-    def verifier_login(self, identifiant, mdp):
+    # ==========================================
+    # 1. UTILISATEURS ET CLIENTS (Vos fonctions)
+    # ==========================================
+    # ... (Gardez vos méthodes ajouter_utilisateur, verifier_login, ajouter_client, recuperer_tous_les_clients ici) ...
+    def verifier_login(self, email, mdp):
         """
-        Vérifie si le couple identifiant / mdp est correct.
+        Vérifie si le couple email / mdp est correct.
         Retourne True si c'est bon, False sinon.
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                'SELECT * FROM utilisateur WHERE identifiant = ? AND mdp = ?', 
-                (identifiant, mdp)
+                'SELECT * FROM utilisateurs WHERE email = ? AND mot_de_passe = ?', 
+                (email, mdp)
             )
             resultat = cursor.fetchone()
             
@@ -71,31 +56,121 @@ class DatabaseManager:
             return resultat is not None
 
     def ajouter_client(self, client):
-        """Permet d'ajouter facilement un client (pour tes tests)."""
+        """Permet d'ajouter un client et met à jour son ID avec celui de la base."""
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    'INSERT INTO client (nom, adresse, x, y, nbBacs, poids) VALUES (?, ?, ?, ?, ?, ?)',
-                    (client.nom, client.adresse, client.x, client.y, client.nbBacs, client.poids)
+                    'INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES (?, ?, ?)',
+                    (client.nom_entreprise, client.latitude, client.longitude)
                 )
                 conn.commit()
+                # On récupère l'ID généré par SQLite et on l'assigne à l'objet
+                client.id = cursor.lastrowid 
                 return True
+                
         except sqlite3.IntegrityError:
-            print(f"Erreur : Le client '{client.nom}' existe déjà.")
+            print(f"Erreur : Le client '{client.nom_entreprise}' n'a pas pu être ajouté.")
             return False
 
     def recuperer_tous_les_clients(self):
         """Récupère et retourne la liste de tous les clients sous forme d'objets Client."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM client')
+            cursor.execute('SELECT id, nom_entreprise, latitude, longitude FROM clients')
             lignes = cursor.fetchall()
             
-            # On transforme chaque tuple renvoyé par SQLite en un objet Client
-            # Rappel de l'ordre : id (0), nom (1), adresse (2), x (3), y (4), nbBacs (5), poids (6)
-            return [Client(id=l[0], nom=l[1], adresse=l[2], x=l[3], y=l[4], nbBacs=l[5], poids=l[6]) for l in lignes]
+            return [Client(id=l[0], nom_entreprise=l[1], latitude=l[2], longitude=l[3]) for l in lignes]
 
-    # --- C'EST ICI QUE TU AJOUTERAS TES FUTURES REQUÊTES ---
-    # Def récupérer_tous_les_produits(self):
-    #     ...
+    # ==========================================
+    # 2. GESTION DES RESSOURCES (Flotte)
+    # ==========================================
+    def ajouter_camion(self, immatriculation, charge_max_kg, bacs_max):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES (?, ?, ?)',
+                (immatriculation, charge_max_kg, bacs_max)
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def ajouter_chauffeur(self, utilisateur_id, nom, prenom, telephone):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT INTO chauffeurs (utilisateur_id, nom, prenom, telephone) VALUES (?, ?, ?, ?)',
+                (utilisateur_id, nom, prenom, telephone)
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    # ==========================================
+    # 3. CONTRAINTES ET PLANIFICATION
+    # ==========================================
+    def ajouter_disponibilite_client(self, client_id, jour_semaine, heure_debut, heure_fin):
+        """Définit une fenêtre de passage (ex: jour_semaine=1 pour Lundi)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin) VALUES (?, ?, ?, ?)',
+                (client_id, jour_semaine, heure_debut, heure_fin)
+            )
+            conn.commit()
+
+    def planifier_tache_collecte(self, client_id, date_planifiee, bacs_prevus):
+        """Crée une demande de collecte pour un jour J."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT INTO taches_collecte (client_id, date_planifiee, bacs_prevus, statut) VALUES (?, ?, ?, ?)',
+                (client_id, date_planifiee, bacs_prevus, 'en_attente')
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def recuperer_taches_du_jour(self, date_jour):
+        """
+        Crucial pour OR-Tools : Récupère toutes les collectes à faire aujourd'hui,
+        avec les infos géographiques du client associé.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT t.id, t.bacs_prevus, c.nom_entreprise, c.latitude, c.longitude 
+                FROM taches_collecte t
+                JOIN clients c ON t.client_id = c.id
+                WHERE t.date_planifiee = ? AND t.statut = 'en_attente'
+            ''', (date_jour,))
+            return cursor.fetchall()
+
+    # ==========================================
+    # 4. RETOUR TERRAIN (Pour l'App Chauffeur)
+    # ==========================================
+    def valider_collecte(self, tache_id, bacs_reels):
+        """Méthode appelée par l'application mobile quand le chauffeur a terminé l'arrêt."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE taches_collecte 
+                SET bacs_reels = ?, statut = 'terminee' 
+                WHERE id = ?
+            ''', (bacs_reels, tache_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def ajouter_utilisateur(self, email, mdp, role='chauffeur'):
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    'INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES (?, ?, ?)', 
+                    (email, mdp, role)
+                )
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            print(f"Erreur : L'email '{email}' existe déjà.")
+            return False
+
+    
