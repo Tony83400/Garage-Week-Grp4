@@ -2,8 +2,9 @@ from flask import Flask, request, jsonify
 from database.database_manager import DatabaseManager
 from client import Client
 from datetime import date
-
+from flask_cors import CORS
 app = Flask(__name__)
+CORS(app)
 # On demande explicitement de réinitialiser/créer la base de données au démarrage
 db = DatabaseManager(reset_db=True)
 

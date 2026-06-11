@@ -8,6 +8,7 @@ import InputField from '../components/InputField';
 import LoginButton from '../components/LoginButton';
 import ErrorMessage from '../components/ErrorMessage';
 import { colors } from '../constants/colors';
+import { loginUser } from '@/constants/api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -29,21 +30,17 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+    const rep = await loginUser(email,password);
+    console.log(rep);
+    if (rep.success == true) {
+      router.replace('/dashboard');
+    }else {
+      setError('Email ou mot de passe incorrect. Veuillez réessayer.');
+      setShowError(true);
+    }
+        setLoading(false);
 
-    // Simulation de l'appel API
-    setTimeout(() => {
-      setLoading(false);
-
-      if (email === 'admin@archappli.fr') {
-        router.replace('/dashboard');
-      } else if (email === 'driver@archappli.fr') {
-        // TODO: router.replace('/driver') quand l'écran conducteur sera prêt
-        router.replace('/dashboard');
-      } else {
-        setError('Email ou mot de passe incorrect. Veuillez réessayer.');
-        setShowError(true);
-      }
-    }, 1400);
+    
   };
 
   return (
