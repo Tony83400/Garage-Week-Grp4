@@ -195,66 +195,66 @@ class DatabaseManager:
             print(f"Erreur : L'email '{email}' existe déjà.")
             return False
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
-        """
-        Extrait les données de la base pour une date précise et les formate 
-        exactement comme le Routing Model de Google OR-Tools l'exige.
-        """
-        data = {}
-        
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
+            """
+            Extrait les données de la base pour une date précise et les formate 
+            exactement comme le Routing Model de Google OR-Tools l'exige, 
+            en incluant la correspondance des ID (la "pierre de Rosette").
+            """
+            data = {}
             
-            # 1. Récupérer les camions disponibles
-            cursor.execute("SELECT bacs_max FROM camions")
-            camions = cursor.fetchall()
-            
-            # On crée autant de véhicules virtuels que nécessaire (ex: 3 vrais camions = 9 tournées possibles)
-            # Pour l'exemple, on prend juste la flotte brute
-            data['vehicle_capacities'] = [c[0] for c in camions]
-            data['num_vehicles'] = len(camions)
-            data['depot'] = 0 # Le dépôt sera toujours l'index 0
-            
-            # 2. Récupérer les tâches du jour avec les coordonnées et horaires
-            # On joint les tâches, les clients, et on cherche la dispo pour ce jour précis de la semaine
-            # date_jour = 'YYYY-MM-DD'. strftime('%w') en SQLite donne 0 (Dimanche) à 6 (Samedi). 
-            # Notre base utilise 1 (Lundi) à 7 (Dimanche), d'où l'ajustement nécessaire en SQL ou Python.
-            
-            cursor.execute('''
-                SELECT 
-                    t.bacs_prevus, c.latitude, c.longitude,
-                    IFNULL(d.heure_debut, '08:00:00'), 
-                    IFNULL(d.heure_fin, '18:00:00')
-                FROM taches_collecte t
-                JOIN clients c ON t.client_id = c.id
-                -- Simulation simple : on prend la première dispo trouvée ou des valeurs par défaut
-                LEFT JOIN disponibilites_clients d ON c.id = d.client_id
-                WHERE t.date_planifiee = ? AND t.statut = 'en_attente'
-            ''', (date_jour,))
-            
-            taches = cursor.fetchall()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 1. Récupérer les camions disponibles
+                cursor.execute("SELECT bacs_max FROM camions")
+                camions = cursor.fetchall()
+                
+                # On crée autant de véhicules virtuels que nécessaire
+                data['vehicle_capacities'] = [c[0] for c in camions]
+                data['num_vehicles'] = len(camions)
+                data['depot'] = 0 # Le dépôt sera toujours l'index 0
+                
+                # 2. Récupérer les tâches du jour avec les coordonnées et horaires
+                # MODIFICATION ICI : On a ajouté "t.id" au tout début du SELECT
+                cursor.execute('''
+                    SELECT 
+                        t.id,
+                        t.bacs_prevus, c.latitude, c.longitude,
+                        IFNULL(d.heure_debut, '08:00:00'), 
+                        IFNULL(d.heure_fin, '18:00:00')
+                    FROM taches_collecte t
+                    JOIN clients c ON t.client_id = c.id
+                    LEFT JOIN disponibilites_clients d ON c.id = d.client_id
+                    WHERE t.date_planifiee = ? AND t.statut = 'en_attente'
+                ''', (date_jour,))
+                
+                taches = cursor.fetchall()
 
-        # 3. Initialisation des listes avec le Dépôt en Index 0
-        coordonnees = [(depot_lat, depot_lon)]
-        data['demands'] = [0] # Le dépôt n'a pas de demande de bacs
-        data['time_windows'] = [(0, 1440)] # Le dépôt est ouvert de 00h00 à 24h00 (1440 minutes)
-
-        # 4. Remplissage avec les données des clients (Index 1 à N)
-        for tache in taches:
-            bacs, lat, lon, h_debut, h_fin = tache
+            # 3. Initialisation des listes avec le Dépôt en Index 0
+            coordonnees = [(depot_lat, depot_lon)]
+            data['demands'] = [0] # Le dépôt n'a pas de demande de bacs
+            data['time_windows'] = [(0, 1440)] # Le dépôt est ouvert de 00h00 à 24h00
             
-            coordonnees.append((lat, lon))
-            data['demands'].append(bacs)
-            
-            # Conversion des heures en minutes (ex: '08:00:00' -> 480)
-            min_debut = heure_vers_minutes(h_debut)
-            min_fin = heure_vers_minutes(h_fin)
-            data['time_windows'].append((min_debut, min_fin))
+            # MODIFICATION ICI : Création de la liste de correspondance (Index 0 = Dépôt = None)
+            data['tache_ids'] = [None]
 
-        # 5. Création de la matrice de distances
-        data['distance_matrix'] = calculer_distance_matrice(coordonnees)
-        
-        # Astuce : On peut cloner la matrice de distance pour le temps si on suppose une vitesse constante,
-        # ou rajouter les 15 minutes de temps de service ici.
-        
-        return data
-    
+            # 4. Remplissage avec les données des clients (Index 1 à N)
+            for tache in taches:
+                # MODIFICATION ICI : On dépaquète le t.id récupéré dans la requête SQL
+                tache_id, bacs, lat, lon, h_debut, h_fin = tache
+                
+                # On stocke l'ID dans notre "pierre de Rosette"
+                data['tache_ids'].append(tache_id)
+                
+                coordonnees.append((lat, lon))
+                data['demands'].append(bacs)
+                
+                # Conversion des heures en minutes (ex: '08:00:00' -> 480)
+                min_debut = heure_vers_minutes(h_debut)
+                min_fin = heure_vers_minutes(h_fin)
+                data['time_windows'].append((min_debut, min_fin))
+
+            # 5. Création de la matrice de distances
+            data['distance_matrix'] = calculer_distance_matrice(coordonnees)
+            
+            return data
