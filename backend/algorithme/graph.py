@@ -56,3 +56,9 @@ class GraphProcessor:
         }
         
         return donnees_finales
+    
+def get_dynamic_travel_time(from_node, to_node, arrival_time):
+    # Créneau bouchons : 7h45 (465 min) à 8h30 (510 min)
+    if 465 <= arrival_time <= 510:
+        return base_travel_time * 1.5  # Majoration de 50% en heure de pointe
+    return base_travel_time
