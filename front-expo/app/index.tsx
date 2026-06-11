@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { login } from '../services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import AnimatedBlob from '../components/AnimatedBlob';
@@ -30,20 +31,21 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // Simulation de l'appel API
-    setTimeout(() => {
-      setLoading(false);
-
-      if (email === 'admin@archappli.fr') {
-        router.replace('/dashboard');
-      } else if (email === 'driver@archappli.fr') {
-        // TODO: router.replace('/driver') quand l'écran conducteur sera prêt
+    try {
+      const { role } = await login(email, password);
+      if (role === 'admin') {
         router.replace('/dashboard');
       } else {
-        setError('Email ou mot de passe incorrect. Veuillez réessayer.');
-        setShowError(true);
+        // TODO: router.replace('/driver') quand l'écran conducteur sera prêt
+        router.replace('/dashboard');
       }
-    }, 1400);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur de connexion.';
+      setError(message);
+      setShowError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
