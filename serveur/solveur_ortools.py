@@ -70,7 +70,7 @@ def sauvegarder_en_csv(data, manager, routing, solution, time_dimension):
 
     print(f"\nFichier '{fichier_csv}' généré avec succès ! (Tournées vides masquées).")
 
-    
+
 def resoudre_et_exporter(data):
     """Configuration et exécution du solveur OR-Tools"""
     
@@ -101,7 +101,7 @@ def resoudre_et_exporter(data):
         demand_callback_index,
         0, 
         data['vehicle_capacities'], 
-        True,
+        True,                   #a changer en True
         'Capacity_Bacs'
     )
 
@@ -113,13 +113,15 @@ def resoudre_et_exporter(data):
         return data['weight_demands'][from_node]
 
     weight_callback_index = routing.RegisterUnaryTransitCallback(weight_callback)
+    
     routing.AddDimensionWithVehicleCapacity(
         weight_callback_index,
         0, 
         data['vehicle_weights'], 
-        True,
+        True,                           # a changer en True 
         'Capacity_Weight'
     )
+    
 
     # Coût fixe de sortie d'un camion du dépôt (Mettre à 0 pour forcer la sortie de tous les camions)
     routing.SetFixedCostOfAllVehicles(10000)
@@ -131,7 +133,7 @@ def resoudre_et_exporter(data):
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
         temps_service = 15 if from_node != data['depot'] else 0
-        temps_trajet = data['distance_matrix'][from_node][to_node] // 100 
+        temps_trajet = data['distance_matrix'][from_node][to_node] // 500
         return temps_service + temps_trajet
 
     time_callback_index = routing.RegisterTransitCallback(time_callback)
@@ -146,12 +148,14 @@ def resoudre_et_exporter(data):
     time_dimension = routing.GetDimensionOrDie('Time')
 
     # Application des fenêtres horaires DES CLIENTS
+    
     for location_idx, time_window in enumerate(data['time_windows']):
         if location_idx == data['depot']:
             continue
         index = manager.NodeToIndex(location_idx)
         time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
-
+    
+      
     # Application des fenêtres horaires DES CHAUFFEURS (Planning)
     # Au lieu de (0, 1440), impose la fenêtre globale sur tous les véhicules
     MIN_GLOBAL = 180 # 3h00
@@ -162,15 +166,16 @@ def resoudre_et_exporter(data):
         index_arrivee = routing.End(vehicle_id)
         time_dimension.CumulVar(index_depart).SetRange(MIN_GLOBAL, MAX_GLOBAL)
         time_dimension.CumulVar(index_arrivee).SetRange(MIN_GLOBAL, MAX_GLOBAL)
+        
 
-    """    
+    """"
         start_time, end_time = data['vehicle_time_windows'][vehicle_id]
         
         # Le camion ne peut pas quitter le dépôt avant le début du service
         time_dimension.CumulVar(index_depart).SetRange(start_time, end_time)
         # Le camion doit obligatoirement être rentré avant la fin du service
         time_dimension.CumulVar(index_arrivee).SetRange(start_time, end_time)
-    """
+    """ 
     # -------------------------------------------------------------
     # 4. EXÉCUTION DU MOTEUR DE RECHERCHE
     # -------------------------------------------------------------
@@ -190,5 +195,12 @@ def resoudre_et_exporter(data):
         sauvegarder_en_csv(data, manager, routing, solution, time_dimension)
     else:
         print("Aucune solution n'a pu être trouvée avec ces contraintes (Vérifiez si les camions ont assez de capacité ou si les horaires sont compatibles).")
+    # DEBUG : Afficher les contraintes avant le solve
+    print("\n--- DIAGNOSTIC DES CONTRAINTES ---")
+    print(f"Nombre de clients à visiter : {len(data['demands']) - 1}")
+    print(f"Total Bacs demandés : {sum(data['demands'])}")
+    print(f"Capacité totale des camions (Bacs) : {sum(data['vehicle_capacities'])}")
+    print(f"Fenêtres horaires clients (min/max) : {min([t[0] for t in data['time_windows'] if t[0]>0])} / {max([t[1] for t in data['time_windows'] if t[1]<1440])}")
+    print("-----------------------------------\n")
 
 

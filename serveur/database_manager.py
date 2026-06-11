@@ -1,28 +1,55 @@
 import sqlite3
 import os
 import math
+import requests
 
 def heure_vers_minutes(heure_str):
     """Convertit '08:30:00' en 510 (minutes depuis minuit)."""
     h, m, s = map(int, heure_str.split(':'))
     return h * 60 + m
 
+
 def calculer_distance_matrice(coordonnees):
     """
-    Génère une matrice de distances (en entiers) entre tous les points.
-    Ici, on utilise une distance euclidienne simplifiée multipliée par 1000 
-    pour avoir des entiers (OR-Tools déteste les nombres à virgule).
+    Appelle l'API OSRM pour obtenir la matrice de distances réelles.
+    OSRM attend des coordonnées au format : lon,lat
     """
+    n = len(coordonnees)
+    
+    # 1. Formatage des coordonnées pour OSRM (lon,lat;lon,lat;...)
+    coords_str = ";".join([f"{lon},{lat}" for lat, lon in coordonnees])
+    
+    # 2. Appel de l'API OSRM (Service /table)
+    url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=distance"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            # La matrice est renvoyée en mètres. 
+            # OR-Tools préfère des entiers (1m = 1 unité)
+            return [[int(dist) for dist in row] for row in data['distances']]
+        else:
+            print("Erreur OSRM, fallback vers distance euclidienne.")
+            return calculer_distance_euclidienne_fallback(coordonnees)
+            
+    except Exception as e:
+        print(f"OSRM indisponible ({e}), fallback vers euclidienne.")
+        return calculer_distance_euclidienne_fallback(coordonnees)
+
+def calculer_distance_euclidienne_fallback(coordonnees):
+    """Ton ancienne fonction de secours si OSRM échoue"""
     n = len(coordonnees)
     matrice = [[0] * n for _ in range(n)]
     for i in range(n):
         for j in range(n):
             if i != j:
-                # Calcul basique de distance (x2 - x1)^2 + (y2 - y1)^2
                 dist = math.sqrt((coordonnees[i][0] - coordonnees[j][0])**2 + 
                                  (coordonnees[i][1] - coordonnees[j][1])**2)
-                matrice[i][j] = int(dist * 1000)
+                matrice[i][j] = int(dist * 100000) # Un peu plus grand pour la précision
     return matrice
+
+
 # Remplacez par votre propre import
 from client import Client 
 

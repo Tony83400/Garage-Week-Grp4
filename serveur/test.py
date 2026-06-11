@@ -1,6 +1,9 @@
 from database_manager import DatabaseManager
 from solveur_ortools import resoudre_et_exporter
 
+import sys
+
+
 # =====================================================================
 # BLOC D'EXÉCUTION PRINCIPAL
 # =====================================================================
