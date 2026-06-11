@@ -181,3 +181,53 @@ cython_debug/
 .cursorindexingignore
 
 *.db
+gemini.md
+
+# ============================================
+# Node.js / Expo / React Native (front-expo)
+# ============================================
+
+# Dependencies
+front-expo/node_modules/
+node_modules/
+
+# Expo
+front-expo/.expo/
+front-expo/.expo-shared/
+.expo/
+.expo-shared/
+
+# Build outputs
+front-expo/dist/
+front-expo/web-build/
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# React Native / Expo
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Metro bundler
+.metro-health-check*
