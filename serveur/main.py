@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify
-from serveur.database_manager import DatabaseManager
-from serveur.client import Client
+from database_manager import DatabaseManager
+from client import Client
 
 app = Flask(__name__)
-db = DatabaseManager()
+# On demande explicitement de réinitialiser/créer la base de données au démarrage
+db = DatabaseManager(reset_db=True)
 
 # On ajoute quelques utilisateurs de test au démarrage du serveur
 db.ajouter_utilisateur('admin@archappli.fr', 'admin', 'admin')

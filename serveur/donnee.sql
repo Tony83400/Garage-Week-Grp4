@@ -91,31 +91,73 @@ CREATE TABLE taches_collecte (
     statut TEXT DEFAULT 'en_attente' CHECK (statut IN ('en_attente', 'en_cours', 'terminee', 'annulee', 'echec_client_absent'))
 );
 
+
 -- =============================================================================
--- 5. JEU DE DONNÉES DE TEST (SIMULATION D'UNE JOURNÉE)
+-- JEU DE DONNÉES DE TEST : SIMULATION OR-TOOLS (VRPTW)
+-- Date de simulation : Lundi 15 Juin 2026
 -- =============================================================================
 
--- Création du personnel et de la flotte
-INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES ('jean@logistic.fr', '1234', 'chauffeur');
-INSERT INTO chauffeurs (utilisateur_id, nom, prenom, telephone) VALUES (1, 'Dupont', 'Jean', '0600000000');
-INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES ('AB-123-CD', 1500, 20);
+-- 1. CRÉATION DU PERSONNEL (3 Chauffeurs)
+INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES 
+('jean@logistic.fr', '1234', 'chauffeur'),
+('alice@logistic.fr', '1234', 'chauffeur'),
+('paul@logistic.fr', '1234', 'chauffeur');
 
--- Création des clients et de leurs horaires
-INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES ('Supermarché Nord', 48.8566, 2.3522);
-INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES ('Restaurant Le Sud', 48.8466, 2.3422);
+INSERT INTO chauffeurs (utilisateur_id, nom, prenom, telephone) VALUES 
+(1, 'Dupont', 'Jean', '0601000000'),
+(2, 'Martin', 'Alice', '0602000000'),
+(3, 'Bernard', 'Paul', '0603000000');
 
--- Dispo : Le supermarché est ouvert le Lundi (1) de 08h à 12h
-INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin) VALUES (1, 1, '08:00:00', '12:00:00');
+-- 2. CRÉATION DE LA FLOTTE (3 Camions avec capacités différentes)
+INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES 
+('AB-123-CD', 1500, 20), -- Camion standard
+('EF-456-GH', 1000, 15), -- Petit camion
+('IJ-789-KL', 2000, 25); -- Gros porteur
 
--- PLANIFICATION DE LA JOURNÉE DU 2026-06-15
--- 1. On crée la tournée et on affecte Jean au camion AB-123-CD
-INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, statut) VALUES ('2026-06-15', 1, 1, 'affectee');
+-- 3. CRÉATION DES CLIENTS (10 clients répartis autour de l'agglomération)
+INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES 
+('Supermarché Port', 43.1200, 5.9300),      -- 1 (Toulon Centre)
+('Restaurant Plage', 43.1000, 5.9000),      -- 2 (Mourillon)
+('Usine Tech', 43.1400, 5.9500),            -- 3 (La Valette)
+('Hôpital Sainte-Marie', 43.1300, 5.9100),  -- 4 (Toulon Nord)
+('Lycée Lumière', 43.1100, 5.8800),         -- 5 (La Seyne)
+('Centre Commercial', 43.1250, 6.0100),     -- 6 (La Garde)
+('Hôtel de la Baie', 43.1205, 6.1286),      -- 7 (Hyères)
+('Boulangerie Matin', 43.1396, 5.8474),     -- 8 (Ollioules)
+('Cinéma Central', 43.1242, 5.9280),        -- 9 (Toulon Centre)
+('Gare Routière', 43.1280, 5.9250);         -- 10 (Toulon Centre)
 
--- 2. On affecte les tâches à cette tournée (tournee_id = 1)
--- Le supermarché doit donner 5 bacs
-INSERT INTO taches_collecte (client_id, tournee_id, date_planifiee, bacs_prevus, statut) 
-VALUES (1, 1, '2026-06-15', 5, 'en_attente');
+-- 4. CONTRAINTES HORAIRES POUR LE LUNDI (jour_semaine = 1)
+-- C'est ici que l'algorithme va transpirer !
+INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin) VALUES 
+(1, 1, '06:00:00', '12:00:00'), -- Supermarché : Matin uniquement
+(2, 1, '14:00:00', '18:00:00'), -- Restaurant : Après-midi uniquement
+(3, 1, '08:00:00', '17:00:00'), -- Usine : Journée complète
+(4, 1, '08:00:00', '10:00:00'), -- Hôpital : Fenêtre très stricte (priorité absolue)
+(5, 1, '07:00:00', '16:00:00'), -- Lycée : Avant la sortie des classes
+(6, 1, '09:00:00', '20:00:00'), -- Centre commercial : Très flexible
+(7, 1, '10:00:00', '14:00:00'), -- Hôtel : Milieu de journée
+(8, 1, '05:00:00', '11:00:00'), -- Boulangerie : Très tôt le matin
+(9, 1, '09:00:00', '12:00:00'), -- Cinéma : Matin
+(10, 1, '00:00:00', '23:59:00');-- Gare : Ouvert 24/24
 
--- Le restaurant doit donner 2 bacs
-INSERT INTO taches_collecte (client_id, tournee_id, date_planifiee, bacs_prevus, statut) 
-VALUES (2, 1, '2026-06-15', 2, 'en_attente');
+-- 5. PLANIFICATION POUR LE 15 JUIN 2026
+-- Création des 3 tournées vides (Les chauffeurs sont prêts, les camions assignés)
+INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, statut) VALUES 
+('2026-06-15', 1, 1, 'brouillon'),
+('2026-06-15', 2, 2, 'brouillon'),
+('2026-06-15', 3, 3, 'brouillon');
+
+-- Création des demandes de collecte (Total = 38 bacs à répartir dans les 60 places de la flotte)
+-- On ne met pas de tournee_id, c'est OR-Tools qui va faire des UPDATE sur ces lignes !
+INSERT INTO taches_collecte (client_id, date_planifiee, bacs_prevus, statut) VALUES 
+(1, '2026-06-15', 6, 'en_attente'),
+(2, '2026-06-15', 3, 'en_attente'),
+(3, '2026-06-15', 10, 'en_attente'), -- L'usine prend beaucoup de place
+(4, '2026-06-15', 4, 'en_attente'),
+(5, '2026-06-15', 5, 'en_attente'),
+(6, '2026-06-15', 2, 'en_attente'),
+(7, '2026-06-15', 1, 'en_attente'),
+(8, '2026-06-15', 2, 'en_attente'),
+(9, '2026-06-15', 3, 'en_attente'),
+(10, '2026-06-15', 2, 'en_attente');

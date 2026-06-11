@@ -1,8 +1,30 @@
 import sqlite3
 import os
+import math
 
+def heure_vers_minutes(heure_str):
+    """Convertit '08:30:00' en 510 (minutes depuis minuit)."""
+    h, m, s = map(int, heure_str.split(':'))
+    return h * 60 + m
+
+def calculer_distance_matrice(coordonnees):
+    """
+    Génère une matrice de distances (en entiers) entre tous les points.
+    Ici, on utilise une distance euclidienne simplifiée multipliée par 1000 
+    pour avoir des entiers (OR-Tools déteste les nombres à virgule).
+    """
+    n = len(coordonnees)
+    matrice = [[0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            if i != j:
+                # Calcul basique de distance (x2 - x1)^2 + (y2 - y1)^2
+                dist = math.sqrt((coordonnees[i][0] - coordonnees[j][0])**2 + 
+                                 (coordonnees[i][1] - coordonnees[j][1])**2)
+                matrice[i][j] = int(dist * 1000)
+    return matrice
 # Remplacez par votre propre import
-from serveur.client import Client 
+from client import Client 
 
 class DatabaseManager:
     def __init__(self, db_name='ma_base.db', reset_db=False):
@@ -18,7 +40,7 @@ class DatabaseManager:
 
     def init_db(self):
         """Lit le fichier sql et l'exécute pour initialiser/réinitialiser la base."""
-        sql_file_path = os.path.join(os.path.dirname(__file__), 'gemini-code-1781162133329.sql')
+        sql_file_path = os.path.join(os.path.dirname(__file__), 'donnee.sql')
         
         if not os.path.exists(sql_file_path):
             print(f"Erreur : Le fichier '{sql_file_path}' est introuvable.")
@@ -172,5 +194,67 @@ class DatabaseManager:
         except sqlite3.IntegrityError:
             print(f"Erreur : L'email '{email}' existe déjà.")
             return False
+    def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
+        """
+        Extrait les données de la base pour une date précise et les formate 
+        exactement comme le Routing Model de Google OR-Tools l'exige.
+        """
+        data = {}
+        
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 1. Récupérer les camions disponibles
+            cursor.execute("SELECT bacs_max FROM camions")
+            camions = cursor.fetchall()
+            
+            # On crée autant de véhicules virtuels que nécessaire (ex: 3 vrais camions = 9 tournées possibles)
+            # Pour l'exemple, on prend juste la flotte brute
+            data['vehicle_capacities'] = [c[0] for c in camions]
+            data['num_vehicles'] = len(camions)
+            data['depot'] = 0 # Le dépôt sera toujours l'index 0
+            
+            # 2. Récupérer les tâches du jour avec les coordonnées et horaires
+            # On joint les tâches, les clients, et on cherche la dispo pour ce jour précis de la semaine
+            # date_jour = 'YYYY-MM-DD'. strftime('%w') en SQLite donne 0 (Dimanche) à 6 (Samedi). 
+            # Notre base utilise 1 (Lundi) à 7 (Dimanche), d'où l'ajustement nécessaire en SQL ou Python.
+            
+            cursor.execute('''
+                SELECT 
+                    t.bacs_prevus, c.latitude, c.longitude,
+                    IFNULL(d.heure_debut, '08:00:00'), 
+                    IFNULL(d.heure_fin, '18:00:00')
+                FROM taches_collecte t
+                JOIN clients c ON t.client_id = c.id
+                -- Simulation simple : on prend la première dispo trouvée ou des valeurs par défaut
+                LEFT JOIN disponibilites_clients d ON c.id = d.client_id
+                WHERE t.date_planifiee = ? AND t.statut = 'en_attente'
+            ''', (date_jour,))
+            
+            taches = cursor.fetchall()
 
+        # 3. Initialisation des listes avec le Dépôt en Index 0
+        coordonnees = [(depot_lat, depot_lon)]
+        data['demands'] = [0] # Le dépôt n'a pas de demande de bacs
+        data['time_windows'] = [(0, 1440)] # Le dépôt est ouvert de 00h00 à 24h00 (1440 minutes)
+
+        # 4. Remplissage avec les données des clients (Index 1 à N)
+        for tache in taches:
+            bacs, lat, lon, h_debut, h_fin = tache
+            
+            coordonnees.append((lat, lon))
+            data['demands'].append(bacs)
+            
+            # Conversion des heures en minutes (ex: '08:00:00' -> 480)
+            min_debut = heure_vers_minutes(h_debut)
+            min_fin = heure_vers_minutes(h_fin)
+            data['time_windows'].append((min_debut, min_fin))
+
+        # 5. Création de la matrice de distances
+        data['distance_matrix'] = calculer_distance_matrice(coordonnees)
+        
+        # Astuce : On peut cloner la matrice de distance pour le temps si on suppose une vitesse constante,
+        # ou rajouter les 15 minutes de temps de service ici.
+        
+        return data
     
