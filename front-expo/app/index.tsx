@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import AnimatedBlob from '../components/AnimatedBlob';
@@ -9,6 +10,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import { colors } from '../constants/colors';
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,13 +35,10 @@ export default function LoginScreen() {
       setLoading(false);
 
       if (email === 'admin@archappli.fr') {
-        Alert.alert('✅ Connexion réussie', 'Connexion Admin réussie !');
-        // TODO: Navigation vers dashboard admin
-        // router.push('/admin/dashboard');
+        router.replace('/dashboard');
       } else if (email === 'driver@archappli.fr') {
-        Alert.alert('✅ Connexion réussie', 'Connexion Conducteur réussie !');
-        // TODO: Navigation vers écran conducteur
-        // router.push('/driver/route');
+        // TODO: router.replace('/driver') quand l'écran conducteur sera prêt
+        router.replace('/dashboard');
       } else {
         setError('Email ou mot de passe incorrect. Veuillez réessayer.');
         setShowError(true);
