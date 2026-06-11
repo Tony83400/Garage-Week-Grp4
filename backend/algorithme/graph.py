@@ -1,5 +1,3 @@
-# api-node/algorithm/graph.py
-
 import networkx as nx
 
 class GraphProcessor:
@@ -17,7 +15,6 @@ class GraphProcessor:
             type_noeud = "depot" if i == 0 else "client"
             G.add_node(i, type=type_noeud, demand=donnees_brutes['demands'][i])
 
-        # 💡 CORRECTION DU BUG : Générer automatiquement les correspondances textuelles manquantes
         # Si 'noeuds_reference' n'est pas fourni par la BDD, on crée des noms et coordonnées par défaut
         if 'noeuds_reference' in donnees_brutes:
             noeuds_reference = donnees_brutes['noeuds_reference']
@@ -54,7 +51,7 @@ class GraphProcessor:
             'vehicle_capacities': donnees_brutes['vehicle_capacities'],
             'num_vehicles': donnees_brutes['num_vehicles'],
             'depot': donnees_brutes['depot'],
-            'noeuds_reference': noeuds_reference,  # ✅ Injecté à coup sûr pour optimizer.py !
+            'noeuds_reference': noeuds_reference,  #Injecté à coup sûr pour optimizer.py !
             'graphe_networkx': G
         }
         
