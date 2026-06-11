@@ -1,11 +1,6 @@
-# Import de votre gestionnaire de base de données
 from database_manager import DatabaseManager
-# Import de la fonction principale du solveur OR-Tools fraîchement créée
 from solveur_ortools import resoudre_et_exporter
 
-# =====================================================================
-# BLOC D'EXÉCUTION PRINCIPAL
-# =====================================================================
 # =====================================================================
 # BLOC D'EXÉCUTION PRINCIPAL
 # =====================================================================
@@ -20,8 +15,8 @@ if __name__ == '__main__':
     
     print(f"Extraction des données depuis la BDD pour la date : {DATE_CIBLE}...")
     
-    # 1. On récupère le dictionnaire
+    # 1. Le gestionnaire de BDD prépare toutes les données (y compris les noms/coordonnées)
     data_ortools = db.preparer_donnees_ortools(DATE_CIBLE, DEPOT_LAT, DEPOT_LON)
     
-    # 2. On lance l'algorithme (Assurez-vous d'avoir créé solveur_ortools.py comme vu précédemment)
-    resoudre_et_exporter(data_ortools, db.db_name, DEPOT_LAT, DEPOT_LON)
+    # 2. Le solveur calcule et exporte le CSV en recevant uniquement le dictionnaire en entrée
+    resoudre_et_exporter(data_ortools)
