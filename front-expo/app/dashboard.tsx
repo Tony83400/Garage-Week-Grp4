@@ -5,17 +5,16 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
 import StatCard from '../components/StatCard';
 import ActivityItem from '../components/ActivityItem';
-import Sidebar from '../components/Sidebar';
+import MobileDrawer from '../components/MobileDrawer';
 import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activite } from '../services/dashboard';
 
 // Date des données de test — à remplacer par date.today() quand la BDD sera remplie au jour J
@@ -73,10 +72,7 @@ function buildActivities(list: Activite[]) {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
-  const { width } = useWindowDimensions();
-  const showSidebar = width >= 768;
-  const router = useRouter();
-
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activites, setActivites] = useState<Activite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,99 +96,97 @@ export default function DashboardScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      <View style={styles.layout}>
-        {showSidebar && <Sidebar activeRoute="dashboard" />}
-
-        <View style={styles.main}>
-          {/* Topbar */}
-          <View style={styles.topbar}>
-            {!showSidebar && (
-              <TouchableOpacity onPress={() => router.replace('/')} style={styles.logoutBtn}>
-                <Text style={styles.logoutBtnText}>← Quitter</Text>
-              </TouchableOpacity>
-            )}
-            <Text style={[styles.greeting, !showSidebar && styles.greetingMobile]}>
-              Bonjour, <Text style={styles.greetingName}>Nicolas</Text> 👋
-            </Text>
-            <View style={styles.topbarRight}>
-              <TouchableOpacity style={styles.notifBtn}>
-                <View style={styles.notifDot} />
-                <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
-              </TouchableOpacity>
-              <LinearGradient
-                colors={[colors.primaryLight, colors.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>N</Text>
-              </LinearGradient>
-            </View>
-          </View>
-
-          {/* Content */}
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
+      {/* Topbar */}
+      <View style={styles.topbar}>
+        <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuBtn}>
+          <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
+        </TouchableOpacity>
+        <Text style={styles.greeting}>
+          Bonjour, <Text style={styles.greetingName}>Nicolas</Text> 👋
+        </Text>
+        <View style={styles.topbarRight}>
+          <TouchableOpacity style={styles.notifBtn}>
+            <View style={styles.notifDot} />
+            <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
+          </TouchableOpacity>
+          <LinearGradient
+            colors={[colors.primaryLight, colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatar}
           >
-            <View style={styles.pageHeader}>
-              <Text style={styles.pageTitle}>Tableau de Bord</Text>
-              <Text style={styles.pageSubtitle}>Vue d'ensemble en temps réel — Var (83)</Text>
-            </View>
-
-            {loading ? (
-              <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
-            ) : (
-              <>
-                {/* Stats — 2 × 2 grid */}
-                {stats && (() => {
-                  const STATS = buildStats(stats);
-                  return (
-                    <View style={styles.statsGrid}>
-                      <View style={styles.statsRow}>
-                        <StatCard {...STATS[0]} />
-                        <StatCard {...STATS[1]} />
-                      </View>
-                      <View style={styles.statsRow}>
-                        <StatCard {...STATS[2]} />
-                        <StatCard {...STATS[3]} />
-                      </View>
-                    </View>
-                  );
-                })()}
-
-                {/* Activity */}
-                <View style={styles.activityCard}>
-                  <View style={styles.activityHeader}>
-                    <Text style={styles.activityTitle}>Activité récente</Text>
-                    <View style={styles.activityCount}>
-                      <Text style={styles.activityCountText}>
-                        {activites.length} événement{activites.length !== 1 ? 's' : ''}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {activites.length === 0 ? (
-                    <Text style={styles.emptyText}>Aucune activité pour cette journée.</Text>
-                  ) : (
-                    buildActivities(activites).map((item, i) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && <View style={styles.divider} />}
-                        <ActivityItem {...item} />
-                      </React.Fragment>
-                    ))
-                  )}
-                </View>
-              </>
-            )}
-          </ScrollView>
+            <Text style={styles.avatarText}>N</Text>
+          </LinearGradient>
         </View>
       </View>
-    </View>
+
+      {/* Content */}
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.pageHeader}>
+          <Text style={styles.pageTitle}>Tableau de Bord</Text>
+          <Text style={styles.pageSubtitle}>Vue d'ensemble en temps réel — Var (83)</Text>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
+        ) : (
+          <>
+            {/* Stats — 2 × 2 grid */}
+            {stats && (() => {
+              const STATS = buildStats(stats);
+              return (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statsRow}>
+                    <StatCard {...STATS[0]} />
+                    <StatCard {...STATS[1]} />
+                  </View>
+                  <View style={styles.statsRow}>
+                    <StatCard {...STATS[2]} />
+                    <StatCard {...STATS[3]} />
+                  </View>
+                </View>
+              );
+            })()}
+
+            {/* Activity */}
+            <View style={styles.activityCard}>
+              <View style={styles.activityHeader}>
+                <Text style={styles.activityTitle}>Activité récente</Text>
+                <View style={styles.activityCount}>
+                  <Text style={styles.activityCountText}>
+                    {activites.length} événement{activites.length !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+              </View>
+
+              {activites.length === 0 ? (
+                <Text style={styles.emptyText}>Aucune activité pour cette journée.</Text>
+              ) : (
+                buildActivities(activites).map((item, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <View style={styles.divider} />}
+                    <ActivityItem {...item} />
+                  </React.Fragment>
+                ))
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      <MobileDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        activeRoute="dashboard"
+      />
+    </SafeAreaView>
   );
 }
 
@@ -200,14 +194,6 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  layout: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  main: {
     flex: 1,
     backgroundColor: colors.background,
   },
@@ -226,22 +212,15 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  logoutBtn: {
+  menuBtn: {
     marginRight: 12,
-  },
-  logoutBtnText: {
-    fontSize: 13,
-    color: colors.textMuted,
-    fontWeight: '500',
+    padding: 4,
   },
   greeting: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
     flex: 1,
-  },
-  greetingMobile: {
-    fontSize: 15,
   },
   greetingName: {
     color: colors.primaryLight,

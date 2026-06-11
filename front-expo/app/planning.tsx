@@ -5,16 +5,15 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  useWindowDimensions,
   ActivityIndicator,
   Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
-import Sidebar from '../components/Sidebar';
+import MobileDrawer from '../components/MobileDrawer';
 import VehicleCard from '../components/VehicleCard';
 import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
@@ -32,14 +31,11 @@ type VehicleRow = { chauffeurId: number; arrets: Arret[] };
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function PlanningScreen() {
-  const { width } = useWindowDimensions();
-  const showSidebar = width >= 768;
-  const router = useRouter();
-
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sitesOpen, setSitesOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -122,203 +118,195 @@ export default function PlanningScreen() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <View style={s.container}>
+    <SafeAreaView style={s.container}>
       <StatusBar style="dark" />
 
-      <View style={s.layout}>
-        {showSidebar && <Sidebar activeRoute="planning" />}
-
-        <View style={s.main}>
-          {/* Topbar */}
-          <View style={s.topbar}>
-            {!showSidebar && (
-              <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-                <Text style={s.backBtnText}>← Retour</Text>
-              </TouchableOpacity>
-            )}
-            <Text style={[s.greeting, !showSidebar && s.greetingMobile]}>
-              Bonjour, <Text style={s.greetingName}>Nicolas</Text> 👋
-            </Text>
-            <View style={s.topbarRight}>
-              <TouchableOpacity style={s.notifBtn}>
-                {stats && stats.alertes > 0 && <View style={s.notifDot} />}
-                <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
-              </TouchableOpacity>
-              <LinearGradient
-                colors={[colors.primaryLight, colors.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={s.avatar}
-              >
-                <Text style={s.avatarText}>N</Text>
-              </LinearGradient>
-            </View>
-          </View>
-
-          {/* Content */}
-          <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false}>
-
-            {/* Page header */}
-            <View style={s.pageHeader}>
-              <View>
-                <Text style={s.pageTitle}>Planning & Tournées</Text>
-                <Text style={s.pageSubtitle}>Optimisation IA par jour et par véhicule</Text>
-              </View>
-              <View style={s.dateBadge}>
-                <Ionicons name="calendar-outline" size={14} color={colors.primaryLight} />
-                <Text style={s.dateBadgeText}>{DATE_DEMO}</Text>
-              </View>
-            </View>
-
-            {/* Alert banner — conditionnel sur stats.alertes */}
-            {stats && stats.alertes > 0 && (
-              <View style={s.alertBanner}>
-                <Ionicons name="warning-outline" size={18} color={colors.coral} />
-                <Text style={s.alertText}>
-                  {stats.alertes} collecte{stats.alertes > 1 ? 's' : ''} en erreur aujourd'hui
-                </Text>
-              </View>
-            )}
-
-            {/* Action bar */}
-            <View style={s.actionBar}>
-              {/* Générer tournées — non fonctionnel (OR-Tools non exposé) */}
-              <TouchableOpacity
-                style={s.btnGenerate}
-                onPress={handleGenerate}
-                activeOpacity={0.85}
-                disabled={generating}
-              >
-                <LinearGradient
-                  colors={[colors.primaryLight, colors.accent]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.btnGenerateGradient}
-                >
-                  {generating ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="sparkles-outline" size={16} color="#fff" />
-                  )}
-                  <Text style={s.btnGenerateText}>
-                    {generating ? 'Calcul en cours...' : 'Générer les tournées (IA)'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* Gérer les imprévus — page non implémentée */}
-              <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
-                <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
-                <Text style={s.btnImprevusText}>Gérer les imprévus</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Map placeholder — nécessite react-native-maps + /api/admin/planning */}
-            <View style={s.mapCard}>
-              <LinearGradient
-                colors={['#E8F5EE', '#F0F7F4']}
-                style={s.mapGradient}
-              >
-                <View style={s.mapContent}>
-                  <View style={s.mapIconWrap}>
-                    <Ionicons name="map-outline" size={28} color={colors.primaryLight} />
-                  </View>
-                  <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
-                  <Text style={s.mapSubtitle}>
-                    {clients.length > 0
-                      ? `${clients.length} sites chargés depuis GET /clients`
-                      : 'Chargement des sites...'}
-                  </Text>
-                  <View style={s.mapChip}>
-                    <Ionicons name="information-circle-outline" size={13} color={colors.secondary} />
-                    <Text style={s.mapChipText}>Nécessite react-native-maps · voir BACK_PLANNING.md</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-            </View>
-
-            {/* Panel sites de collecte */}
-            <View style={s.sitesPanel}>
-              <TouchableOpacity
-                style={s.sitesPanelHeader}
-                onPress={() => setSitesOpen(v => !v)}
-                activeOpacity={0.75}
-              >
-                <View style={s.sitesPanelLeft}>
-                  <View style={s.sitesPanelIcon}>
-                    <Ionicons name="location-outline" size={18} color={colors.primaryLight} />
-                  </View>
-                  <View>
-                    <Text style={s.sitesPanelTitle}>Sites de collecte enregistrés</Text>
-                    <Text style={s.sitesPanelSub}>
-                      {clients.length} site{clients.length !== 1 ? 's' : ''} dans la base
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons
-                  name={sitesOpen ? 'chevron-up' : 'chevron-down'}
-                  size={18}
-                  color={colors.textMuted}
-                />
-              </TouchableOpacity>
-
-              {sitesOpen && (
-                <View style={s.sitesList}>
-                  {clients.length === 0 ? (
-                    <Text style={s.sitesEmpty}>Aucun site chargé</Text>
-                  ) : (
-                    clients.map((c, i) => (
-                      <View key={c.id ?? i} style={[s.siteItem, i > 0 && s.siteDivider]}>
-                        <View style={s.siteItemLeft}>
-                          <Text style={s.siteName}>{c.nom_entreprise}</Text>
-                          <Text style={s.siteCoords}>
-                            {c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}
-                          </Text>
-                        </View>
-                        <Ionicons name="location" size={14} color={colors.accentLight} />
-                      </View>
-                    ))
-                  )}
-                </View>
-              )}
-            </View>
-
-            {/* Vehicle cards */}
-            <View style={s.vehiclesSection}>
-              <Text style={s.sectionTitle}>Tournées du jour</Text>
-              <Text style={s.sectionSub}>
-                {vehicles.length > 0
-                  ? `${vehicles.length} véhicule${vehicles.length > 1 ? 's' : ''} en service`
-                  : 'Aucune tournée assignée pour cette date'}
-              </Text>
-            </View>
-
-            {loading ? (
-              <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 20 }} />
-            ) : vehicles.length === 0 ? (
-              <View style={s.emptyVehicles}>
-                <Ionicons name="car-outline" size={32} color={colors.textMuted} />
-                <Text style={s.emptyVehiclesText}>
-                  Aucune tournée planifiée pour le {DATE_DEMO}
-                </Text>
-                <Text style={s.emptyVehiclesSub}>
-                  Générez les tournées ou vérifiez les données de la base
-                </Text>
-              </View>
-            ) : (
-              vehicles.map((v, i) => (
-                <VehicleCard
-                  key={v.chauffeurId}
-                  index={i}
-                  chauffeurId={v.chauffeurId}
-                  arrets={v.arrets}
-                  onExport={() => handleExportBluebob(v.chauffeurId)}
-                />
-              ))
-            )}
-          </ScrollView>
+      {/* Topbar */}
+      <View style={s.topbar}>
+        <TouchableOpacity onPress={() => setDrawerOpen(true)} style={s.menuBtn}>
+          <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
+        </TouchableOpacity>
+        <Text style={s.greeting}>
+          Bonjour, <Text style={s.greetingName}>Nicolas</Text> 👋
+        </Text>
+        <View style={s.topbarRight}>
+          <TouchableOpacity style={s.notifBtn}>
+            {stats && stats.alertes > 0 && <View style={s.notifDot} />}
+            <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
+          </TouchableOpacity>
+          <LinearGradient
+            colors={[colors.primaryLight, colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.avatar}
+          >
+            <Text style={s.avatarText}>N</Text>
+          </LinearGradient>
         </View>
       </View>
+
+      {/* Content */}
+      <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false}>
+
+        {/* Page header */}
+        <View style={s.pageHeader}>
+          <View>
+            <Text style={s.pageTitle}>Planning & Tournées</Text>
+            <Text style={s.pageSubtitle}>Optimisation IA par jour et par véhicule</Text>
+          </View>
+          <View style={s.dateBadge}>
+            <Ionicons name="calendar-outline" size={14} color={colors.primaryLight} />
+            <Text style={s.dateBadgeText}>{DATE_DEMO}</Text>
+          </View>
+        </View>
+
+        {/* Alert banner — conditionnel sur stats.alertes */}
+        {stats && stats.alertes > 0 && (
+          <View style={s.alertBanner}>
+            <Ionicons name="warning-outline" size={18} color={colors.coral} />
+            <Text style={s.alertText}>
+              {stats.alertes} collecte{stats.alertes > 1 ? 's' : ''} en erreur aujourd'hui
+            </Text>
+          </View>
+        )}
+
+        {/* Action bar */}
+        <View style={s.actionBar}>
+          {/* Générer tournées — non fonctionnel (OR-Tools non exposé) */}
+          <TouchableOpacity
+            style={s.btnGenerate}
+            onPress={handleGenerate}
+            activeOpacity={0.85}
+            disabled={generating}
+          >
+            <LinearGradient
+              colors={[colors.primaryLight, colors.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={s.btnGenerateGradient}
+            >
+              {generating ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="sparkles-outline" size={16} color="#fff" />
+              )}
+              <Text style={s.btnGenerateText}>
+                {generating ? 'Calcul en cours...' : 'Générer les tournées (IA)'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Gérer les imprévus — page non implémentée */}
+          <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
+            <Text style={s.btnImprevusText}>Gérer les imprévus</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Map placeholder — nécessite react-native-maps + /api/admin/planning */}
+        <View style={s.mapCard}>
+          <LinearGradient
+            colors={['#E8F5EE', '#F0F7F4']}
+            style={s.mapGradient}
+          >
+            <View style={s.mapContent}>
+              <View style={s.mapIconWrap}>
+                <Ionicons name="map-outline" size={28} color={colors.primaryLight} />
+              </View>
+              <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
+              <Text style={s.mapSubtitle}>
+                {clients.length > 0
+                  ? `${clients.length} sites chargés depuis GET /clients`
+                  : 'Chargement des sites...'}
+              </Text>
+              <View style={s.mapChip}>
+                <Ionicons name="information-circle-outline" size={13} color={colors.secondary} />
+                <Text style={s.mapChipText}>Nécessite react-native-maps · voir BACK_PLANNING.md</Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* Panel sites de collecte */}
+        <View style={s.sitesPanel}>
+          <TouchableOpacity
+            style={s.sitesPanelHeader}
+            onPress={() => setSitesOpen(v => !v)}
+            activeOpacity={0.75}
+          >
+            <View style={s.sitesPanelLeft}>
+              <View style={s.sitesPanelIcon}>
+                <Ionicons name="location-outline" size={18} color={colors.primaryLight} />
+              </View>
+              <View>
+                <Text style={s.sitesPanelTitle}>Sites de collecte enregistrés</Text>
+                <Text style={s.sitesPanelSub}>
+                  {clients.length} site{clients.length !== 1 ? 's' : ''} dans la base
+                </Text>
+              </View>
+            </View>
+            <Ionicons
+              name={sitesOpen ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={colors.textMuted}
+            />
+          </TouchableOpacity>
+
+          {sitesOpen && (
+            <View style={s.sitesList}>
+              {clients.length === 0 ? (
+                <Text style={s.sitesEmpty}>Aucun site chargé</Text>
+              ) : (
+                clients.map((c, i) => (
+                  <View key={c.id ?? i} style={[s.siteItem, i > 0 && s.siteDivider]}>
+                    <View style={s.siteItemLeft}>
+                      <Text style={s.siteName}>{c.nom_entreprise}</Text>
+                      <Text style={s.siteCoords}>
+                        {c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}
+                      </Text>
+                    </View>
+                    <Ionicons name="location" size={14} color={colors.accentLight} />
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Vehicle cards */}
+        <View style={s.vehiclesSection}>
+          <Text style={s.sectionTitle}>Tournées du jour</Text>
+          <Text style={s.sectionSub}>
+            {vehicles.length > 0
+              ? `${vehicles.length} véhicule${vehicles.length > 1 ? 's' : ''} en service`
+              : 'Aucune tournée assignée pour cette date'}
+          </Text>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 20 }} />
+        ) : vehicles.length === 0 ? (
+          <View style={s.emptyVehicles}>
+            <Ionicons name="car-outline" size={32} color={colors.textMuted} />
+            <Text style={s.emptyVehiclesText}>
+              Aucune tournée planifiée pour le {DATE_DEMO}
+            </Text>
+            <Text style={s.emptyVehiclesSub}>
+              Générez les tournées ou vérifiez les données de la base
+            </Text>
+          </View>
+        ) : (
+          vehicles.map((v, i) => (
+            <VehicleCard
+              key={v.chauffeurId}
+              index={i}
+              chauffeurId={v.chauffeurId}
+              arrets={v.arrets}
+              onExport={() => handleExportBluebob(v.chauffeurId)}
+            />
+          ))
+        )}
+      </ScrollView>
 
       {/* Toast */}
       {toast && (
@@ -326,7 +314,13 @@ export default function PlanningScreen() {
           <Text style={s.toastText}>{toast}</Text>
         </Animated.View>
       )}
-    </View>
+
+      <MobileDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        activeRoute="planning"
+      />
+    </SafeAreaView>
   );
 }
 
@@ -334,8 +328,6 @@ export default function PlanningScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  layout: { flex: 1, flexDirection: 'row' },
-  main: { flex: 1, backgroundColor: colors.background },
 
   // Topbar
   topbar: {
@@ -353,10 +345,8 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  backBtn: { marginRight: 12 },
-  backBtnText: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  menuBtn: { marginRight: 12, padding: 4 },
   greeting: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 },
-  greetingMobile: { fontSize: 15 },
   greetingName: { color: colors.primaryLight },
   topbarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   notifBtn: {
@@ -523,7 +513,7 @@ const s = StyleSheet.create({
 
   // Toast
   toast: {
-    position: 'absolute', bottom: 28, right: 24, left: 24,
+    position: 'absolute', top: 80, right: 24, left: 24,
     backgroundColor: colors.primaryDark,
     borderRadius: 14, paddingHorizontal: 20, paddingVertical: 14,
     shadowColor: colors.primaryDark,

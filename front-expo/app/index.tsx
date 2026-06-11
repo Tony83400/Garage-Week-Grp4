@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { login } from '../services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,6 +50,7 @@ export default function LoginScreen() {
   };
 
   return (
+    <SafeAreaView style={styles.container}>
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
@@ -142,6 +144,7 @@ export default function LoginScreen() {
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

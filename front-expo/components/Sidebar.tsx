@@ -23,9 +23,10 @@ function LogoIcon() {
 
 interface Props {
   activeRoute: 'dashboard' | 'planning';
+  style?: object;
 }
 
-export default function Sidebar({ activeRoute }: Props) {
+export default function Sidebar({ activeRoute, style }: Props) {
   const router = useRouter();
 
   return (
@@ -33,7 +34,7 @@ export default function Sidebar({ activeRoute }: Props) {
       colors={[colors.primaryDark, colors.sidebarDark]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
-      style={styles.sidebar}
+      style={[styles.sidebar, style]}
     >
       <View style={styles.logoSection}>
         <LinearGradient

@@ -26,7 +26,7 @@ export default function StatCard({ iconBg, icon, value, label, badgeText, badgeS
       <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
         {icon}
       </View>
-      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.badge, { backgroundColor: badge.bg }]}>
         <Text style={[styles.badgeText, { color: badge.text }]}>{badgeText}</Text>
@@ -40,8 +40,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.card,
     borderRadius: 18,
-    padding: 20,
-    gap: 10,
+    padding: 14,
+    gap: 8,
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   value: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
     color: colors.text,
     letterSpacing: -0.5,
