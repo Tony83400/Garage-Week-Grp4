@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArchAppli — Tableau de Bord</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green-deep:   #1B4332;
+      --green-mid:    #2D6A4F;
+      --green-soft:   #52B788;
+      --green-light:  #74C69D;
+      --blue:         #1A759F;
+      --blue-light:   #48CAE4;
+      --bg:           #F0F7F4;
+      --card:         #FFFFFF;
+      --text:         #1B2D27;
+      --text-muted:   #6B8F7E;
+      --coral:        #E76F51;
+      --coral-light:  #FFF0EB;
+      --sidebar-w:    240px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: linear-gradient(180deg, var(--green-deep) 0%, #163d2b 100%);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 100;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-logo-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--green-mid), var(--green-soft));
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    /* ── REMPLACEZ LE SVG PAR VOTRE LOGO :
+       <img src="logo.png" alt="logo" style="width:100%;height:100%;object-fit:cover;"> ── */
+    .sidebar-logo-icon svg { width: 22px; height: 22px; }
+    .sidebar-logo-name {
+      font-size: 17px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+    .sidebar-logo-sub {
+      font-size: 10px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 20px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-decoration: none;
+      color: rgba(255,255,255,0.55);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+    .nav-item.active {
+      background: rgba(82,183,136,0.2);
+      color: var(--green-light);
+    }
+    .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    .sidebar-bottom {
+      padding: 16px 12px 24px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .nav-item.logout { color: rgba(231,111,81,0.7); }
+    .nav-item.logout:hover { background: rgba(231,111,81,0.1); color: var(--coral); }
+
+    /* ── MAIN ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      background: var(--card);
+      border-bottom: 1px solid #E8F0EC;
+      padding: 0 32px;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 12px rgba(27,67,50,0.06);
+    }
+    .topbar-greeting { font-size: 20px; font-weight: 700; color: var(--text); }
+    .topbar-greeting span { color: var(--green-mid); }
+    .topbar-right { display: flex; align-items: center; gap: 14px; }
+
+    .notif-btn {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      border: none;
+      background: var(--bg);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      transition: background 0.15s;
+    }
+    .notif-btn:hover { background: #ddeee6; }
+    .notif-dot {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 8px; height: 8px;
+      background: var(--coral);
+      border-radius: 50%;
+      border: 2px solid var(--card);
+    }
+
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--green-mid), var(--blue));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(45,106,79,0.3);
+    }
+
+    /* ── CONTENT ── */
+    .content {
+      padding: 32px;
+      flex: 1;
+    }
+
+    .page-header { margin-bottom: 28px; }
+    .page-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.4px;
+    }
+    .page-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    /* ── STAT CARDS ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 22px 20px;
+      box-shadow: 0 2px 16px rgba(27,67,50,0.07);
+      border: 1px solid #EAF2EE;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      animation: fadeUp 0.5s ease both;
+    }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(27,67,50,0.12); }
+    .stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .stat-card:nth-child(2) { animation-delay: 0.1s; }
+    .stat-card:nth-child(3) { animation-delay: 0.15s; }
+    .stat-card:nth-child(4) { animation-delay: 0.2s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .stat-icon {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .stat-icon.green  { background: #E8F5EE; }
+    .stat-icon.blue   { background: #E6F4FA; }
+    .stat-icon.coral  { background: var(--coral-light); }
+    .stat-icon.teal   { background: #E6F7F9; }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .stat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      width: fit-content;
+    }
+    .stat-badge.ok   { background: #E8F5EE; color: var(--green-mid); }
+    .stat-badge.warn { background: var(--coral-light); color: var(--coral); }
+    .stat-badge.info { background: #E6F4FA; color: var(--blue); }
+
+    /* ── ACTIVITY CARD ── */
+    .activity-card {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 26px 28px;
+      box-shadow: 0 2px 16px rgba(27,67,50,0.07);
+      border: 1px solid #EAF2EE;
+      animation: fadeUp 0.5s ease 0.25s both;
+    }
+    .activity-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .activity-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .activity-count {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .activity-list { display: flex; flex-direction: column; gap: 2px; }
+
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 14px;
+      border-radius: 12px;
+      transition: background 0.12s;
+      cursor: default;
+    }
+    .activity-item:hover { background: var(--bg); }
+
+    .activity-icon {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .activity-icon.success { background: #E8F5EE; }
+    .activity-icon.error   { background: var(--coral-light); }
+
+    .activity-text { flex: 1; }
+    .activity-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .activity-detail {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-weight: 400;
+    }
+    .activity-time {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .divider {
+      height: 1px;
+      background: #F0F7F4;
+      margin: 0 14px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1100px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .main { margin-left: 0; }
+      .content { padding: 20px; }
+      .topbar { padding: 0 20px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .stat-value { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">
+        <!-- REMPLACEZ PAR : <img src="logo.png" alt="logo" style="width:100%;height:100%;object-fit:cover;"> -->
+        <svg viewBox="0 0 22 22" fill="none">
+          <path d="M4 11 C4 7 7 4 11 4" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <path d="M10 2L11 4L8.5 4Z" fill="white"/>
+          <path d="M18 11 C18 15 15 18 11 18" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <path d="M12 20L11 18L13.5 18Z" fill="white"/>
+          <path d="M11 6 C14 6 16 8.5 16 11.5 C16 14 13.5 16 11 16 C8.5 16 6.5 14 6.5 11.5 C6.5 8.5 8 6 11 6Z" fill="rgba(255,255,255,0.3)"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sidebar-logo-name">ArchAppli</div>
+        <div class="sidebar-logo-sub">portail admin</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" href="#">
+        <svg viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="1" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="10" y="1" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="1" y="10" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="10" y="10" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Tableau de Bord
+      </a>
+      <a class="nav-item" href="#">
+        <svg viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="3" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 1V5M13 1V5M1 7H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Planning & Tournées
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <a class="nav-item logout" href="archappli-login.html">
+        <svg viewBox="0 0 18 18" fill="none">
+          <path d="M7 3H3a1 1 0 00-1 1v10a1 1 0 001 1h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M12 13l4-4-4-4M16 9H7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Déconnexion
+      </a>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-greeting">Bonjour, <span>Nicolas</span> 👋</div>
+      <div class="topbar-right">
+        <button class="notif-btn" title="Notifications">
+          <div class="notif-dot"></div>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 2a6 6 0 00-6 6v3l-1.5 2.5h15L16 11V8a6 6 0 00-6-6z" stroke="#2D6A4F" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M8.5 16a1.5 1.5 0 003 0" stroke="#2D6A4F" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <div class="avatar" title="Nicolas">N</div>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="content">
+
+      <!-- Page header -->
+      <div class="page-header">
+        <h1 class="page-title">Tableau de Bord</h1>
+        <p class="page-subtitle">Vue d'ensemble en temps réel — Var (83)</p>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stats-grid">
+
+        <div class="stat-card">
+          <div class="stat-icon green">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 3C13.5 3 16 5.5 16 8.5C16 12 12.5 14.5 10 17C7.5 14.5 4 12 4 8.5C4 5.5 6.5 3 10 3Z" stroke="#2D6A4F" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-value">2 000 kg</div>
+          <div class="stat-label">Biodéchets prévus</div>
+          <div class="stat-badge ok">↑ Journée chargée</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon blue">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="7" stroke="#1A759F" stroke-width="1.5"/>
+              <path d="M7 10l2 2 4-4" stroke="#1A759F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-value">11 / 15</div>
+          <div class="stat-label">Collectes validées</div>
+          <div class="stat-badge info">4 en cours</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon coral">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 3v7" stroke="#E76F51" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="10" cy="14.5" r="1" fill="#E76F51"/>
+              <path d="M10 1L18.5 16H1.5L10 1Z" stroke="#E76F51" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-value">2</div>
+          <div class="stat-label">Alertes actives</div>
+          <div class="stat-badge warn">⚠ Action requise</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon teal">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="7" stroke="#48CAE4" stroke-width="1.5"/>
+              <path d="M10 6v4l3 2" stroke="#48CAE4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="stat-value">~20 min</div>
+          <div class="stat-label">Prochain camion</div>
+          <div class="stat-badge info">Arrivée estimée</div>
+        </div>
+
+      </div>
+
+      <!-- Activité récente -->
+      <div class="activity-card">
+        <div class="activity-header">
+          <div class="activity-title">Activité récente</div>
+          <div class="activity-count">5 événements</div>
+        </div>
+
+        <div class="activity-list">
+
+          <div class="activity-item">
+            <div class="activity-icon success">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="#2D6A4F" stroke-width="1.5"/>
+                <path d="M5 8l2 2 4-4" stroke="#2D6A4F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="activity-text">
+              <div class="activity-name">Marc Dubois a validé la collecte</div>
+              <div class="activity-detail">📍 Restaurant Le Provençal — Toulon (83000)</div>
+            </div>
+            <div class="activity-time">08h14</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="activity-item">
+            <div class="activity-icon success">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="#2D6A4F" stroke-width="1.5"/>
+                <path d="M5 8l2 2 4-4" stroke="#2D6A4F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="activity-text">
+              <div class="activity-name">Sophie Martinez a validé la collecte</div>
+              <div class="activity-detail">📍 Hôtel Ibis — La Seyne-sur-Mer (83500)</div>
+            </div>
+            <div class="activity-time">08h47</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="activity-item">
+            <div class="activity-icon error">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="#E76F51" stroke-width="1.5"/>
+                <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="#E76F51" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="activity-text">
+              <div class="activity-name">Toni Jonio n'a pas pu finir sa tournée</div>
+              <div class="activity-detail">📍 Arrêt : Cantine Municipale — Hyères (83400)</div>
+            </div>
+            <div class="activity-time">09h03</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="activity-item">
+            <div class="activity-icon success">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="#2D6A4F" stroke-width="1.5"/>
+                <path d="M5 8l2 2 4-4" stroke="#2D6A4F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="activity-text">
+              <div class="activity-name">Zidane a validé la collecte</div>
+              <div class="activity-detail">📍 Brasserie du Port — Sanary-sur-Mer (83110)</div>
+            </div>
+            <div class="activity-time">09h31</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="activity-item">
+            <div class="activity-icon success">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="#2D6A4F" stroke-width="1.5"/>
+                <path d="M5 8l2 2 4-4" stroke="#2D6A4F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="activity-text">
+              <div class="activity-name">Jami a validé la collecte</div>
+              <div class="activity-detail">📍 Lycée Bonaparte — Toulon (83000)</div>
+            </div>
+            <div class="activity-time">09h58</div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+</body>
+</html>
