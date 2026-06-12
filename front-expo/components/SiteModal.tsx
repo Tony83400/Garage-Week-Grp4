@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
+import { addClient } from '@/services/clients';
 
 const CATEGORIES = ['Restaurant', 'Hôtel', 'École', 'Cantine', 'Fast-food', 'Supermarché', 'Autre'];
 const VILLES = ['Toulon', 'Hyères', 'La Seyne-sur-Mer', 'Six-Fours', 'Sanary-sur-Mer', 'Bandol', 'Ollioules', 'La Garde', 'Le Pradet', 'Le Lavandou'];
@@ -33,17 +34,26 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
 
   const canSubmit = nom.trim().length > 0 && adresse.trim().length > 0;
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return;
-    onSuccess(`✓ ${nom.trim()} ajouté au planning`);
-    setNom('');
-    setCategorie('');
-    setAdresse('');
-    setVille('');
-    setSlotStart('07:00');
-    setSlotEnd('12:00');
-    setSaisonnier(false);
-    onClose();
+    
+    try {
+      // Appel à l'API Python pour enregistrer le client
+      await addClient({
+        nom_entreprise: nom.trim(),
+        // On met des coordonnées bidons pour la démo, 
+        // ou on pourrait utiliser l'adresse pour faire du géocodage plus tard
+        latitude: 43.1200, 
+        longitude: 5.9300 
+      });
+
+      onSuccess(`✓ ${nom.trim()} ajouté avec succès !`);
+      handleClose(); // Ferme et vide le formulaire
+    } catch (e: any) {
+      console.error(e);
+      // Gérer l'erreur si besoin
+      alert("Erreur lors de l'ajout du site");
+    }
   }
 
   function handleClose() {

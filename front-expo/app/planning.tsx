@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Animated,
 } from 'react-native';
@@ -17,21 +17,15 @@ import { colors } from '../constants/colors';
 import MobileDrawer from '../components/MobileDrawer';
 import SiteModal from '../components/SiteModal';
 import VehicleCard from '../components/VehicleCard';
-import { getDashboardStats, type DashboardStats } from '../services/dashboard';
-import { getClients, type Client } from '../services/clients';
-import { getTournee, type Arret } from '../services/chauffeur';
-import { getPlanningAdmin } from '../services/planning';
 import MapTournees, { type MapVehicle, type MapStop } from '../components/MapTournees';
 
-const DATE_DEMO = '2026-06-15';
+import { getDashboardStats, type DashboardStats } from '../services/dashboard';
+import { getClients, type Client } from '../services/clients';
+import { getPlanningAdmin, genererBrouillons, optimiserTournees, type TourneeAdmin } from '../services/planning';
 
-// IDs chauffeurs connus des données de test — à remplacer par GET /api/chauffeurs
-// Voir BACK_PLANNING.md
-const CHAUFFEUR_IDS = [1, 2, 3, 4, 5];
+const DATE_DEMO = new Date().toISOString().split('T')[0];
 
-type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: Arret[] };
-
-// ── Screen ─────────────────────────────────────────────────────────────────────
+type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: any[] };
 
 export default function PlanningScreen() {
   const router = useRouter();
@@ -47,49 +41,47 @@ export default function PlanningScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
-  // ── Data loading ──────────────────────────────────────────────────────────────
+  // ── Chargement des données ───────────────────────────────────────────
+  async function fetchData() {
+    setLoading(true);
+    try {
+      const [statsRes, clientsRes, planningRes] = await Promise.allSettled([
+        getDashboardStats(DATE_DEMO),
+        getClients(),
+        getPlanningAdmin(DATE_DEMO),
+      ]);
+
+      if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+      if (clientsRes.status === 'fulfilled') setClients(clientsRes.value);
+
+      if (planningRes.status === 'fulfilled' && planningRes.value) {
+        const rows: VehicleRow[] = planningRes.value.map(tournee => ({
+          chauffeurId: tournee.chauffeur_id,
+          chauffeurNom: tournee.chauffeur,
+          arrets: tournee.arrets.map(a => ({
+            id: a.tache_id,
+            nom: a.client_nom,
+            adresse: "Adresse à compléter",
+            statut: a.statut,
+            bacs: Math.round(a.poids_prevu_kg / 40) || 0,
+            poids: a.poids_prevu_kg,
+            latitude: (a as any).latitude || 0,
+            longitude: (a as any).longitude || 0,
+            ordre: a.ordre
+          }))
+        }));
+        setVehicles(rows);
+      }
+    } catch (e) {
+      console.warn('Planning fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const [statsRes, clientsRes, planningRes] = await Promise.allSettled([
-          getDashboardStats(DATE_DEMO),
-          getClients(),
-          getPlanningAdmin(DATE_DEMO),
-        ]);
-
-        if (statsRes.status === 'fulfilled') setStats(statsRes.value);
-        if (clientsRes.status === 'fulfilled') setClients(clientsRes.value);
-
-        // Priorité : /api/admin/planning si implémenté
-        if (planningRes.status === 'fulfilled' && planningRes.value.length > 0) {
-          // TODO: mapper TourneeAdmin → VehicleRow quand le back l'implémentera
-          setVehicles([]);
-        } else {
-          // Fallback : appel individuel par chauffeur (IDs hardcodés)
-          const results = await Promise.allSettled(
-            CHAUFFEUR_IDS.map(id => getTournee(id, DATE_DEMO))
-          );
-          const rows: VehicleRow[] = results
-            .map((r, i) => ({
-              chauffeurId: CHAUFFEUR_IDS[i],
-              chauffeurNom: r.status === 'fulfilled' && r.value ? r.value.chauffeur : `Chauffeur ${CHAUFFEUR_IDS[i]}`,
-              arrets: r.status === 'fulfilled' && r.value ? r.value.arrets : [],
-            }))
-            .filter(row => row.arrets.length > 0);
-          setVehicles(rows);
-        }
-      } catch (e) {
-        console.warn('Planning fetch error:', e);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchData();
   }, []);
-
-  // ── Toast ─────────────────────────────────────────────────────────────────────
 
   function showToast(msg: string) {
     setToast(msg);
@@ -100,16 +92,26 @@ export default function PlanningScreen() {
     ]).start(() => setToast(null));
   }
 
-  // ── Handlers ──────────────────────────────────────────────────────────────────
-
-  function handleGenerate() {
-    // Non fonctionnel — OR-Tools non exposé via le back
-    // Voir BACK_PLANNING.md : POST /api/tournees/generer
+  // ── Génération par l'IA (OR-Tools) ──────────────────────────────────
+  async function handleGenerate() {
     setGenerating(true);
-    setTimeout(() => {
+    showToast('Création des brouillons de collecte...');
+    
+    try {
+      await genererBrouillons(DATE_DEMO);
+      showToast('Calcul IA en cours (OR-Tools)...');
+      
+      await optimiserTournees(DATE_DEMO);
+      showToast('Tournées générées avec succès !');
+      
+      // On rafraîchit la page
+      await fetchData();
+    } catch (e: any) {
+      console.error(e);
+      showToast(e?.response?.data?.erreur || 'Erreur lors de la génération IA');
+    } finally {
       setGenerating(false);
-      showToast('Génération IA disponible après intégration OR-Tools');
-    }, 1800);
+    }
   }
 
   function handleImprevus() {
@@ -117,11 +119,8 @@ export default function PlanningScreen() {
   }
 
   function handleExportBluebob(chauffeurId: number) {
-    // Export côté client uniquement — voir BACK_PLANNING.md pour format
     showToast(`Export BlueBob — Chauffeur #${chauffeurId}`);
   }
-
-  // ── Map data ──────────────────────────────────────────────────────────────────
 
   const mapVehicles = useMemo<MapVehicle[]>(() =>
     vehicles.map((v, idx) => ({
@@ -132,15 +131,13 @@ export default function PlanningScreen() {
         .map<MapStop>(a => ({
           lat: a.latitude,
           lon: a.longitude,
-          label: a.client_nom,
+          label: a.nom,
           statut: a.statut,
           ordre: a.ordre,
         })),
     })),
     [vehicles]
   );
-
-  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={s.container}>
@@ -159,12 +156,7 @@ export default function PlanningScreen() {
             {stats && stats.alertes > 0 && <View style={s.notifDot} />}
             <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
           </TouchableOpacity>
-          <LinearGradient
-            colors={[colors.primaryLight, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.avatar}
-          >
+          <LinearGradient colors={[colors.primaryLight, colors.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.avatar}>
             <Text style={s.avatarText}>N</Text>
           </LinearGradient>
         </View>
@@ -173,7 +165,6 @@ export default function PlanningScreen() {
       {/* Content */}
       <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false}>
 
-        {/* Page header */}
         <View style={s.pageHeader}>
           <View>
             <Text style={s.pageTitle}>Planning & Tournées</Text>
@@ -185,7 +176,6 @@ export default function PlanningScreen() {
           </View>
         </View>
 
-        {/* Alert banner — conditionnel sur stats.alertes */}
         {stats && stats.alertes > 0 && (
           <View style={s.alertBanner}>
             <Ionicons name="warning-outline" size={18} color={colors.coral} />
@@ -195,92 +185,50 @@ export default function PlanningScreen() {
           </View>
         )}
 
-        {/* Action bar */}
         <TouchableOpacity style={s.btnSaisir} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
           <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
           <Text style={s.btnSaisirText}>+ Saisir un nouveau site</Text>
         </TouchableOpacity>
 
         <View style={s.actionBar}>
-          {/* Générer tournées — non fonctionnel (OR-Tools non exposé) */}
-          <TouchableOpacity
-            style={s.btnGenerate}
-            onPress={handleGenerate}
-            activeOpacity={0.85}
-            disabled={generating}
-          >
-            <LinearGradient
-              colors={[colors.primaryLight, colors.accent]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={s.btnGenerateGradient}
-            >
-              {generating ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="sparkles-outline" size={16} color="#fff" />
-              )}
-              <Text style={s.btnGenerateText}>
-                {generating ? 'Calcul en cours...' : 'Générer les tournées (IA)'}
-              </Text>
+          <TouchableOpacity style={s.btnGenerate} onPress={handleGenerate} activeOpacity={0.85} disabled={generating}>
+            <LinearGradient colors={[colors.primaryLight, colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGenerateGradient}>
+              {generating ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles-outline" size={16} color="#fff" />}
+              <Text style={s.btnGenerateText}>{generating ? 'Calcul en cours...' : 'Générer les tournées (IA)'}</Text>
             </LinearGradient>
           </TouchableOpacity>
-
-          {/* Gérer les imprévus — page non implémentée */}
           <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
             <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
             <Text style={s.btnImprevusText}>Gérer les imprévus</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Carte des tournées — OpenStreetMap via Leaflet + OSRM */}
         <View style={s.mapCard}>
           <View style={s.mapHeader}>
             <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
             <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
             <View style={s.mapChip}>
-              <Text style={s.mapChipText}>
-                {mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts
-              </Text>
+              <Text style={s.mapChipText}>{mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts</Text>
             </View>
           </View>
-          <MapTournees
-            height={340}
-            vehicles={mapVehicles}
-            selectedStop={selectedStop}
-          />
+          <MapTournees height={340} vehicles={mapVehicles} selectedStop={selectedStop} />
         </View>
 
-        {/* Panel sites de collecte */}
         <View style={s.sitesPanel}>
-          <TouchableOpacity
-            style={s.sitesPanelHeader}
-            onPress={() => setSitesOpen(v => !v)}
-            activeOpacity={0.75}
-          >
+          <TouchableOpacity style={s.sitesPanelHeader} onPress={() => setSitesOpen(v => !v)} activeOpacity={0.75}>
             <View style={s.sitesPanelLeft}>
-              <View style={s.sitesPanelIcon}>
-                <Ionicons name="location-outline" size={18} color={colors.primaryLight} />
-              </View>
+              <View style={s.sitesPanelIcon}><Ionicons name="location-outline" size={18} color={colors.primaryLight} /></View>
               <View>
                 <Text style={s.sitesPanelTitle}>Sites de collecte enregistrés</Text>
-                <Text style={s.sitesPanelSub}>
-                  {clients.length} site{clients.length !== 1 ? 's' : ''} dans la base
-                </Text>
+                <Text style={s.sitesPanelSub}>{clients.length} site{clients.length !== 1 ? 's' : ''} dans la base</Text>
               </View>
             </View>
-            <Ionicons
-              name={sitesOpen ? 'chevron-up' : 'chevron-down'}
-              size={18}
-              color={colors.textMuted}
-            />
+            <Ionicons name={sitesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
           {sitesOpen && (
             <View style={s.sitesList}>
-              {clients.length === 0 ? (
-                <Text style={s.sitesEmpty}>Aucun site chargé</Text>
-              ) : (
+              {clients.length === 0 ? <Text style={s.sitesEmpty}>Aucun site chargé</Text> : (
                 clients.map((c, i) => (
                   <TouchableOpacity
                     key={c.id ?? i}
@@ -290,9 +238,7 @@ export default function PlanningScreen() {
                   >
                     <View style={s.siteItemLeft}>
                       <Text style={s.siteName}>{c.nom_entreprise}</Text>
-                      <Text style={s.siteCoords}>
-                        {c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}
-                      </Text>
+                      <Text style={s.siteCoords}>{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</Text>
                     </View>
                     <Ionicons name="location" size={14} color={colors.accentLight} />
                   </TouchableOpacity>
@@ -302,13 +248,10 @@ export default function PlanningScreen() {
           )}
         </View>
 
-        {/* Vehicle cards */}
         <View style={s.vehiclesSection}>
           <Text style={s.sectionTitle}>Tournées du jour</Text>
           <Text style={s.sectionSub}>
-            {vehicles.length > 0
-              ? `${vehicles.length} véhicule${vehicles.length > 1 ? 's' : ''} en service`
-              : 'Aucune tournée assignée pour cette date'}
+            {vehicles.length > 0 ? `${vehicles.length} véhicule${vehicles.length > 1 ? 's' : ''} en service` : 'Aucune tournée assignée pour cette date'}
           </Text>
         </View>
 
@@ -317,12 +260,8 @@ export default function PlanningScreen() {
         ) : vehicles.length === 0 ? (
           <View style={s.emptyVehicles}>
             <Ionicons name="car-outline" size={32} color={colors.textMuted} />
-            <Text style={s.emptyVehiclesText}>
-              Aucune tournée planifiée pour le {DATE_DEMO}
-            </Text>
-            <Text style={s.emptyVehiclesSub}>
-              Générez les tournées ou vérifiez les données de la base
-            </Text>
+            <Text style={s.emptyVehiclesText}>Aucune tournée planifiée pour le {DATE_DEMO}</Text>
+            <Text style={s.emptyVehiclesSub}>Générez les tournées ou vérifiez les données de la base</Text>
           </View>
         ) : (
           vehicles.map((v, i) => (
@@ -338,27 +277,18 @@ export default function PlanningScreen() {
         )}
       </ScrollView>
 
-      {/* Toast */}
       {toast && (
         <Animated.View style={[s.toast, { opacity: toastOpacity }]}>
           <Text style={s.toastText}>{toast}</Text>
         </Animated.View>
       )}
 
-      <SiteModal
-        visible={siteModalOpen}
-        onClose={() => setSiteModalOpen(false)}
-        onSuccess={(msg) => showToast(msg)}
-      />
-
-      <MobileDrawer
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        activeRoute="planning"
-      />
+      <SiteModal visible={siteModalOpen} onClose={() => setSiteModalOpen(false)} onSuccess={(msg) => showToast(msg)} />
+      <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} activeRoute="planning" />
     </SafeAreaView>
   );
 }
+
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 

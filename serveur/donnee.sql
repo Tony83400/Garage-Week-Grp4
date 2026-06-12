@@ -15,6 +15,10 @@ DROP TABLE IF EXISTS utilisateurs;
 DROP TABLE IF EXISTS depots;
 PRAGMA foreign_keys = ON;
 
+-- =============================================================================
+-- 1. CRÉATION DES TABLES
+-- =============================================================================
+
 CREATE TABLE utilisateurs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
@@ -60,38 +64,6 @@ CREATE TABLE exceptions_calendrier_clients (
     est_ferme BOOLEAN DEFAULT 1
 );
 
-CREATE TABLE tournees_jour (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date_tournee TEXT NOT NULL,
-    chauffeur_id INTEGER NOT NULL REFERENCES chauffeurs(id) ON DELETE CASCADE,
-    camion_id INTEGER NOT NULL REFERENCES camions(id) ON DELETE CASCADE,
-    depot_id INTEGER NOT NULL DEFAULT 1 REFERENCES depots(id), -- AJOUT ICI
-    heure_debut_service TEXT NOT NULL,
-    heure_fin_service TEXT NOT NULL,
-    statut TEXT DEFAULT 'brouillon' CHECK (statut IN ('brouillon', 'affectee', 'demarree', 'terminee'))
-);
-
-CREATE TABLE taches_collecte (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tournee_id INTEGER REFERENCES tournees_jour(id) ON DELETE CASCADE, -- AJOUT DU LIEN (Crucial)
-    client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE, -- Peut être NULL si c'est un vidage
-    
-    type_tache TEXT DEFAULT 'collecte' CHECK (type_tache IN ('collecte', 'vidage_depot')), -- NOUVEAU
-    
-    date_planifiee DATE NOT NULL,
-    ordre_passage INTEGER DEFAULT NULL,
-    
-    -- Prévisionnel
-    bacs_prevus INTEGER DEFAULT 0,
-    poids_prevu_kg REAL DEFAULT 0,
-    duree_estimee_min INTEGER DEFAULT 5, 
-    
-    -- Réel
-    bacs_reels INTEGER DEFAULT NULL,
-    statut TEXT DEFAULT 'en_attente', 
-    commentaire TEXT DEFAULT NULL
-);
-
 CREATE TABLE depots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT NOT NULL,
@@ -99,16 +71,39 @@ CREATE TABLE depots (
     longitude REAL NOT NULL
 );
 
--- Insertion de ton dépôt initial
+CREATE TABLE tournees_jour (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date_tournee TEXT NOT NULL,
+    chauffeur_id INTEGER NOT NULL REFERENCES chauffeurs(id) ON DELETE CASCADE,
+    camion_id INTEGER NOT NULL REFERENCES camions(id) ON DELETE CASCADE,
+    depot_id INTEGER NOT NULL DEFAULT 1 REFERENCES depots(id),
+    heure_debut_service TEXT NOT NULL,
+    heure_fin_service TEXT NOT NULL,
+    statut TEXT DEFAULT 'brouillon' CHECK (statut IN ('brouillon', 'affectee', 'demarree', 'terminee'))
+);
+
+CREATE TABLE taches_collecte (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournee_id INTEGER REFERENCES tournees_jour(id) ON DELETE CASCADE,
+    client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+    type_tache TEXT DEFAULT 'collecte' CHECK (type_tache IN ('collecte', 'vidage_depot')),
+    date_planifiee DATE NOT NULL,
+    ordre_passage INTEGER DEFAULT NULL,
+    bacs_prevus INTEGER DEFAULT 0,
+    poids_prevu_kg REAL DEFAULT 0,
+    duree_estimee_min INTEGER DEFAULT 15,
+    bacs_reels INTEGER DEFAULT NULL,
+    statut TEXT DEFAULT 'en_attente', 
+    commentaire TEXT DEFAULT NULL
+);
+
+-- =============================================================================
+-- 2. INSERTION DES DONNÉES DE BASE (DÉPÔT, PERSONNEL, FLOTTE, CLIENTS)
+-- =============================================================================
+
 INSERT INTO depots (nom, latitude, longitude) VALUES 
 ('Dépôt La Farlède', 43.1389, 6.0222);
 
-
--- =============================================================================
--- JEU DE DONNÉES DE TEST : DÉPARTEMENT DU VAR (83)
--- =============================================================================
-
--- 1. CRÉATION DU PERSONNEL (5 Chauffeurs)
 INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES 
 ('admin@logistic.fr', '1234', 'admin'),
 ('jean@logistic.fr', '1234', 'chauffeur'),
@@ -124,7 +119,6 @@ INSERT INTO chauffeurs (utilisateur_id, nom, prenom, telephone) VALUES
 (5, 'Lefevre', 'Marie', '0604000000'),
 (6, 'Durand', 'Luc', '0605000000');
 
--- 2. CRÉATION DE LA FLOTTE (5 Camions pour couvrir le Var)
 INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES 
 ('AB-123-CD', 1500, 20),
 ('EF-456-GH', 1000, 15),
@@ -132,7 +126,6 @@ INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES
 ('MN-012-OP', 1500, 20),
 ('QR-345-ST', 2000, 25);
 
--- 3. CRÉATION DES CLIENTS (20 points répartis dans le 83)
 INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES 
 ('Supermarché Port', 43.1200, 5.9300),      -- 1 (Toulon)
 ('Restaurant Plage', 43.1000, 5.8800),      -- 2 (La Seyne-sur-Mer)
@@ -155,56 +148,30 @@ INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES
 ('Bibliothèque Municipale', 43.0833, 6.0833),-- 19 (Carqueiranne)
 ('Musée d''Art', 43.1500, 6.3500);          -- 20 (Bormes-les-Mimosas)
 
--- 4. CONTRAINTES HORAIRES POUR LE LUNDI
--- Des créneaux plus larges pour prendre en compte les longs trajets (Fréjus, Draguignan...)
-INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin) VALUES 
-(1, 1, '06:00:00', '14:00:00'),
-(2, 1, '10:00:00', '18:00:00'),
-(3, 1, '08:00:00', '17:00:00'),
-(4, 1, '06:00:00', '12:00:00'),
-(5, 1, '07:00:00', '16:00:00'),
-(6, 1, '09:00:00', '20:00:00'),
-(7, 1, '10:00:00', '16:00:00'),
-(8, 1, '05:00:00', '13:00:00'),
-(9, 1, '09:00:00', '18:00:00'),
-(10, 1, '00:00:00', '23:59:00'),
-(11, 1, '08:00:00', '18:00:00'),
-(12, 1, '06:00:00', '14:00:00'),
-(13, 1, '08:00:00', '15:00:00'),
-(14, 1, '09:00:00', '17:00:00'),
-(15, 1, '08:00:00', '12:00:00'),
-(16, 1, '06:00:00', '14:00:00'),
-(17, 1, '09:00:00', '19:00:00'),
-(18, 1, '08:00:00', '18:00:00'),
-(19, 1, '10:00:00', '17:00:00'),
-(20, 1, '09:00:00', '16:00:00');
 
--- 5. PLANIFICATION POUR LE 15 JUIN 2026
-INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, heure_debut_service, heure_fin_service, statut) VALUES 
-('2026-06-15', 1, 1, '06:00:00', '13:00:00', 'brouillon'), -- Jean : Équipe du Matin (7h)
-('2026-06-15', 2, 2, '06:00:00', '13:00:00', 'brouillon'), -- Alice : Équipe du Matin (7h)
-('2026-06-15', 3, 3, '13:00:00', '20:00:00', 'brouillon'), -- Paul : Équipe d'Après-midi (7h)
-('2026-06-15', 4, 4, '08:00:00', '16:00:00', 'brouillon'), -- Marie : Journée classique (8h)
-('2026-06-15', 5, 5, '09:00:00', '17:00:00', 'brouillon'); -- Luc : Journée décalée (8h)
+-- =============================================================================
+-- 3. CONFIGURATION PARFAITE POUR LE TEST IA DU VENDREDI 12 JUIN 2026 (Jour 5)
+-- =============================================================================
 
-INSERT INTO taches_collecte (client_id, date_planifiee, bacs_prevus, poids_prevu_kg, statut) VALUES 
-(1, '2026-06-15', 4, 160, 'en_attente'),
-(2, '2026-06-15', 3, 120, 'en_attente'),
-(3, '2026-06-15', 8, 320, 'en_attente'), 
-(4, '2026-06-15', 4, 160, 'en_attente'),
-(5, '2026-06-15', 5, 200, 'en_attente'),
-(6, '2026-06-15', 2, 80, 'en_attente'),
-(7, '2026-06-15', 2, 80, 'en_attente'),
-(8, '2026-06-15', 2, 80, 'en_attente'),
-(9, '2026-06-15', 5, 200, 'en_attente'),
-(10, '2026-06-15', 3, 120, 'en_attente'),
-(11, '2026-06-15', 6, 240, 'en_attente'),
-(12, '2026-06-15', 4, 160, 'en_attente'),
-(13, '2026-06-15', 3, 120, 'en_attente'),
-(14, '2026-06-15', 7, 280, 'en_attente'),
-(15, '2026-06-15', 2, 80, 'en_attente'),
-(16, '2026-06-15', 3, 120, 'en_attente'),
-(17, '2026-06-15', 2, 80, 'en_attente'),
-(18, '2026-06-15', 1, 40, 'en_attente'),
-(19, '2026-06-15', 1, 40, 'en_attente'),
-(20, '2026-06-15', 2, 80, 'en_attente');
+-- A. Les clients ouverts le vendredi (Cible de l'IA pour générer les tâches)
+INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin) VALUES
+(1, 5, '06:00:00', '14:00:00'),
+(2, 5, '10:00:00', '18:00:00'),
+(3, 5, '08:00:00', '17:00:00'),
+(4, 5, '06:00:00', '12:00:00'),
+(5, 5, '07:00:00', '16:00:00'),
+(6, 5, '09:00:00', '20:00:00'),
+(7, 5, '10:00:00', '16:00:00'),
+(8, 5, '05:00:00', '13:00:00'),
+(9, 5, '09:00:00', '18:00:00'),
+(10, 5, '00:00:00', '23:59:00');
+
+-- B. Les plannings de travail des chauffeurs (Où l'IA va répartir les tâches)
+INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, heure_debut_service, heure_fin_service, statut) VALUES
+('2026-06-12', 1, 1, '06:00:00', '14:00:00', 'brouillon'),
+('2026-06-12', 2, 2, '06:00:00', '13:00:00', 'brouillon'),
+('2026-06-12', 3, 3, '13:00:00', '20:00:00', 'brouillon'),
+('2026-06-12', 4, 4, '08:00:00', '16:00:00', 'brouillon');
+
+-- C. AUCUNE TÂCHE N'EST INSÉRÉE (La table taches_collecte reste vide). 
+-- C'est le clic sur le bouton "Générer les tournées (IA)" qui va les créer !

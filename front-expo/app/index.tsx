@@ -21,8 +21,6 @@ export default function LoginScreen() {
   const [showError, setShowError] = useState(false);
 
   const handleLogin = async () => {
-    Alert.alert('DEBUG', 'Bouton cliqué sur Mobile');
-    console.log('--- BOUTON LOGIN CLIQUÉ ---');
     setShowError(false);
     setError('');
 
@@ -37,7 +35,6 @@ export default function LoginScreen() {
 
     try {
       const response = await login(email.trim(), password);
-      Alert.alert('DEBUG', 'Réponse reçue: ' + response.role);
       console.log('Login success response:', response);
       const { role } = response;
       
@@ -48,11 +45,11 @@ export default function LoginScreen() {
         console.log('Redirecting to /driver');
         router.replace('/driver');
       } else {
-        Alert.alert('DEBUG', 'Rôle inconnu: ' + role);
+        console.log('DEBUG', 'Rôle inconnu: ' + role);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur de connexion.';
-      Alert.alert('Erreur', message);
+      console.log('Erreur', message);
       setError(message);
       setShowError(true);
     } finally {

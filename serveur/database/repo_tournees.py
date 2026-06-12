@@ -82,7 +82,8 @@ class TourneeRepository:
 
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
         data = {}
-        
+        MIN_GLOBAL = 180  # 3h00 (Temps minimum par défaut pour les clients)
+        MAX_GLOBAL = 825  # 13h45 (Temps maximum par défaut pour les clients)
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             
@@ -415,3 +416,62 @@ class TourneeRepository:
             
             conn.commit()
             return {"status": "succes", "taches_creees": taches_inserees}
+    def sauvegarder_resultat_optimisation(self, date_jour, routes_optimales, data_ortools):
+        """
+        Prend le résultat d'OR-Tools et met à jour la table 'taches_collecte'
+        en associant chaque tâche à sa tournée et son ordre de passage.
+        """
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 1. Récupérer les ID réels des tournées créées pour ce jour
+            cursor.execute('''
+                SELECT id FROM tournees_jour 
+                WHERE date_tournee = ? 
+                ORDER BY id ASC
+            ''', (date_jour,))
+            tournees_reelles_ids = [row[0] for row in cursor.fetchall()]
+            
+            if not tournees_reelles_ids:
+                print("Attention : Aucune tournée configurée pour cette date.")
+                return
+
+            # 2. Parcourir les routes calculées par OR-Tools
+            for vehicule_id, sequence_noeuds in routes_optimales.items():
+                
+                # Correspondance simple : véhicule IA = camion réel
+                index_tournee_physique = vehicule_id
+                
+                # Sécurité si l'IA génère plus de routes que prévu
+                if index_tournee_physique >= len(tournees_reelles_ids):
+                    continue
+                
+                tournee_bdd_id = tournees_reelles_ids[index_tournee_physique]
+                
+                ordre_passage = 1
+                for noeud_index in sequence_noeuds:
+                    # Le nœud 0 correspond au dépôt (départ/arrivée), on ne le sauvegarde pas
+                    if noeud_index == 0:
+                        continue
+                    
+                    # On récupère l'ID en base de données de cette collecte
+                    tache_id = data_ortools['tache_ids'][noeud_index]
+                    
+                    if tache_id:
+                        # On met à jour la tâche avec son camion et son ordre
+                        cursor.execute('''
+                            UPDATE taches_collecte 
+                            SET tournee_id = ?, ordre_passage = ?, statut = 'planifiee'
+                            WHERE id = ?
+                        ''', (tournee_bdd_id, ordre_passage, tache_id))
+                        ordre_passage += 1
+            
+            # 3. Passer le statut des camions de "brouillon" à "affectee"
+            cursor.execute('''
+                UPDATE tournees_jour 
+                SET statut = 'affectee' 
+                WHERE date_tournee = ?
+            ''', (date_jour,))
+            
+            conn.commit()
+            

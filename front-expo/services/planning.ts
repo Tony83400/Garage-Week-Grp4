@@ -1,26 +1,39 @@
 import { api } from './api';
 
-// Futur GET /api/admin/planning?date= — NON IMPLÉMENTÉ côté back
-// Voir BACK_PLANNING.md pour la spec complète
 export interface TourneeAdmin {
-  tournee_id: number;
-  vehicule: string;
-  capacite_max: number;
-  charge_actuelle: number;
+  chauffeur_id: number;
   chauffeur: string;
+  vehicule: string;
+  immatriculation: string;
+  capacite_max_kg: number;
+  heure_depart: string;
   arrets: {
-    id: number;
-    statut: 'en_attente' | 'en_cours' | 'terminee' | 'erreur';
-    client: string;
-    lat: number;
-    lon: number;
+    tache_id: number;
+    statut: 'en_attente' | 'planifiee' | 'en_cours' | 'terminee' | 'erreur';
+    client_nom: string;
+    poids_prevu_kg: number;
+    ordre: number;
+    latitude?: number;
+    longitude?: number;
   }[];
 }
 
+// 1. Récupérer le planning existant
 export async function getPlanningAdmin(date: string): Promise<TourneeAdmin[]> {
   try {
     return await api.get<TourneeAdmin[]>(`/api/admin/planning?date=${date}`);
-  } catch {
+  } catch (e) {
+    console.error("Erreur getPlanningAdmin:", e);
     return [];
   }
+}
+
+// 2. Déclencher la création des brouillons de la journée
+export async function genererBrouillons(date: string): Promise<any> {
+  return await api.post('/api/planning/generer', { date });
+}
+
+// 3. Déclencher le calcul OR-Tools
+export async function optimiserTournees(date: string): Promise<any> {
+  return await api.post('/api/planning/optimiser', { date });
 }

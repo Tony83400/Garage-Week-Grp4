@@ -1,0 +1,15 @@
+Chauffeur,Ordre,Nom_Etape,Latitude,Longitude,Heure_Arrivee,Distance_Cumulee_Unite,Bacs_a_Collecter,Poids_a_Collecter_Kg
+Tournée de Martin (T1),1,Dépôt,43.167,6.043,06:00,0,0,0
+Tournée de Martin (T1),2,Lycée Campus,43.125,6.01,06:10,15341,3,120.0
+Tournée de Martin (T1),3,Hôpital Sud,43.1205,6.1286,06:48,27209,3,120.0
+Tournée de Martin (T1),4,Gare Routière,43.5333,6.4667,08:49,80567,3,120.0
+Tournée de Martin (T1),5,Cinéma Central,43.4,6.05,10:31,124317,3,120.0
+Tournée de Martin (T1),6,Retour Dépôt,43.167,6.043,11:32,147627,0,0
+Tournée de Lefevre (T1),1,Dépôt,43.167,6.043,08:00,0,0,0
+Tournée de Lefevre (T1),2,Usine Tech,43.1381,5.9822,08:13,16731,3,120.0
+Tournée de Lefevre (T1),3,Supermarché Port,43.12,5.93,08:39,22255,3,120.0
+Tournée de Lefevre (T1),4,Restaurant Plage,43.1,5.88,09:04,27640,3,120.0
+Tournée de Lefevre (T1),5,Centre Commercial,43.0936,5.8385,09:27,31839,3,120.0
+Tournée de Lefevre (T1),6,Hôtel de la Baie,43.1167,5.8,09:50,36328,3,120.0
+Tournée de Lefevre (T1),7,Boulangerie Matin,43.1333,5.75,10:15,41596,3,120.0
+Tournée de Lefevre (T1),8,Retour Dépôt,43.167,6.043,11:28,71089,0,0

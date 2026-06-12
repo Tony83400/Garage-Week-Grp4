@@ -1,10 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,47 +11,12 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
+import { getImprevus, replanifierImprevu, type Imprevu } from '../services/imprevus';
+import { StyleSheet } from 'react-native';
 
-// Données hardcodées — à remplacer par GET /api/imprevus quand le back sera prêt
-type Imprevu = {
-  id: number;
-  nom: string;
-  adresse: string;
-  ville: string;
-  chauffeur: string;
-  raison: string;
-  timeAgo: string;
-};
 
-const INITIAL_IMPREVUS: Imprevu[] = [
-  {
-    id: 1,
-    nom: "McDonald's Toulon Mayol",
-    adresse: '12 av. du Maréchal Foch',
-    ville: 'Toulon',
-    chauffeur: 'Marc Dubois',
-    raison: 'Site inaccessible · camion trop grand',
-    timeAgo: 'il y a 45 min',
-  },
-  {
-    id: 2,
-    nom: 'Hôtel Mercure Bandol',
-    adresse: '3 allée Alfred Vivien',
-    ville: 'Bandol',
-    chauffeur: 'Sophie Martel',
-    raison: 'Client absent à l\'arrivée',
-    timeAgo: 'il y a 1h20',
-  },
-  {
-    id: 3,
-    nom: 'Cantine Collège Beaussier',
-    adresse: 'Av. du 8 mai 1945',
-    ville: 'La Seyne-sur-Mer',
-    chauffeur: 'Thomas Riva',
-    raison: 'Bac plein · volume imprévu',
-    timeAgo: 'il y a 2h',
-  },
-];
+// Date du jour dynamique (ex: 2026-06-15)
+const DATE_DEMO = new Date().toISOString().split('T')[0]; 
 
 // ── Item animé ────────────────────────────────────────────────────────────────
 
@@ -82,10 +46,10 @@ function ImprevuItem({
           <Ionicons name="location-outline" size={18} color={colors.coral} />
         </View>
         <View style={s.itemInfo}>
-          <Text style={s.itemNom} numberOfLines={1}>{item.nom}</Text>
-          <Text style={s.itemAdresse}>{item.adresse} · {item.ville}</Text>
+          <Text style={s.itemNom} numberOfLines={1}>{item.client_nom}</Text>
+          <Text style={s.itemAdresse}>{item.adresse || 'Adresse inconnue'} · {item.ville || ''}</Text>
         </View>
-        <Text style={s.itemTime}>{item.timeAgo}</Text>
+        <Text style={s.itemTime}>{item.heure || 'Récent'}</Text>
       </View>
 
       <View style={s.itemRaison}>
@@ -95,23 +59,15 @@ function ImprevuItem({
 
       <View style={s.itemMeta}>
         <Ionicons name="person-outline" size={12} color={colors.textMuted} />
-        <Text style={s.itemChauffeur}>{item.chauffeur}</Text>
+        <Text style={s.itemChauffeur}>{item.chauffeur || 'Inconnu'}</Text>
       </View>
 
       <View style={s.itemActions}>
-        <TouchableOpacity
-          style={s.btnReplan}
-          onPress={() => animateOut(onReplan)}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity style={s.btnReplan} onPress={() => animateOut(onReplan)} activeOpacity={0.8}>
           <Ionicons name="refresh-outline" size={14} color="#fff" />
           <Text style={s.btnReplanText}>Replanifier</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={s.btnDelete}
-          onPress={() => animateOut(onDelete)}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity style={s.btnDelete} onPress={() => animateOut(onDelete)} activeOpacity={0.8}>
           <Ionicons name="trash-outline" size={14} color={colors.coral} />
           <Text style={s.btnDeleteText}>Supprimer</Text>
         </TouchableOpacity>
@@ -124,7 +80,8 @@ function ImprevuItem({
 
 export default function ImprevusScreen() {
   const router = useRouter();
-  const [imprevus, setImprevus] = useState<Imprevu[]>(INITIAL_IMPREVUS);
+  const [imprevus, setImprevus] = useState<Imprevu[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -137,13 +94,33 @@ export default function ImprevusScreen() {
     ]).start(() => setToast(null));
   }
 
-  function handleReplan(item: Imprevu) {
-    setImprevus(prev => prev.filter(i => i.id !== item.id));
-    showToast(`↻ ${item.nom} ajouté au prochain planning`);
+  // Chargement depuis le Backend
+  useEffect(() => {
+    async function fetchImprevus() {
+      try {
+        const data = await getImprevus(DATE_DEMO);
+        setImprevus(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchImprevus();
+  }, []);
+
+  async function handleReplan(item: Imprevu) {
+    try {
+      await replanifierImprevu(item.tache_id);
+      setImprevus(prev => prev.filter(i => i.tache_id !== item.tache_id));
+      showToast(`↻ ${item.client_nom} ajouté au prochain planning`);
+    } catch (e) {
+      showToast("Erreur lors de la replanification");
+    }
   }
 
   function handleDelete(item: Imprevu) {
-    setImprevus(prev => prev.filter(i => i.id !== item.id));
+    setImprevus(prev => prev.filter(i => i.tache_id !== item.tache_id));
   }
 
   return (
@@ -167,7 +144,9 @@ export default function ImprevusScreen() {
       </View>
 
       {/* Content */}
-      {imprevus.length === 0 ? (
+      {loading ? (
+        <View style={s.emptyState}><Text>Chargement...</Text></View>
+      ) : imprevus.length === 0 ? (
         <View style={s.emptyState}>
           <View style={s.emptyIcon}>
             <Ionicons name="checkmark-circle-outline" size={52} color={colors.accent} />
@@ -178,18 +157,14 @@ export default function ImprevusScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView
-          style={s.scroll}
-          contentContainerStyle={s.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
           <Text style={s.sectionLabel}>
             {imprevus.length} site{imprevus.length !== 1 ? 's' : ''} à replanifier
           </Text>
 
           {imprevus.map(item => (
             <ImprevuItem
-              key={item.id}
+              key={item.tache_id}
               item={item}
               onReplan={() => handleReplan(item)}
               onDelete={() => handleDelete(item)}
@@ -207,6 +182,7 @@ export default function ImprevusScreen() {
     </SafeAreaView>
   );
 }
+
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 

@@ -94,7 +94,7 @@ def resoudre_et_exporter(data):
     # -------------------------------------------------------------
     def demand_callback(from_index):
         from_node = manager.IndexToNode(from_index)
-        return data['demands'][from_node]
+        return int(data['demands'][from_node])
 
     demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
     routing.AddDimensionWithVehicleCapacity(
@@ -110,7 +110,7 @@ def resoudre_et_exporter(data):
     # -------------------------------------------------------------
     def weight_callback(from_index):
         from_node = manager.IndexToNode(from_index)
-        return data['weight_demands'][from_node]
+        return int(data['weight_demands'][from_node])
 
     weight_callback_index = routing.RegisterUnaryTransitCallback(weight_callback)
     
