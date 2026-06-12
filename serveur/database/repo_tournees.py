@@ -1,5 +1,6 @@
 import sqlite3
 import math
+import datetime
 
 def heure_vers_minutes(heure_str):
     h, m, s = map(int, heure_str.split(':'))
@@ -81,13 +82,13 @@ class TourneeRepository:
 
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
         data = {}
-        MIN_GLOBAL = 180 
-        MAX_GLOBAL = 825 
         
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # 1. On récupère les horaires réels des chauffeurs
             cursor.execute('''
-                SELECT c.bacs_max, c.charge_max_kg, ch.nom
+                SELECT c.bacs_max, c.charge_max_kg, ch.nom, tj.heure_debut_service, tj.heure_fin_service
                 FROM tournees_jour tj
                 JOIN camions c ON tj.camion_id = c.id
                 JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
@@ -99,26 +100,42 @@ class TourneeRepository:
             data['vehicle_weights'] = []
             data['vehicle_time_windows'] = []
             data['driver_names'] = []
+            data['groupes_vehicules'] = [] # NOUVEAU : Pour lier les tournées virtuelles à un seul chauffeur
             
-            for c in camions_jour:
-                data['vehicle_capacities'].append(c[0])
-                data['vehicle_weights'].append(c[1])
-                data['driver_names'].append(f"{c[2]} (T1)")
-                data['vehicle_time_windows'].append((MIN_GLOBAL, MAX_GLOBAL))
+            MAX_TOURS = 3 # On autorise jusqu'à 3 retours au dépôt par chauffeur
+            
+            for index_chauffeur, c in enumerate(camions_jour):
+                bacs_max, charge_max, nom_chauffeur, heure_debut, heure_fin = c
                 
-                data['vehicle_capacities'].append(c[0])
-                data['vehicle_weights'].append(c[1])
-                data['driver_names'].append(f"{c[2]} (T2)")
-                data['vehicle_time_windows'].append((MIN_GLOBAL, MAX_GLOBAL))
+                # Conversion des heures du chauffeur en minutes (ex: 08:00 = 480)
+                debut_min = heure_vers_minutes(heure_debut)
+                fin_min = heure_vers_minutes(heure_fin)
+                
+                # On génère 3 "slots" de tournées potentiels pour CE chauffeur
+                # OR-Tools n'utilisera le T2 ou T3 que s'il y a assez de place dans son amplitude horaire
+                for numero_tournee in range(1, MAX_TOURS + 1):
+                    data['vehicle_capacities'].append(bacs_max)
+                    data['vehicle_weights'].append(charge_max)
+                    data['driver_names'].append(f"{nom_chauffeur} (T{numero_tournee})")
+                    
+                    # La "Time Window" du véhicule virtuel est strictement limitée au shift du chauffeur
+                    data['vehicle_time_windows'].append((debut_min, fin_min))
+                    
+                    # On mémorise que ce véhicule virtuel appartient à 'index_chauffeur'
+                    data['groupes_vehicules'].append(index_chauffeur)
             
             data['num_vehicles'] = len(data['vehicle_capacities'])
             data['depot'] = 0 
+            
+            # ... (La suite du code pour récupérer les tâches reste identique) ...
             
             cursor.execute('''
                 SELECT t.id, t.bacs_prevus, t.poids_prevu_kg, c.latitude, c.longitude, c.nom_entreprise
                 FROM taches_collecte t
                 JOIN clients c ON t.client_id = c.id
-                WHERE t.date_planifiee = ? AND t.statut = 'en_attente'
+                WHERE t.date_planifiee = ? 
+                AND t.statut = 'en_attente' 
+                AND t.type_tache = 'collecte'
             ''', (date_jour,))
             taches = cursor.fetchall()
 
@@ -342,3 +359,59 @@ class TourneeRepository:
                     "heure": "N/A"
                 })
             return imprevus
+    
+    def generer_brouillons_jour(self, date_jour):
+        """
+        Génère automatiquement les tâches de collecte pour un jour donné,
+        en se basant sur les disponibilités des clients et en ignorant ceux 
+        qui sont en exception (ex: fermés ce jour-là).
+        """
+        # 1. Calcul du jour de la semaine (1 = Lundi, ..., 7 = Dimanche)
+        date_obj = datetime.datetime.strptime(date_jour, '%Y-%m-%d')
+        jour_semaine = date_obj.weekday() + 1
+
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 2. Sécurité : Vérifier qu'on n'a pas déjà généré les tâches pour ce jour
+            cursor.execute('''
+                SELECT COUNT(*) FROM taches_collecte 
+                WHERE date_planifiee = ? AND type_tache = 'collecte'
+            ''', (date_jour,))
+            
+            if cursor.fetchone()[0] > 0:
+                return {"status": "erreur", "message": "Les tâches pour cette date existent déjà."}
+
+            # 3. La Super-Requête : Trouver les clients prévus ce jour, SAUF s'ils sont fermés
+            cursor.execute('''
+                SELECT d.client_id
+                FROM disponibilites_clients d
+                WHERE d.jour_semaine = ?
+                AND d.client_id NOT IN (
+                    SELECT client_id 
+                    FROM exceptions_calendrier_clients 
+                    WHERE date_exception = ? AND est_ferme = 1
+                )
+            ''', (jour_semaine, date_jour))
+            
+            clients_a_collecter = cursor.fetchall()
+            
+            # 4. Création des tâches
+            taches_inserees = 0
+            for client in clients_a_collecter:
+                client_id = client[0]
+                
+                # Pour le prototype, on met une estimation moyenne (ex: 3 bacs, 120kg)
+                # Plus tard, cela pourrait venir d'une moyenne historique par client
+                bacs_estimes = 3
+                poids_estime = 120.0
+                
+                cursor.execute('''
+                    INSERT INTO taches_collecte 
+                    (client_id, date_planifiee, type_tache, bacs_prevus, poids_prevu_kg, statut) 
+                    VALUES (?, ?, 'collecte', ?, ?, 'en_attente')
+                ''', (client_id, date_jour, bacs_estimes, poids_estime))
+                taches_inserees += 1
+            
+            conn.commit()
+            return {"status": "succes", "taches_creees": taches_inserees}

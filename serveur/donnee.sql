@@ -64,29 +64,43 @@ CREATE TABLE tournees_jour (
     date_tournee TEXT NOT NULL,
     chauffeur_id INTEGER NOT NULL REFERENCES chauffeurs(id) ON DELETE CASCADE,
     camion_id INTEGER NOT NULL REFERENCES camions(id) ON DELETE CASCADE,
-    heure_debut_service TEXT NOT NULL, -- NOUVELLE COLONNE
-    heure_fin_service TEXT NOT NULL,   -- NOUVELLE COLONNE
+    depot_id INTEGER NOT NULL DEFAULT 1 REFERENCES depots(id), -- AJOUT ICI
+    heure_debut_service TEXT NOT NULL,
+    heure_fin_service TEXT NOT NULL,
     statut TEXT DEFAULT 'brouillon' CHECK (statut IN ('brouillon', 'affectee', 'demarree', 'terminee'))
 );
 
-CREATE TABLE IF NOT EXISTS taches_collecte (
+CREATE TABLE taches_collecte (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id INTEGER NOT NULL,
+    tournee_id INTEGER REFERENCES tournees_jour(id) ON DELETE CASCADE, -- AJOUT DU LIEN (Crucial)
+    client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE, -- Peut être NULL si c'est un vidage
+    
+    type_tache TEXT DEFAULT 'collecte' CHECK (type_tache IN ('collecte', 'vidage_depot')), -- NOUVEAU
+    
     date_planifiee DATE NOT NULL,
-    
-    -- Ce qui est calculé/prévu par l'IA ou le planning
-    bacs_prevus INTEGER NOT NULL,
-    poids_prevu_kg REAL,
-    
-    -- Ce qui est réellement fait sur le terrain
-    bacs_reels INTEGER DEFAULT NULL,
-    
-    statut TEXT DEFAULT 'en_attente', -- 'en_attente', 'planifiee', 'terminee', 'erreur'
     ordre_passage INTEGER DEFAULT NULL,
-    commentaire TEXT DEFAULT NULL, -- Utile si le chauffeur signale une erreur
     
-    FOREIGN KEY (client_id) REFERENCES clients(id)
+    -- Prévisionnel
+    bacs_prevus INTEGER DEFAULT 0,
+    poids_prevu_kg REAL DEFAULT 0,
+    duree_estimee_min INTEGER DEFAULT 5, 
+    
+    -- Réel
+    bacs_reels INTEGER DEFAULT NULL,
+    statut TEXT DEFAULT 'en_attente', 
+    commentaire TEXT DEFAULT NULL
 );
+
+CREATE TABLE depots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL
+);
+
+-- Insertion de ton dépôt initial
+INSERT INTO depots (nom, latitude, longitude) VALUES 
+('Dépôt La Farlède', 43.1389, 6.0222);
 
 
 -- =============================================================================
