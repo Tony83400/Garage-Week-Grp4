@@ -1,7 +1,9 @@
-# ArchAppli — Front Expo
+# AlchiRoute — Front Expo
 
-App mobile/web de gestion de tournées de collecte de biodéchets.  
+App mobile/web de gestion de tournées de collecte de biodéchets.
 **Les Alchimistes Côte d'Azur — Garage Week Grp4**
+
+---
 
 ## Lancer le projet
 
@@ -10,25 +12,35 @@ App mobile/web de gestion de tournées de collecte de biodéchets.
 python main.py
 
 # Front
-npx expo start
+npx expo start --clear
 # Web : W  |  Mobile : scanner le QR avec Expo Go
 ```
 
-Comptes de test : `admin@archappli.fr` (admin) · `driver@archappli.fr` (chauffeur)  
-Mot de passe : n'importe lequel  
-Données disponibles pour la date : `2026-06-15`
+Comptes de test (donnee.sql) :
+
+| Email | Mot de passe | Rôle |
+|---|---|---|
+| admin@logistic.fr | 1234 | Admin → `/dashboard` |
+| jean@logistic.fr | 1234 | Chauffeur → `/driver?id=1` |
+| alice@logistic.fr | 1234 | Chauffeur → `/driver?id=2` |
+
+Données disponibles pour la date : **aujourd'hui (vendredi)** — générées via le bouton "Générer" dans Planning.
 
 ---
 
-## IP mobile
+## IP / réseau
 
-Si le mobile n'est pas sur le même réseau que le PC, créer `.env.local` à la racine de `front-expo/` :
+Créer `.env.local` à la racine de `front-expo/` avec l'IP du PC **sur le réseau courant** :
 
 ```
-EXPO_PUBLIC_API_URL=http://TON_IP:5000
+EXPO_PUBLIC_API_URL=http://192.168.X.X:5000
 ```
 
-Sans ce fichier, l'IP est détectée automatiquement via Metro en Expo Go.
+Trouver l'IP : `ipconfig` → IPv4 de l'adaptateur WiFi/Ethernet actif.
+
+> Sans ce fichier, l'IP est détectée automatiquement via Metro (Expo Go uniquement).
+> L'IP change selon le réseau (WiFi, hotspot…) — mettre à jour `.env.local` à chaque changement.
+> Hors réseau commun → utiliser `ngrok http 5000` pour exposer le serveur.
 
 ---
 
@@ -36,6 +48,8 @@ Sans ce fichier, l'IP est détectée automatiquement via Metro en Expo Go.
 
 - **Expo ~54** + **Expo Router ~6** — routing file-based
 - **React Native 0.81.5** + **StyleSheet** — pas de NativeWind, pas de Tailwind
+- **react-native-reanimated ~4.1.1** — animations
+- **react-native-svg 15.12.1** — SVG animés (camion login)
 - **TypeScript 5**
 - **Flask** (port 5000) + flask-cors — backend Python
 
@@ -45,50 +59,43 @@ Sans ce fichier, l'IP est détectée automatiquement via Metro en Expo Go.
 
 ```
 front-expo/
-├── app/                      # Écrans (1 fichier = 1 route)
+├── app/
 │   ├── _layout.tsx           # Stack navigator + SafeAreaProvider
-│   ├── index.tsx             # / → Login
-│   ├── dashboard.tsx         # /dashboard → Dashboard admin
-│   ├── planning.tsx          # /planning → Planning & tournées admin
-│   ├── driver.tsx            # /driver → Vue conducteur (file d'arrêts)
-│   └── imprevus.tsx          # /imprevus → Gestion des imprévus
+│   ├── index.tsx             # Login — animation camion SVG
+│   ├── dashboard.tsx         # Dashboard admin
+│   ├── planning.tsx          # Planning & tournées (carte + IA OR-Tools)
+│   ├── driver.tsx            # Vue conducteur (ID depuis URL params ?id=X)
+│   └── imprevus.tsx          # Gestion des imprévus
 │
-├── components/               # Briques UI réutilisables
-│   ├── AnimatedBlob.tsx      # Cercle animé (fond login)
-│   ├── InputField.tsx        # Champ de saisie glassmorphism
+├── components/
+│   ├── TruckAnimation.tsx    # Camion SVG animé (login) ← session 3
+│   ├── AnimatedBlob.tsx      # Blobs fond login
+│   ├── InputField.tsx        # Champ de saisie
 │   ├── LoginButton.tsx       # Bouton gradient + spinner
 │   ├── ErrorMessage.tsx      # Message d'erreur animé
-│   ├── StatCard.tsx          # Carte KPI (icône, valeur, badge)
-│   ├── ActivityItem.tsx      # Ligne d'activité succès/erreur
-│   ├── Sidebar.tsx           # Barre de navigation latérale
-│   ├── MobileDrawer.tsx      # Overlay animé (hamburger → sidebar)
-│   ├── VehicleCard.tsx       # Carte tournée véhicule (expandable)
-│   ├── StopCard.tsx          # Arrêt conducteur (valider / passer, slide-out)
-│   └── SiteModal.tsx         # Modal ajout site de collecte (bottom sheet)
+│   ├── StatCard.tsx          # Carte KPI
+│   ├── ActivityItem.tsx      # Ligne activité récente
+│   ├── Sidebar.tsx           # Nav latérale (safe area insets mobile)
+│   ├── MobileDrawer.tsx      # Overlay animé hamburger → sidebar
+│   ├── VehicleCard.tsx       # Carte tournée véhicule (capaciteMaxKg back)
+│   ├── StopCard.tsx          # Arrêt conducteur (valider / passer)
+│   ├── SiteModal.tsx         # Modal ajout site de collecte
+│   └── MapTournees.tsx       # Carte Leaflet (WebView mobile / iframe web)
 │
-├── services/                 # Appels HTTP vers le back
-│   ├── api.ts                # Wrapper fetch (gestion erreurs)
+├── services/
+│   ├── api.ts                # Wrapper fetch
 │   ├── auth.ts               # POST /login
-│   ├── dashboard.ts          # GET /api/dashboard/stats|activite
-│   ├── planning.ts           # GET /api/admin/planning
-│   ├── chauffeur.ts          # GET+POST /api/chauffeur/...
-│   └── clients.ts            # GET+POST /clients
+│   ├── dashboard.ts          # GET stats + activite
+│   ├── planning.ts           # GET planning + POST generer + POST optimiser
+│   ├── chauffeur.ts          # GET tournee + POST statut tache
+│   └── clients.ts            # GET + POST /clients
 │
-└── constants/
-    ├── colors.ts             # Palette de couleurs
-    └── api.ts                # URL API — détection auto IP + .env.local
-```
-
----
-
-## Flux d'une requête
-
-```
-Écran (app/)
-  → service (services/)       # quoi envoyer
-    → api.ts                  # comment fetcher
-      → constants/api.ts      # où (URL)
-        → Flask backend
+├── constants/
+│   ├── colors.ts             # Palette couleurs
+│   └── api.ts                # URL API (auto-détection IP Metro + .env.local)
+│
+└── assets/
+    └── télécharger.png       # Logo Les Alchimistes (utilisé dans TruckAnimation)
 ```
 
 ---
@@ -101,39 +108,41 @@ front-expo/
 | dashboard.ts | `getDashboardStats()` | GET `/api/dashboard/stats?date=` |
 | dashboard.ts | `getActiviteRecente()` | GET `/api/dashboard/activite?date=` |
 | planning.ts | `getPlanningAdmin()` | GET `/api/admin/planning?date=` |
+| planning.ts | `genererBrouillons()` | POST `/api/planning/generer` |
+| planning.ts | `optimiserTournees()` | POST `/api/planning/optimiser` |
 | chauffeur.ts | `getTournee(id)` | GET `/api/chauffeur/<id>/tournee?date=` |
-| chauffeur.ts | `updateStatutTache(id, data)` | POST `/api/chauffeur/tache/<id>/statut` |
+| chauffeur.ts | `updateStatutTache(id)` | POST `/api/chauffeur/tache/<id>/statut` |
 | clients.ts | `getClients()` | GET `/clients` |
 | clients.ts | `addClient(data)` | POST `/clients` |
 
 ---
 
-## Règles du projet
+## Animation login (TruckAnimation)
 
-- **StyleSheet uniquement** — NativeWind v4 cause des conflits de dépendances
-- **`/front` est la source de vérité design** — chaque page HTML devient un écran Expo
-- **Navigation** : hamburger universel → `MobileDrawer` overlay sur tous les écrans
-- **Git** : `git add front-expo/` uniquement pour ne pas écraser le back du collègue
+Le camion est le personnage principal du login. Phases :
 
----
-
-## Connexion / rôles
-
-| Email | Rôle | Destination |
+| Phase | Déclencheur | Animation |
 |---|---|---|
-| admin@archappli.fr | Admin (via back) | `/dashboard` |
-| driver@archappli.fr | Chauffeur (hardcodé) | `/driver` |
+| `arriving` | Montage | Camion slide depuis la gauche, hayon s'ouvre, formulaire tombe |
+| `idle` | Après arrivée | Camion statique |
+| `starting` | Clic connexion | Vibration moteur + roues tournent |
+| `departing` | Connexion OK | Hayon se referme, camion accélère et quitte l'écran |
+| `error` | Connexion KO | Secousse, hayon s'ouvre, bacs s'éjectent |
 
-Le chauffeur est identifié par email avant l'appel API. Le back doit retourner `"role": "chauffeur"` pour les vrais comptes conducteurs (cf. `BACK_PLANNING.md` à la racine).
+Bacs dans la benne : apparaissent quand email (avec @) et mot de passe sont remplis.
 
 ---
 
-## État des pages
+## Bugs back connus (à transmettre)
 
-| Page | Route | Branché back | Notes |
-|---|---|---|---|
-| Login | `/` | ✅ | Logo leaf+sync-outline, bypass `driver@archappli.fr` |
-| Dashboard admin | `/dashboard` | ✅ | KPIs + activité récente |
-| Planning admin | `/planning` | ✅ partiel | SiteModal, bouton imprévus fonctionnels |
-| Vue conducteur | `/driver` | ❌ hardcodé | 5 arrêts fictifs, en attente back |
-| Imprévus | `/imprevus` | ❌ hardcodé | 3 imprévus fictifs, en attente back |
+1. **`get_tournees_detaillees`** (`repo_tournees.py` ~ligne 314) : manque `AND t.tournee_id = ?` → tous les chauffeurs voient tous les arrêts
+2. **`sauvegarder_resultat_optimisation`** : `vehicule_id` direct au lieu de `vehicule_id // MAX_TOURS` → mapping OR-Tools → chauffeurs incorrect
+
+---
+
+## Règles
+
+- **StyleSheet uniquement** — NativeWind v4 cause des conflits
+- **Dates dynamiques** : `new Date().toISOString().split('T')[0]` partout
+- **Git** : `git add front-expo/` uniquement
+- **Back** : ne toucher que chirurgicalement, avec accord
