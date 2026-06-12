@@ -1,7 +1,5 @@
 import React, { useRef, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
+import { View, StyleSheet, Platform } from 'react-native';
 import type { Arret } from '../services/chauffeur';
 
 export interface MapStop {
@@ -52,6 +50,17 @@ function buildHtml(vehicles: MapVehicle[]): string {
       box-shadow:0 2px 8px rgba(0,0,0,0.18);transition:all 0.2s;color:white
     }
     .chip.dimmed{opacity:0.35;transform:scale(0.95)}
+    @keyframes ping{
+      0%{transform:scale(1);opacity:0.8}
+      100%{transform:scale(2.8);opacity:0}
+    }
+    .pin-ring{
+      position:absolute;width:44px;height:44px;border-radius:50%;
+      background:rgba(234,67,53,0.35);
+      animation:ping 1s ease-out 3;
+      top:-4px;left:-4px;
+    }
+    .pin-wrap{position:relative;width:36px;height:44px}
   </style>
 </head>
 <body>
@@ -71,7 +80,7 @@ function buildHtml(vehicles: MapVehicle[]): string {
   var markerGroups = [];
   var activeFilter = -1;
   var allMarkersMap = {};
-  var pulseLayer = null;
+  var pulseMarker = null;
 
   // ── Markers par véhicule ──────────────────────────────────────────
   vehicles.forEach(function(v, vi) {
@@ -101,32 +110,26 @@ function buildHtml(vehicles: MapVehicle[]): string {
     if (v.stops.length < 2) return;
     var c = vColors[vi % vColors.length];
     var coords = v.stops.map(function(s){ return s.lon + ',' + s.lat; }).join(';');
-
     fetch('https://router.project-osrm.org/route/v1/driving/' + coords + '?overview=full&geometries=geojson')
       .then(function(r){ return r.json(); })
       .then(function(data) {
         if (!data.routes || !data.routes[0]) throw new Error('no route');
-        var layer = L.geoJSON(data.routes[0].geometry, {
-          style: {color:c, weight:4, opacity:0.75}
-        }).addTo(map);
+        var layer = L.geoJSON(data.routes[0].geometry, {style:{color:c,weight:4,opacity:0.75}}).addTo(map);
         routeLayers[vi] = layer;
       })
       .catch(function() {
-        // Fallback lignes droites si OSRM indisponible
         var pts = v.stops.map(function(s){ return [s.lat, s.lon]; });
-        var layer = L.polyline(pts, {color:c, weight:3, opacity:0.6, dashArray:'6,4'}).addTo(map);
+        var layer = L.polyline(pts, {color:c,weight:3,opacity:0.6,dashArray:'6,4'}).addTo(map);
         routeLayers[vi] = layer;
       });
   });
 
-  // ── Fit bounds ─────────────────────────────────────────────────────
+  // ── Fit bounds ────────────────────────────────────────────────────
   var allPts = [];
-  vehicles.forEach(function(v){ v.stops.forEach(function(s){ allPts.push([s.lat, s.lon]); }); });
-  if (allPts.length > 0) {
-    map.fitBounds(L.latLngBounds(allPts).pad(0.25));
-  }
+  vehicles.forEach(function(v){ v.stops.forEach(function(s){ allPts.push([s.lat,s.lon]); }); });
+  if (allPts.length > 0) map.fitBounds(L.latLngBounds(allPts).pad(0.25));
 
-  // ── Chips de filtre ────────────────────────────────────────────────
+  // ── Chips de filtre ───────────────────────────────────────────────
   var filtersEl = document.getElementById('filters');
   vehicles.forEach(function(v, vi) {
     if (v.stops.length === 0) return;
@@ -148,30 +151,36 @@ function buildHtml(vehicles: MapVehicle[]): string {
       document.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('dimmed'); });
     } else {
       activeFilter = idx;
-      routeLayers.forEach(function(l, i){ if (l) l.setStyle({opacity: i === idx ? 0.85 : 0.1}); });
-      markerGroups.forEach(function(g, i){
-        g.eachLayer(function(l){ if (l.setOpacity) l.setOpacity(i === idx ? 1 : 0.15); });
+      routeLayers.forEach(function(l,i){ if (l) l.setStyle({opacity:i===idx?0.85:0.1}); });
+      markerGroups.forEach(function(g,i){
+        g.eachLayer(function(l){ if (l.setOpacity) l.setOpacity(i===idx?1:0.15); });
       });
-      document.querySelectorAll('.chip').forEach(function(c) {
-        var chipIdx = parseInt(c.id.replace('chip-', ''));
-        if (chipIdx === idx) c.classList.remove('dimmed');
-        else c.classList.add('dimmed');
+      document.querySelectorAll('.chip').forEach(function(c){
+        var chipIdx = parseInt(c.id.replace('chip-',''));
+        if (chipIdx===idx) c.classList.remove('dimmed'); else c.classList.add('dimmed');
       });
     }
   }
 
-  // ── Zoom vers un arrêt (appelé depuis React Native) ───────────────
+  // ── Zoom + épingle rouge pulsante (style Google Maps) ─────────────
   function zoomToStop(lat, lon) {
-    if (pulseLayer) { map.removeLayer(pulseLayer); pulseLayer = null; }
+    if (pulseMarker) { map.removeLayer(pulseMarker); pulseMarker = null; }
     map.setView([lat, lon], 15, {animate:true, duration:0.8});
     var key = lat + ',' + lon;
-    if (allMarkersMap[key]) {
-      setTimeout(function(){ allMarkersMap[key].openPopup(); }, 500);
-    }
-    pulseLayer = L.circle([lat, lon], {
-      radius:80, color:'#F39C12', fillColor:'#F39C12', fillOpacity:0.25, weight:2
+    if (allMarkersMap[key]) setTimeout(function(){ allMarkersMap[key].openPopup(); }, 500);
+
+    var pinHtml = '<div class="pin-wrap">'
+      + '<div class="pin-ring"></div>'
+      + '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44" style="position:absolute;top:0;left:0">'
+      + '<ellipse cx="18" cy="41" rx="8" ry="3" fill="rgba(0,0,0,0.2)"/>'
+      + '<path d="M18 1C10.8 1 5 6.8 5 14c0 10.5 13 27 13 27S31 24.5 31 14C31 6.8 25.2 1 18 1Z" fill="#EA4335" stroke="white" stroke-width="2.5"/>'
+      + '<circle cx="18" cy="14" r="5.5" fill="white"/>'
+      + '</svg></div>';
+
+    pulseMarker = L.marker([lat, lon], {
+      icon: L.divIcon({html:pinHtml, className:'', iconSize:[36,44], iconAnchor:[18,42], zIndexOffset:1000})
     }).addTo(map);
-    setTimeout(function(){ if (pulseLayer){ map.removeLayer(pulseLayer); pulseLayer = null; } }, 3500);
+    setTimeout(function(){ if (pulseMarker){ map.removeLayer(pulseMarker); pulseMarker = null; } }, 3500);
   }
 
   window.zoomToStop = zoomToStop;
@@ -183,26 +192,31 @@ function buildHtml(vehicles: MapVehicle[]): string {
 
 export default function MapTournees({ vehicles, selectedStop, height = 340 }: Props) {
   const webViewRef = useRef<any>(null);
-
-  // Injection JS quand l'utilisateur clique un arrêt dans une VehicleCard
-  useEffect(() => {
-    if (!selectedStop || !webViewRef.current) return;
-    const js = `zoomToStop(${selectedStop.lat}, ${selectedStop.lon}); true;`;
-    webViewRef.current.injectJavaScript(js);
-  }, [selectedStop]);
+  const iframeRef = useRef<any>(null);
 
   const html = useMemo(() => buildHtml(vehicles), [vehicles]);
 
-  const totalStops = vehicles.reduce((acc, v) => acc + v.stops.length, 0);
+  // Zoom vers l'arrêt sélectionné — mobile via injectJavaScript, web via contentWindow
+  useEffect(() => {
+    if (!selectedStop) return;
+    const js = `zoomToStop(${selectedStop.lat}, ${selectedStop.lon}); true;`;
+    if (Platform.OS === 'web') {
+      const win = iframeRef.current?.contentWindow;
+      if (win?.zoomToStop) win.zoomToStop(selectedStop.lat, selectedStop.lon);
+    } else {
+      webViewRef.current?.injectJavaScript(js);
+    }
+  }, [selectedStop]);
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[s.fallback, { height }]}>
-        <Ionicons name="map-outline" size={28} color={colors.primaryLight} />
-        <Text style={s.fallbackTitle}>Carte disponible sur mobile</Text>
-        <Text style={s.fallbackSub}>
-          {totalStops} arrêt{totalStops !== 1 ? 's' : ''} · {vehicles.length} véhicule{vehicles.length !== 1 ? 's' : ''}
-        </Text>
+      <View style={[s.container, { height }]}>
+        {React.createElement('iframe', {
+          ref: iframeRef,
+          srcDoc: html,
+          style: { width: '100%', height: '100%', border: 'none', borderRadius: 16 },
+          title: 'Carte des tournées',
+        })}
       </View>
     );
   }
@@ -219,7 +233,6 @@ export default function MapTournees({ vehicles, selectedStop, height = 340 }: Pr
         originWhitelist={['*']}
         javaScriptEnabled
         domStorageEnabled
-        allowsInlineMediaPlayback
       />
     </View>
   );
@@ -234,23 +247,5 @@ const s = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  fallback: {
-    borderRadius: 16,
-    backgroundColor: '#E8F5EE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#D1E9DC',
-  },
-  fallbackTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  fallbackSub: {
-    fontSize: 12,
-    color: colors.textMuted,
   },
 });
