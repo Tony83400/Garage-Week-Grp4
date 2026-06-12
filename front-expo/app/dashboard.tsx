@@ -28,9 +28,9 @@ function buildStats(s: DashboardStats) {
     {
       iconBg: '#E8F5EE',
       icon: <Ionicons name="leaf-outline" size={20} color={colors.primaryLight} />,
-      value: `${s.poids_prevu_kg.toLocaleString('fr-FR')} kg`,
-      label: 'Biodéchets prévus',
-      badgeText: '↑ Journée chargée',
+      value: `${s.poids_collecte_kg.toLocaleString('fr-FR')} kg`,
+      label: 'Biodéchets collectés',
+      badgeText: `sur ${s.poids_prevu_kg.toLocaleString('fr-FR')} prévus`,
       badgeStyle: 'ok' as const,
     },
     {
@@ -51,10 +51,10 @@ function buildStats(s: DashboardStats) {
     },
     {
       iconBg: '#E6F7F9',
-      icon: <Ionicons name="time-outline" size={20} color={colors.secondaryLight} />,
-      value: `${s.collectes_total - s.collectes_validees - s.alertes}`,
-      label: 'Collectes restantes',
-      badgeText: 'En attente',
+      icon: <Ionicons name="navigate-outline" size={20} color={colors.secondaryLight} />,
+      value: `${s.km_total} km`,
+      label: 'Distance totale',
+      badgeText: 'Optimisé par IA',
       badgeStyle: 'info' as const,
     },
   ];
@@ -154,6 +154,25 @@ export default function DashboardScreen() {
                 </View>
               );
             })()}
+
+            {/* Flotte en temps réel */}
+            {stats && stats.flotte.length > 0 && (
+              <View style={[styles.activityCard, { marginBottom: 24 }]}>
+                <View style={styles.activityHeader}>
+                  <Text style={styles.activityTitle}>Positions de la flotte</Text>
+                  <View style={styles.activityCount}>
+                    <Text style={styles.activityCountText}>En cours</Text>
+                  </View>
+                </View>
+                {stats.flotte.map((f, i) => (
+                  <View key={i} style={styles.fleetRow}>
+                    <View style={styles.fleetDot} />
+                    <Text style={styles.fleetName}>{f.chauffeur} :</Text>
+                    <Text style={styles.fleetPoint}>{f.dernier_point}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Activity */}
             <View style={styles.activityCard}>
@@ -342,5 +361,29 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     paddingVertical: 20,
+  },
+  fleetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  fleetDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+    marginRight: 10,
+  },
+  fleetName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginRight: 6,
+  },
+  fleetPoint: {
+    fontSize: 14,
+    color: colors.primaryLight,
+    fontWeight: '600',
   },
 });

@@ -1,15 +1,14 @@
 Chauffeur,Ordre,Nom_Etape,Latitude,Longitude,Heure_Arrivee,Distance_Cumulee_Unite,Bacs_a_Collecter,Poids_a_Collecter_Kg
 Tournée de Dupont,1,Dépôt,43.167,6.043,03:00,0,0,0
-Tournée de Dupont,2,Usine Tech,43.1381,5.9822,03:13,16923,3,120.0
-Tournée de Dupont,3,Hôtel de la Baie,43.1167,5.8,04:02,34394,3,120.0
-Tournée de Dupont,4,Boulangerie Matin,43.1333,5.75,04:30,40919,3,120.0
-Tournée de Dupont,5,Centre Commercial,43.0936,5.8385,05:06,51555,3,120.0
-Tournée de Dupont,6,Restaurant Plage,43.1,5.88,05:30,56064,3,120.0
-Tournée de Dupont,7,Supermarché Port,43.12,5.93,06:00,63668,3,120.0
-Tournée de Dupont,8,Retour Dépôt,43.167,6.043,06:41,76725,0,0
+Tournée de Dupont,2,Hôtel de la Baie,43.1167,5.8,03:49,34517,3,90.0
+Tournée de Dupont,3,Boulangerie Matin,43.1333,5.75,04:17,41042,2,60.0
+Tournée de Dupont,4,Centre Commercial,43.0936,5.8385,04:53,51678,5,200.0
+Tournée de Dupont,5,Restaurant Plage,43.1,5.88,05:17,56187,3,120.0
+Tournée de Dupont,6,Supermarché Port,43.12,5.93,05:47,63791,7,250.5
+Tournée de Dupont,7,Retour Dépôt,43.167,6.043,06:28,76848,0,0
 Tournée de Martin,1,Dépôt,43.167,6.043,03:00,0,0,0
-Tournée de Martin,2,Lycée Campus,43.125,6.01,03:14,17409,3,120.0
-Tournée de Martin,3,Hôpital Sud,43.1205,6.1286,03:53,29789,3,120.0
-Tournée de Martin,4,Cinéma Central,43.4,6.05,05:37,74715,3,120.0
-Tournée de Martin,5,Gare Routière,43.5333,6.4667,07:51,134370,3,120.0
-Tournée de Martin,6,Retour Dépôt,43.167,6.043,10:36,209637,0,0
+Tournée de Martin,2,Usine Tech,43.1381,5.9822,03:13,16923,5,180.0
+Tournée de Martin,3,Lycée Campus,43.125,6.01,03:36,21313,4,150.0
+Tournée de Martin,4,Cinéma Central,43.4,6.05,05:09,60369,2,45.0
+Tournée de Martin,5,Gare Routière,43.5333,6.4667,07:23,120024,2,75.0
+Tournée de Martin,6,Retour Dépôt,43.167,6.043,10:08,195291,0,0

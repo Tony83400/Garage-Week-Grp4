@@ -181,7 +181,6 @@ cython_debug/
 .cursorindexingignore
 
 *.db
-gemini.md
 
 # ============================================
 # Node.js / Expo / React Native (front-expo)

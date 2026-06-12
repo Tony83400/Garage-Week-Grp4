@@ -182,16 +182,17 @@ def api_optimiser_tournees():
             return jsonify({"erreur": "Aucune tâche de collecte en attente pour cette date."}), 400
         
         # 2. Exécution du moteur Google OR-Tools
-        routes_optimales = resoudre_et_exporter(data_ortools)
+        resultats_ia = resoudre_et_exporter(data_ortools)
         
-        if not routes_optimales:
+        if not resultats_ia:
             return jsonify({"erreur": "Le solveur n'a pas pu trouver de solution."}), 500
         
         # 3. Sauvegarde en BDD
-        db.sauvegarder_resultat_optimisation(date_cible, routes_optimales, data_ortools)
+        db.sauvegarder_resultat_optimisation(date_cible, resultats_ia, data_ortools)
         
         return jsonify({
-            "message": "L'optimisation des tournées a été calculée et enregistrée avec succès !"
+            "message": "L'optimisation des tournées a été calculée et enregistrée avec succès !",
+            "vehicules_utilises": len(resultats_ia['routes'])
         }), 200
         
     except Exception as e:

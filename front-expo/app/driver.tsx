@@ -36,7 +36,14 @@ export default function DriverScreen() {
         const data = await getTournee(chauffeurId, DATE_DEMO);
         if (data && data.arrets) {
           setTournee(data);
+          // On garde tous les arrêts dans l'objet tournée, mais on filtre ceux à afficher
           setStops(data.arrets.filter(a => a.statut !== 'terminee' && a.statut !== 'erreur'));
+          
+          // INITIALISATION DU COMPTEUR : Somme des poids déjà collectés
+          const alreadyCollected = data.arrets
+            .filter(a => a.statut === 'terminee')
+            .reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0);
+          setCollectedKg(alreadyCollected);
         }
       } catch (e) {
         console.error("Erreur chargement tournée :", e);
@@ -47,9 +54,10 @@ export default function DriverScreen() {
     fetchTournee();
   }, []);
 
-  const total = tournee ? tournee.arrets.length : 0;
-  const done = total - stops.length;
-  const progressPct = total === 0 ? 0 : Math.round((done / total) * 100);
+  const totalArrets = tournee ? tournee.arrets.length : 0;
+  const doneArrets = tournee ? tournee.arrets.filter(a => a.statut === 'terminee' || a.statut === 'erreur').length : 0;
+  const progressPct = totalArrets === 0 ? 0 : Math.round((doneArrets / totalArrets) * 100);
+  const totalKgPrevu = tournee ? tournee.arrets.reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0) : 0;
 
   function showToast(msg: string) {
     setToast(msg);
@@ -67,6 +75,13 @@ export default function DriverScreen() {
       
       setStops(prev => prev.filter(s => s.tache_id !== arret.tache_id));
       setCollectedKg(prev => prev + (arret.poids_prevu_kg || 0));
+      // On met à jour l'objet local tournee pour que le calcul global reste juste si besoin
+      if (tournee) {
+        const updatedArrets = tournee.arrets.map(a => 
+          a.tache_id === arret.tache_id ? { ...a, statut: 'terminee' as const } : a
+        );
+        setTournee({ ...tournee, arrets: updatedArrets });
+      }
       showToast(`✓ ${arret.client_nom} validé`);
     } catch (e) {
       showToast("Erreur lors de la validation");
@@ -80,6 +95,12 @@ export default function DriverScreen() {
         commentaire: "Signalé comme imprévu par le chauffeur" 
       });
       setStops(prev => prev.filter(s => s.tache_id !== arret.tache_id));
+      if (tournee) {
+        const updatedArrets = tournee.arrets.map(a => 
+          a.tache_id === arret.tache_id ? { ...a, statut: 'erreur' as const } : a
+        );
+        setTournee({ ...tournee, arrets: updatedArrets });
+      }
       showToast(`↷ ${arret.client_nom} reporté aux imprévus`);
     } catch (e) {
       showToast("Erreur lors du signalement");
@@ -124,8 +145,8 @@ export default function DriverScreen() {
       {/* Progress */}
       <View style={s.progressWrap}>
         <View style={s.progressLabelRow}>
-          <Text style={s.progressLabel}>{done} / {total} collectes</Text>
-          <Text style={s.progressKg}>{collectedKg} kg collectés</Text>
+          <Text style={s.progressLabel}>{doneArrets} / {totalArrets} collectes</Text>
+          <Text style={s.progressKg}>{collectedKg} / {totalKgPrevu} kg</Text>
         </View>
         <View style={s.progressBarBg}>
           <View style={[s.progressBarFill, { width: `${progressPct}%` as any }]} />
@@ -140,7 +161,7 @@ export default function DriverScreen() {
           </View>
           <Text style={s.emptyTitle}>Tournée terminée !</Text>
           <Text style={s.emptySubtitle}>
-            {done} collecte{done !== 1 ? 's' : ''} · {collectedKg} kg collectés
+            {doneArrets} collecte{doneArrets !== 1 ? 's' : ''} · {collectedKg} kg collectés
           </Text>
         </View>
       ) : (

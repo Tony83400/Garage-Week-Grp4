@@ -2,6 +2,7 @@ import sqlite3
 import math
 import datetime
 import requests
+import random
 
 def heure_vers_minutes(heure_str):
     h, m, s = map(int, heure_str.split(':'))
@@ -206,8 +207,8 @@ class TourneeRepository:
                        c.nom_entreprise, c.latitude, c.longitude
                 FROM taches_collecte t
                 JOIN clients c ON t.client_id = c.id
-                JOIN tournees_jour tj ON t.date_planifiee = tj.date_tournee 
-                WHERE tj.chauffeur_id = ? AND t.date_planifiee = ?
+                JOIN tournees_jour tj ON t.tournee_id = tj.id 
+                WHERE tj.chauffeur_id = ? AND tj.date_tournee = ?
                 ORDER BY t.ordre_passage ASC
             ''', (chauffeur_id, date_jour))
             
@@ -237,11 +238,14 @@ class TourneeRepository:
     def get_dashboard_stats(self, date_jour):
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # 1. Stats de poids et collectes
             cursor.execute('''
                 SELECT 
                     SUM(poids_prevu_kg),
                     COUNT(id),
-                    SUM(CASE WHEN statut = 'terminee' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN statut = 'terminee' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN statut = 'terminee' THEN poids_prevu_kg ELSE 0 END)
                 FROM taches_collecte
                 WHERE date_planifiee = ?
             ''', (date_jour,))
@@ -250,18 +254,49 @@ class TourneeRepository:
             poids_total = resultat[0] or 0
             total_collectes = resultat[1] or 0
             collectes_validees = resultat[2] or 0
+            poids_collecte = resultat[3] or 0
             
+            # 2. Alertes
             cursor.execute('''
                 SELECT COUNT(id) FROM taches_collecte 
                 WHERE date_planifiee = ? AND statut = 'erreur'
             ''', (date_jour,))
             alertes = cursor.fetchone()[0] or 0
 
+            # 3. Kilométrage total
+            cursor.execute('''
+                SELECT SUM(distance_km) FROM tournees_jour
+                WHERE date_tournee = ?
+            ''', (date_jour,))
+            km_total = cursor.fetchone()[0] or 0
+
+            # 4. Statut de la flotte (Dernier point par chauffeur)
+            cursor.execute('''
+                SELECT ch.prenom, c.nom_entreprise, MAX(t.ordre_passage)
+                FROM tournees_jour tj
+                JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
+                JOIN taches_collecte t ON tj.id = t.tournee_id
+                JOIN clients c ON t.client_id = c.id
+                WHERE tj.date_tournee = ? AND t.statut = 'terminee'
+                GROUP BY tj.id
+            ''', (date_jour,))
+            flotte_lignes = cursor.fetchall()
+            
+            flotte_statut = []
+            for f in flotte_lignes:
+                flotte_statut.append({
+                    "chauffeur": f[0],
+                    "dernier_point": f[1]
+                })
+
             return {
                 "poids_prevu_kg": poids_total,
+                "poids_collecte_kg": poids_collecte,
                 "collectes_total": total_collectes,
                 "collectes_validees": collectes_validees,
-                "alertes": alertes
+                "alertes": alertes,
+                "km_total": round(km_total, 1),
+                "flotte": flotte_statut
             }
 
     def get_activite_recente(self, date_jour, limite=5):
@@ -289,7 +324,7 @@ class TourneeRepository:
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT tj.id, tj.chauffeur_id, c.immatriculation, c.charge_max_kg, ch.nom, ch.prenom, tj.heure_debut_service
+                SELECT tj.id, tj.chauffeur_id, c.immatriculation, c.charge_max_kg, ch.nom, ch.prenom, tj.heure_debut_service, tj.distance_km
                 FROM tournees_jour tj
                 JOIN camions c ON tj.camion_id = c.id
                 JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
@@ -299,11 +334,11 @@ class TourneeRepository:
             
             resultat = []
             for t in tournees:
-                tournee_id, chauffeur_id, immatriculation, charge_max, nom, prenom, heure_depart = t
+                tournee_id, chauffeur_id, immatriculation, charge_max, nom, prenom, heure_depart, dist_km = t
                 
                 # CORRECTION ICI : On ne prend QUE les arrêts liés à CE tournee_id
                 cursor.execute('''
-                    SELECT t.id, t.statut, t.poids_prevu_kg, c.nom_entreprise, t.ordre_passage, c.latitude, c.longitude
+                    SELECT t.id, t.statut, t.poids_prevu_kg, c.nom_entreprise, t.ordre_passage, c.latitude, c.longitude, t.heure_estimee
                     FROM taches_collecte t
                     JOIN clients c ON t.client_id = c.id
                     WHERE t.date_planifiee = ? AND t.tournee_id = ?
@@ -320,7 +355,8 @@ class TourneeRepository:
                         "client_nom": a[3],
                         "ordre": a[4] or 0,
                         "latitude": a[5],
-                        "longitude": a[6]
+                        "longitude": a[6],
+                        "heure_estimee": a[7]
                     })
                 
                 # NOUVEAU : On n'envoie pas la tournée au Front si elle est vide (facultatif mais plus propre)
@@ -332,6 +368,7 @@ class TourneeRepository:
                         "immatriculation": immatriculation,
                         "capacite_max_kg": charge_max,
                         "heure_depart": heure_depart,
+                        "distance_km": dist_km,
                         "arrets": liste_arrets
                     })
             return resultat
@@ -379,12 +416,18 @@ class TourneeRepository:
                 WHERE date_planifiee = ? AND type_tache = 'collecte'
             ''', (date_jour,))
             
+            # En phase de test, on supprime les anciennes tâches pour tout regénérer proprement
             if cursor.fetchone()[0] > 0:
-                return {"status": "erreur", "message": "Les tâches pour cette date existent déjà."}
+                print(f"Suppression des tâches existantes pour le {date_jour} pour regénération.")
+                cursor.execute('''
+                    DELETE FROM taches_collecte 
+                    WHERE date_planifiee = ? AND type_tache = 'collecte'
+                ''', (date_jour,))
+                conn.commit()
 
             # 3. La Super-Requête : Trouver les clients prévus ce jour, SAUF s'ils sont fermés
             cursor.execute('''
-                SELECT d.client_id
+                SELECT d.client_id, d.poids_prevu_kg
                 FROM disponibilites_clients d
                 WHERE d.jour_semaine = ?
                 AND d.client_id NOT IN (
@@ -399,12 +442,11 @@ class TourneeRepository:
             # 4. Création des tâches
             taches_inserees = 0
             for client in clients_a_collecter:
-                client_id = client[0]
+                client_id, poids_estime = client
                 
-                # Pour le prototype, on met une estimation moyenne (ex: 3 bacs, 120kg)
-                # Plus tard, cela pourrait venir d'une moyenne historique par client
-                bacs_estimes = 3
-                poids_estime = 120.0
+                # On utilise le poids défini spécifiquement pour ce point (créneau de disponibilité)
+                # On estime environ 40kg par bac pour le nombre de bacs prévus
+                bacs_estimes = math.ceil(poids_estime / 40)
                 
                 cursor.execute('''
                     INSERT INTO taches_collecte 
@@ -415,7 +457,7 @@ class TourneeRepository:
             
             conn.commit()
             return {"status": "succes", "taches_creees": taches_inserees}
-    def sauvegarder_resultat_optimisation(self, date_jour, routes_optimales, data_ortools):
+    def sauvegarder_resultat_optimisation(self, date_jour, resultats_ia, data_ortools):
             """
             Prend le résultat d'OR-Tools et met à jour la table 'taches_collecte'
             en associant chaque tâche à sa tournée et son ordre de passage réel.
@@ -443,6 +485,9 @@ class TourneeRepository:
                 ''', (date_jour,))
 
                 # 3. Traitement des routes calculées par l'IA
+                routes_optimales = resultats_ia['routes']
+                distances_optimales = resultats_ia['distances']
+
                 for vehicule_id, sequence_noeuds in routes_optimales.items():
                     # On ignore les véhicules vides (qui ne contiennent que le dépôt départ/arrivée)
                     if len(sequence_noeuds) <= 2:
@@ -454,9 +499,20 @@ class TourneeRepository:
                         continue
                         
                     tournee_bdd_id = tournees_reelles_ids[vehicule_id]
+                    dist_km = distances_optimales.get(vehicule_id, 0)
+
+                    # Mise à jour de la distance pour cette tournée
+                    cursor.execute('''
+                        UPDATE tournees_jour 
+                        SET distance_km = ?
+                        WHERE id = ?
+                    ''', (dist_km, tournee_bdd_id))
                     
                     ordre_passage = 1
-                    for noeud_index in sequence_noeuds:
+                    for etape in sequence_noeuds:
+                        noeud_index = etape["node_index"]
+                        heure_estimee = etape["heure_estimee"]
+                        
                         # On ignore le nœud du dépôt (0)
                         if noeud_index == 0:
                             continue
@@ -467,9 +523,9 @@ class TourneeRepository:
                         if tache_id:
                             cursor.execute('''
                                 UPDATE taches_collecte 
-                                SET tournee_id = ?, ordre_passage = ?, statut = 'planifiee'
+                                SET tournee_id = ?, ordre_passage = ?, heure_estimee = ?, statut = 'planifiee'
                                 WHERE id = ?
-                            ''', (tournee_bdd_id, ordre_passage, tache_id))
+                            ''', (tournee_bdd_id, ordre_passage, heure_estimee, tache_id))
                             ordre_passage += 1
                 
                 # 4. Passage des tournées concernées au statut 'affectee'
@@ -480,5 +536,5 @@ class TourneeRepository:
                 ''', (date_jour,))
                 
                 conn.commit()
-                print("💾 Résultats de l'optimisation IA enregistrés avec succès en base de données !")
+                print("Resultats de l'optimisation IA enregistres avec succes en base de donnees !")
             

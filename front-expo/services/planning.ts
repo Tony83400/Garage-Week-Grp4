@@ -15,6 +15,7 @@ export interface TourneeAdmin {
     ordre: number;
     latitude?: number;
     longitude?: number;
+    heure_estimee?: string;
   }[];
 }
 

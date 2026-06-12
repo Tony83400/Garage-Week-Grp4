@@ -54,6 +54,7 @@ CREATE TABLE disponibilites_clients (
     jour_semaine INTEGER NOT NULL CHECK (jour_semaine BETWEEN 1 AND 7),
     heure_debut TEXT NOT NULL,
     heure_fin TEXT NOT NULL,
+    poids_prevu_kg REAL DEFAULT 100.0,
     CHECK (heure_debut < heure_fin)
 );
 
@@ -79,6 +80,7 @@ CREATE TABLE tournees_jour (
     depot_id INTEGER NOT NULL DEFAULT 1 REFERENCES depots(id),
     heure_debut_service TEXT NOT NULL,
     heure_fin_service TEXT NOT NULL,
+    distance_km REAL DEFAULT 0,
     statut TEXT DEFAULT 'brouillon' CHECK (statut IN ('brouillon', 'affectee', 'demarree', 'terminee'))
 );
 
@@ -89,6 +91,7 @@ CREATE TABLE taches_collecte (
     type_tache TEXT DEFAULT 'collecte' CHECK (type_tache IN ('collecte', 'vidage_depot')),
     date_planifiee DATE NOT NULL,
     ordre_passage INTEGER DEFAULT NULL,
+    heure_estimee TEXT DEFAULT NULL,
     bacs_prevus INTEGER DEFAULT 0,
     poids_prevu_kg REAL DEFAULT 0,
     duree_estimee_min INTEGER DEFAULT 15,
@@ -150,17 +153,17 @@ INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES
 -- =============================================================================
 
 -- A. Les clients ouverts le vendredi (Disponibilité de 3h à 16h)
-INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin) VALUES
-(1, 5, '03:00:00', '16:00:00'),
-(2, 5, '03:00:00', '16:00:00'),
-(3, 5, '03:00:00', '16:00:00'),
-(4, 5, '03:00:00', '16:00:00'),
-(5, 5, '03:00:00', '16:00:00'),
-(6, 5, '03:00:00', '16:00:00'),
-(7, 5, '03:00:00', '16:00:00'),
-(8, 5, '03:00:00', '16:00:00'),
-(9, 5, '03:00:00', '16:00:00'),
-(10, 5, '03:00:00', '16:00:00');
+INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin, poids_prevu_kg) VALUES
+(1, 5, '03:00:00', '16:00:00', 250.5),
+(2, 5, '03:00:00', '16:00:00', 120.0),
+(3, 5, '03:00:00', '16:00:00', 180.0),
+(4, 5, '03:00:00', '16:00:00', 300.0),
+(5, 5, '03:00:00', '16:00:00', 150.0),
+(6, 5, '03:00:00', '16:00:00', 200.0),
+(7, 5, '03:00:00', '16:00:00', 90.0),
+(8, 5, '03:00:00', '16:00:00', 60.0),
+(9, 5, '03:00:00', '16:00:00', 45.0),
+(10, 5, '03:00:00', '16:00:00', 75.0);
 
 -- B. Les plannings de travail des chauffeurs (Où l'IA va répartir les tâches)
 -- On affecte 2 camions en service de 3h00 à 16h00 sans interruption.

@@ -4,9 +4,12 @@ import { api } from './api';
 // Champs exacts retournés par repo_tournees.get_dashboard_stats()
 export interface DashboardStats {
   poids_prevu_kg: number;
+  poids_collecte_kg: number;
   collectes_total: number;
   collectes_validees: number;
   alertes: number;
+  km_total: number;
+  flotte: { chauffeur: string; dernier_point: string }[];
 }
 
 // Correspond à GET /api/dashboard/activite?date=YYYY-MM-DD

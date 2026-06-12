@@ -201,10 +201,27 @@ def resoudre_et_exporter(data):
     # -------------------------------------------------------------
     # 4. EXÉCUTION DU MOTEUR DE RECHERCHE
     # -------------------------------------------------------------
+    # NOUVEAU : Ajout d'une pénalité pour permettre de "déposer" (ignorer) un point si impossible
+    # Cela évite que le solveur ne renvoie "Aucune solution" si un point casse une contrainte.
+    penalty = 1000000 
+    for node in range(1, len(data['distance_matrix'])):
+        routing.AddDisjunction([manager.NodeToIndex(node)], penalty)
+
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
     search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     search_parameters.time_limit.seconds = 10 
+
+    # DEBUG : Afficher les contraintes avant le solve
+    print("\n--- DIAGNOSTIC DES CONTRAINTES ---")
+    print(f"Nombre de clients à visiter : {len(data['demands']) - 1}")
+    print(f"Nombre de véhicules : {data['num_vehicles']}")
+    print(f"Total Bacs demandés : {sum(data['demands'])}")
+    print(f"Capacité totale Bacs : {sum(data['vehicle_capacities'])}")
+    print(f"Total Poids demandé : {sum(data['weight_demands'])} kg")
+    print(f"Capacité totale Poids : {sum(data['vehicle_weights'])} kg")
+    print(f"Fenêtres horaires clients (min/max) : {min([t[0] for t in data['time_windows'] if t[0]>0])} / {max([t[1] for t in data['time_windows'] if t[1]<1440])}")
+    print("-----------------------------------\n")
 
     print("Recherche de l'itinéraire optimal en cours (Max 10 sec)...")
     solution = routing.SolveWithParameters(search_parameters)
@@ -217,32 +234,50 @@ def resoudre_et_exporter(data):
         sauvegarder_en_csv(data, manager, routing, solution, time_dimension)
         
         # --- NOUVEAUTÉ : On construit le dictionnaire pour l'API ---
-        routes_optimales = {}
+        resultat = {
+            "routes": {},
+            "distances": {}
+        }
+        
         for vehicle_id in range(data['num_vehicles']):
             index = routing.Start(vehicle_id)
             route = []
+            route_distance = 0
             
             # On parcours les arrêts du véhicule
             while not routing.IsEnd(index):
                 node_index = manager.IndexToNode(index)
-                route.append(node_index)
+                
+                # Calcul de l'heure estimée
+                temps_var = time_dimension.CumulVar(index)
+                heure_arrivee = minutes_en_heure(solution.Min(temps_var))
+                
+                # On stocke l'index ET l'heure
+                route.append({
+                    "node_index": node_index,
+                    "heure_estimee": heure_arrivee
+                })
+                
+                previous_index = index
                 index = solution.Value(routing.NextVar(index))
+                # On récupère la distance du trajet (coût de l'arc)
+                route_distance += routing.GetArcCostForVehicle(previous_index, index, vehicle_id)
                 
             # On ajoute le dépôt d'arrivée (la fin)
-            route.append(manager.IndexToNode(index))
+            temps_var = time_dimension.CumulVar(index)
+            heure_arrivee = minutes_en_heure(solution.Min(temps_var))
+            route.append({
+                "node_index": manager.IndexToNode(index),
+                "heure_estimee": heure_arrivee
+            })
             
-            routes_optimales[vehicle_id] = route
+            resultat["routes"][vehicle_id] = route
+            # Conversion distance (mètres -> km avec 1 décimale)
+            resultat["distances"][vehicle_id] = round(route_distance / 1000, 1)
             
-        return routes_optimales # <-- C'EST ÇA QUI MANQUAIT !
+        return resultat
     else:
-        print("Aucune solution n'a pu être trouvée.")
+        print("AUCUNE SOLUTION TROUVEE par OR-Tools.")
         return None
-    # DEBUG : Afficher les contraintes avant le solve
-    print("\n--- DIAGNOSTIC DES CONTRAINTES ---")
-    print(f"Nombre de clients à visiter : {len(data['demands']) - 1}")
-    print(f"Total Bacs demandés : {sum(data['demands'])}")
-    print(f"Capacité totale des camions (Bacs) : {sum(data['vehicle_capacities'])}")
-    print(f"Fenêtres horaires clients (min/max) : {min([t[0] for t in data['time_windows'] if t[0]>0])} / {max([t[1] for t in data['time_windows'] if t[1]<1440])}")
-    print("-----------------------------------\n")
 
 

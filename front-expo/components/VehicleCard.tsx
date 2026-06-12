@@ -41,9 +41,17 @@ export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg 
 
   const vehicleColor = VEHICLE_COLORS[index % VEHICLE_COLORS.length];
   const vehicleLabel = `VL${index + 1}`;
-  const chargeKg = arrets.reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
-  const fillPct = Math.min(Math.round((chargeKg / capaciteMaxKg) * 100), 100);
-  const isOverload = fillPct >= 95;
+  
+  // Poids total prévu pour la tournée
+  const chargeTotaleKg = arrets.reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
+  
+  // Poids actuellement estimé dans le camion (arrêts terminés)
+  const chargeActuelleKg = arrets
+    .filter(a => a.statut === 'terminee')
+    .reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
+
+  const fillPct = Math.min(Math.round((chargeActuelleKg / capaciteMaxKg) * 100), 100);
+  const isOverload = chargeActuelleKg >= capaciteMaxKg * 0.95;
 
   return (
     <View style={s.card}>
@@ -82,8 +90,8 @@ export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg 
           <Text style={s.metaLabel}>Arrêts</Text>
         </View>
         <View style={[s.metaItem, s.metaBorder]}>
-          <Text style={s.metaValue}>≈ {chargeKg} kg</Text>
-          <Text style={s.metaLabel}>Charge</Text>
+          <Text style={s.metaValue}>≈ {chargeTotaleKg} kg</Text>
+          <Text style={s.metaLabel}>Prévu</Text>
         </View>
         <View style={s.metaItem}>
           {/* Heure de départ : non fournie par le back — voir BACK_PLANNING.md */}
@@ -95,9 +103,9 @@ export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg 
       {/* Weight bar */}
       <View style={s.weightWrap}>
         <View style={s.weightLabelRow}>
-          <Text style={s.weightLabel}>Charge utile</Text>
+          <Text style={s.weightLabel}>Charge actuelle estimée</Text>
           <Text style={[s.weightValue, isOverload && { color: '#E67E22' }]}>
-            {chargeKg} / {capaciteMaxKg} kg{isOverload ? ' ⚠' : ''}
+            {chargeActuelleKg} / {capaciteMaxKg} kg{isOverload ? ' ⚠' : ''}
           </Text>
         </View>
         <View style={s.weightBarBg}>
@@ -125,7 +133,12 @@ export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg 
                 <View style={s.stopNum}>
                   <Text style={s.stopNumText}>{a.ordre ?? i + 1}</Text>
                 </View>
-                <Text style={s.stopName} numberOfLines={1}>{a.client_nom}</Text>
+                <View style={s.stopContent}>
+                  <Text style={s.stopName} numberOfLines={1}>{a.client_nom}</Text>
+                  {a.heure_estimee && (
+                    <Text style={s.stopTime}>Heure estimée : {a.heure_estimee}</Text>
+                  )}
+                </View>
                 <StatutBadge statut={a.statut} />
                 {a.latitude && a.longitude && (
                   <Ionicons name="location-outline" size={13} color={colors.accentLight} />
@@ -310,11 +323,19 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: colors.primaryLight,
   },
-  stopName: {
+  stopContent: {
     flex: 1,
+    justifyContent: 'center',
+  },
+  stopName: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.text,
+  },
+  stopTime: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   badge: {
     paddingHorizontal: 9,

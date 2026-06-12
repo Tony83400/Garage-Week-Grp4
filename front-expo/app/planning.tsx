@@ -25,7 +25,7 @@ import { getPlanningAdmin, genererBrouillons, optimiserTournees, type TourneeAdm
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
-type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: any[]; capaciteMaxKg: number };
+type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: any[]; capaciteMaxKg: number; distance_km: number };
 
 export default function PlanningScreen() {
   const router = useRouter();
@@ -61,21 +61,23 @@ export default function PlanningScreen() {
           chauffeurId: tournee.chauffeur_id,
           chauffeurNom: tournee.chauffeur,
           capaciteMaxKg: tournee.capacite_max_kg,
+          distance_km: (tournee as any).distance_km || 0,
           arrets: tournee.arrets.map(a => ({
-            id: a.tache_id,
-            nom: a.client_nom,
+            tache_id: a.tache_id,
+            client_nom: a.client_nom,
             adresse: "Adresse à compléter",
             statut: a.statut,
-            bacs: Math.round(a.poids_prevu_kg / 40) || 0,
-            poids: a.poids_prevu_kg,
+            bacs_prevus: Math.round(a.poids_prevu_kg / 40) || 0,
+            poids_prevu_kg: a.poids_prevu_kg,
             latitude: (a as any).latitude || 0,
             longitude: (a as any).longitude || 0,
-            ordre: a.ordre
+            ordre: a.ordre,
+            heure_estimee: a.heure_estimee
           }))
         }));
         // LOG 3 : Ce qui est envoyé aux composants (VehicleCard)
         console.log("=== LOG 3 : ROWS PRÊTES POUR L'AFFICHAGE ===");
-        console.log(JSON.stringify(rows.map(r => ({ id: r.chauffeurId, nom: r.chauffeurNom, arrets: r.arrets.length })), null, 2));
+        console.log(JSON.stringify(rows.map(r => ({ id: r.chauffeurId, nom: r.chauffeurNom, arrets: r.arrets.length, km: r.distance_km })), null, 2));
         setVehicles(rows);
       }
     } catch (e) {
@@ -179,6 +181,26 @@ export default function PlanningScreen() {
           <View style={s.dateBadge}>
             <Ionicons name="calendar-outline" size={14} color={colors.primaryLight} />
             <Text style={s.dateBadgeText}>{DATE_DEMO}</Text>
+          </View>
+        </View>
+
+        {/* Stats Bar */}
+        <View style={s.statsBar}>
+          <View style={s.statItem}>
+            <Text style={s.statValue}>{vehicles.length}</Text>
+            <Text style={s.statLabel}>Camions</Text>
+          </View>
+          <View style={s.statItem}>
+            <Text style={s.statValue}>{vehicles.reduce((acc, v) => acc + v.arrets.length, 0)}</Text>
+            <Text style={s.statLabel}>Arrêts</Text>
+          </View>
+          <View style={s.statItem}>
+            <Text style={s.statValue}>~{stats?.poids_prevu_kg || 0} kg</Text>
+            <Text style={s.statLabel}>Total prévu</Text>
+          </View>
+          <View style={s.statItem}>
+            <Text style={s.statValue}>{stats?.km_total || 0} km</Text>
+            <Text style={s.statLabel}>Distance</Text>
           </View>
         </View>
 
@@ -366,6 +388,38 @@ const s = StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   dateBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primaryLight },
+
+  // Stats Bar
+  statsBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1, borderColor: '#EAF2EE',
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#EAF2EE',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
 
   // Alert banner
   alertBanner: {

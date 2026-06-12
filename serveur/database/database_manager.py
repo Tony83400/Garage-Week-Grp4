@@ -71,5 +71,5 @@ class DatabaseManager:
     def generer_brouillons_jour(self, date_jour):
         return self.repo_tournees.generer_brouillons_jour(date_jour)
         
-    def sauvegarder_resultat_optimisation(self, date_jour, routes_optimales, data_ortools):
-        return self.repo_tournees.sauvegarder_resultat_optimisation(date_jour, routes_optimales, data_ortools)
+    def sauvegarder_resultat_optimisation(self, date_jour, resultats_ia, data_ortools):
+        return self.repo_tournees.sauvegarder_resultat_optimisation(date_jour, resultats_ia, data_ortools)
