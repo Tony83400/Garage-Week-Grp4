@@ -9,6 +9,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
@@ -31,32 +32,33 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
   const [slotStart, setSlotStart] = useState('07:00');
   const [slotEnd, setSlotEnd] = useState('12:00');
   const [saisonnier, setSaisonnier] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const canSubmit = nom.trim().length > 0 && adresse.trim().length > 0;
 
   async function handleSubmit() {
-    if (!canSubmit) return;
-    
+    if (!canSubmit || submitting) return;
+    setSubmitting(true);
+    setErrorMsg(null);
     try {
-      // Appel à l'API Python pour enregistrer le client
       await addClient({
         nom_entreprise: nom.trim(),
-        // On met des coordonnées bidons pour la démo, 
-        // ou on pourrait utiliser l'adresse pour faire du géocodage plus tard
-        latitude: 43.1200, 
-        longitude: 5.9300 
+        latitude: 43.1200,
+        longitude: 5.9300,
       });
-
       onSuccess(`✓ ${nom.trim()} ajouté avec succès !`);
-      handleClose(); // Ferme et vide le formulaire
-    } catch (e: any) {
-      console.error(e);
-      // Gérer l'erreur si besoin
-      alert("Erreur lors de l'ajout du site");
+      handleClose();
+    } catch {
+      setErrorMsg("Impossible d'ajouter ce site. Vérifiez votre connexion.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   function handleClose() {
+    if (submitting) return;
     setNom('');
     setCategorie('');
     setAdresse('');
@@ -64,6 +66,8 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
     setSlotStart('07:00');
     setSlotEnd('12:00');
     setSaisonnier(false);
+    setErrorMsg(null);
+    setFocusedField(null);
     onClose();
   }
 
@@ -78,9 +82,12 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
 
             {/* Header */}
             <View style={s.header}>
-              <View>
+              <View style={s.headerIconWrap}>
+                <Ionicons name="leaf" size={18} color={colors.primaryLight} />
+              </View>
+              <View style={s.headerText}>
                 <Text style={s.title}>Nouveau site de collecte</Text>
-                <Text style={s.subtitle}>Ajouter un point au planning</Text>
+                <Text style={s.subtitle}>Var · Les Alchimistes Côte d'Azur</Text>
               </View>
               <TouchableOpacity style={s.closeBtn} onPress={handleClose} activeOpacity={0.75}>
                 <Ionicons name="close" size={20} color={colors.textMuted} />
@@ -94,19 +101,25 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Nom */}
+              {/* Section — Établissement */}
+              <View style={s.sectionHeader}>
+                <Ionicons name="business-outline" size={13} color={colors.primaryLight} />
+                <Text style={s.sectionLabel}>Établissement</Text>
+              </View>
+
               <View style={s.field}>
-                <Text style={s.label}>Nom de l'établissement <Text style={s.required}>*</Text></Text>
+                <Text style={s.label}>Nom <Text style={s.required}>*</Text></Text>
                 <TextInput
-                  style={s.input}
+                  style={[s.input, focusedField === 'nom' && s.inputFocused]}
                   value={nom}
                   onChangeText={setNom}
+                  onFocus={() => setFocusedField('nom')}
+                  onBlur={() => setFocusedField(null)}
                   placeholder="ex: McDonald's Toulon Mayol"
                   placeholderTextColor={colors.textMuted}
                 />
               </View>
 
-              {/* Catégorie */}
               <View style={s.field}>
                 <Text style={s.label}>Catégorie</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
@@ -114,7 +127,7 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
                     <TouchableOpacity
                       key={cat}
                       style={[s.chip, categorie === cat && s.chipActive]}
-                      onPress={() => setCategorie(cat)}
+                      onPress={() => setCategorie(c => c === cat ? '' : cat)}
                       activeOpacity={0.75}
                     >
                       <Text style={[s.chipText, categorie === cat && s.chipTextActive]}>{cat}</Text>
@@ -123,19 +136,27 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
                 </ScrollView>
               </View>
 
-              {/* Adresse */}
+              <View style={s.divider} />
+
+              {/* Section — Localisation */}
+              <View style={s.sectionHeader}>
+                <Ionicons name="location-outline" size={13} color={colors.primaryLight} />
+                <Text style={s.sectionLabel}>Localisation</Text>
+              </View>
+
               <View style={s.field}>
                 <Text style={s.label}>Adresse <Text style={s.required}>*</Text></Text>
                 <TextInput
-                  style={s.input}
+                  style={[s.input, focusedField === 'adresse' && s.inputFocused]}
                   value={adresse}
                   onChangeText={setAdresse}
+                  onFocus={() => setFocusedField('adresse')}
+                  onBlur={() => setFocusedField(null)}
                   placeholder="ex: 12 rue des Oliviers"
                   placeholderTextColor={colors.textMuted}
                 />
               </View>
 
-              {/* Ville */}
               <View style={s.field}>
                 <Text style={s.label}>Commune</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
@@ -143,7 +164,7 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
                     <TouchableOpacity
                       key={v}
                       style={[s.chip, ville === v && s.chipActive]}
-                      onPress={() => setVille(v)}
+                      onPress={() => setVille(c => c === v ? '' : v)}
                       activeOpacity={0.75}
                     >
                       <Text style={[s.chipText, ville === v && s.chipTextActive]}>{v}</Text>
@@ -152,27 +173,38 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
                 </ScrollView>
               </View>
 
-              {/* Créneau */}
+              <View style={s.divider} />
+
+              {/* Section — Planning */}
+              <View style={s.sectionHeader}>
+                <Ionicons name="time-outline" size={13} color={colors.primaryLight} />
+                <Text style={s.sectionLabel}>Planning</Text>
+              </View>
+
               <View style={s.field}>
                 <Text style={s.label}>Créneau de collecte</Text>
                 <View style={s.timeRow}>
-                  <View style={s.timeField}>
-                    <Ionicons name="time-outline" size={15} color={colors.textMuted} />
+                  <View style={[s.timeField, focusedField === 'start' && s.timeFieldFocused]}>
+                    <Ionicons name="sunny-outline" size={14} color={colors.textMuted} />
                     <TextInput
                       style={s.timeInput}
                       value={slotStart}
                       onChangeText={setSlotStart}
+                      onFocus={() => setFocusedField('start')}
+                      onBlur={() => setFocusedField(null)}
                       placeholder="07:00"
                       placeholderTextColor={colors.textMuted}
                     />
                   </View>
-                  <Text style={s.timeSep}>→</Text>
-                  <View style={s.timeField}>
-                    <Ionicons name="time-outline" size={15} color={colors.textMuted} />
+                  <Ionicons name="arrow-forward-outline" size={14} color={colors.textMuted} />
+                  <View style={[s.timeField, focusedField === 'end' && s.timeFieldFocused]}>
+                    <Ionicons name="moon-outline" size={14} color={colors.textMuted} />
                     <TextInput
                       style={s.timeInput}
                       value={slotEnd}
                       onChangeText={setSlotEnd}
+                      onFocus={() => setFocusedField('end')}
+                      onBlur={() => setFocusedField(null)}
                       placeholder="12:00"
                       placeholderTextColor={colors.textMuted}
                     />
@@ -180,7 +212,6 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
                 </View>
               </View>
 
-              {/* Saisonnalité */}
               <TouchableOpacity
                 style={[s.saisonCard, saisonnier && s.saisonCardActive]}
                 onPress={() => setSaisonnier(v => !v)}
@@ -195,29 +226,50 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
                 </View>
                 <View style={s.saisonInfo}>
                   <Text style={[s.saisonTitle, saisonnier && s.saisonTitleActive]}>
-                    Saisonnalité {saisonnier ? 'active' : 'inactive'}
+                    {saisonnier ? 'Saisonnalité active' : 'Client toute l\'année'}
                   </Text>
-                  <Text style={s.saisonSub}>Juin → Septembre · prédiction +20%</Text>
+                  <Text style={s.saisonSub}>
+                    {saisonnier ? 'Juin → Septembre · prédiction +20%' : 'Collecte régulière hors saison'}
+                  </Text>
                 </View>
                 <View style={[s.toggle, saisonnier && s.toggleActive]}>
                   <View style={[s.toggleThumb, saisonnier && s.toggleThumbOn]} />
                 </View>
               </TouchableOpacity>
+
+              {/* Inline error */}
+              {errorMsg && (
+                <View style={s.errorRow}>
+                  <Ionicons name="alert-circle-outline" size={14} color={colors.coral} />
+                  <Text style={s.errorText}>{errorMsg}</Text>
+                </View>
+              )}
             </ScrollView>
 
             {/* Footer */}
             <View style={s.footer}>
-              <TouchableOpacity style={s.btnCancel} onPress={handleClose} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={s.btnCancel}
+                onPress={handleClose}
+                activeOpacity={0.8}
+                disabled={submitting}
+              >
                 <Text style={s.btnCancelText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.btnSubmit, !canSubmit && s.btnSubmitDisabled]}
                 onPress={handleSubmit}
                 activeOpacity={0.85}
-                disabled={!canSubmit}
+                disabled={!canSubmit || submitting}
               >
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={s.btnSubmitText}>Valider le site</Text>
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={16} color="#fff" />
+                    <Text style={s.btnSubmitText}>Valider le site</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -263,22 +315,35 @@ const s = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#EAF2EE',
   },
+  headerIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: '#E8F5EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C8E8D4',
+  },
+  headerText: {
+    flex: 1,
+  },
   title: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: colors.text,
     letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textMuted,
     marginTop: 2,
     fontWeight: '500',
@@ -298,17 +363,37 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 8,
-    gap: 20,
+    gap: 14,
   },
+
+  // Sections
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primaryLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#EAF2EE',
+    marginVertical: 6,
+  },
+
+  // Fields
   field: {
     gap: 8,
   },
   label: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   required: {
     color: colors.coral,
@@ -316,7 +401,7 @@ const s = StyleSheet.create({
   input: {
     backgroundColor: colors.background,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#D4E8DC',
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -324,6 +409,12 @@ const s = StyleSheet.create({
     color: colors.text,
     fontWeight: '500',
   },
+  inputFocused: {
+    borderColor: colors.primaryLight,
+    backgroundColor: '#F5FAF7',
+  },
+
+  // Chips
   chips: {
     gap: 8,
     paddingVertical: 2,
@@ -333,7 +424,7 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: colors.background,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#D4E8DC',
   },
   chipActive: {
@@ -348,10 +439,12 @@ const s = StyleSheet.create({
   chipTextActive: {
     color: '#fff',
   },
+
+  // Time row
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   timeField: {
     flex: 1,
@@ -360,10 +453,14 @@ const s = StyleSheet.create({
     gap: 8,
     backgroundColor: colors.background,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#D4E8DC',
     paddingHorizontal: 12,
     paddingVertical: 11,
+  },
+  timeFieldFocused: {
+    borderColor: colors.primaryLight,
+    backgroundColor: '#F5FAF7',
   },
   timeInput: {
     flex: 1,
@@ -371,11 +468,8 @@ const s = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
-  timeSep: {
-    fontSize: 16,
-    color: colors.textMuted,
-    fontWeight: '600',
-  },
+
+  // Saisonnalité
   saisonCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -383,12 +477,12 @@ const s = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     backgroundColor: colors.background,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#D4E8DC',
   },
   saisonCardActive: {
     backgroundColor: '#FFF8F0',
-    borderColor: 'rgba(230,126,34,0.3)',
+    borderColor: 'rgba(230,126,34,0.35)',
   },
   saisonIconWrap: {
     width: 38,
@@ -443,6 +537,27 @@ const s = StyleSheet.create({
   toggleThumbOn: {
     marginLeft: 20,
   },
+
+  // Error
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.coralLight,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(231,111,81,0.25)',
+  },
+  errorText: {
+    fontSize: 12,
+    color: colors.coral,
+    fontWeight: '600',
+    flex: 1,
+  },
+
+  // Footer
   footer: {
     flexDirection: 'row',
     gap: 12,

@@ -56,8 +56,9 @@ export default function DriverScreen() {
 
   const totalArrets = tournee ? tournee.arrets.length : 0;
   const doneArrets = tournee ? tournee.arrets.filter(a => a.statut === 'terminee' || a.statut === 'erreur').length : 0;
-  const progressPct = totalArrets === 0 ? 0 : Math.round((doneArrets / totalArrets) * 100);
   const totalKgPrevu = tournee ? tournee.arrets.reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0) : 0;
+  const kgProgressPct = totalKgPrevu === 0 ? 0 : Math.min(Math.round((collectedKg / totalKgPrevu) * 100), 100);
+  const kgRestants = Math.max(totalKgPrevu - collectedKg, 0);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -133,7 +134,9 @@ export default function DriverScreen() {
           <View>
             <Text style={s.driverName}>{tournee?.chauffeur || 'Aucun chauffeur'}</Text>
             <Text style={s.driverSub}>
-              {tournee?.immatriculation || 'Aucun véhicule'} · max {tournee?.capacite_max_kg || 0} kg
+              {stops.length > 0
+                ? `${stops.length} arrêt${stops.length > 1 ? 's' : ''} restant${stops.length > 1 ? 's' : ''} · ${kgRestants} kg`
+                : tournee?.immatriculation || '–'}
             </Text>
           </View>
         </View>
@@ -145,11 +148,14 @@ export default function DriverScreen() {
       {/* Progress */}
       <View style={s.progressWrap}>
         <View style={s.progressLabelRow}>
-          <Text style={s.progressLabel}>{doneArrets} / {totalArrets} collectes</Text>
-          <Text style={s.progressKg}>{collectedKg} / {totalKgPrevu} kg</Text>
+          <View>
+            <Text style={s.progressKgBig}>{collectedKg} <Text style={s.progressKgUnit}>kg collectés</Text></Text>
+            <Text style={s.progressSub}>sur {totalKgPrevu} kg prévus · {doneArrets}/{totalArrets} arrêts</Text>
+          </View>
+          <Text style={s.progressPct}>{kgProgressPct}%</Text>
         </View>
         <View style={s.progressBarBg}>
-          <View style={[s.progressBarFill, { width: `${progressPct}%` as any }]} />
+          <View style={[s.progressBarFill, { width: `${kgProgressPct}%` as any }]} />
         </View>
       </View>
 
@@ -166,35 +172,81 @@ export default function DriverScreen() {
         </View>
       ) : (
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={s.listHeader}>
-            <Text style={s.listTitle}>File de collecte</Text>
-            <View style={s.listCount}>
-              <Text style={s.listCountText}>
-                {stops.length} arrêt{stops.length !== 1 ? 's' : ''}
-              </Text>
+
+          {/* Hero — prochain arrêt */}
+          {stops[0] && (
+            <View style={s.heroCard}>
+              <View style={s.heroTopRow}>
+                <View style={s.heroLabel}>
+                  <View style={s.heroDot} />
+                  <Text style={s.heroLabelText}>Prochain arrêt</Text>
+                </View>
+                <View style={s.heroNumBadge}>
+                  <Text style={s.heroNumText}>#{stops[0].ordre || 1}</Text>
+                </View>
+              </View>
+
+              <Text style={s.heroClientName} numberOfLines={2}>{stops[0].client_nom}</Text>
+              <Text style={s.heroPoids}>~{stops[0].poids_prevu_kg} kg à collecter</Text>
+
+              <View style={s.heroActions}>
+                <TouchableOpacity
+                  style={s.heroValidate}
+                  onPress={() => handleValidate(stops[0])}
+                  activeOpacity={0.82}
+                >
+                  <LinearGradient
+                    colors={[colors.primaryLight, colors.accent]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={s.heroActionGradient}
+                  >
+                    <Ionicons name="checkmark" size={20} color="#fff" />
+                    <Text style={s.heroValidateText}>Valider la collecte</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.heroSkip}
+                  onPress={() => handleSkip(stops[0])}
+                  activeOpacity={0.82}
+                >
+                  <Ionicons name="alert-circle-outline" size={18} color={colors.coral} />
+                  <Text style={s.heroSkipText}>Signaler un imprévu</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
-          {stops.map((stop, i) => {
-            // Transformation temporaire pour matcher le format attendu par ton composant StopCard actuel
-            const mappedStop = {
-              id: stop.tache_id,
-              ordre: stop.ordre || i + 1,
-              nom: stop.client_nom,
-              ville: "Var", // A ajouter côté BDD plus tard si besoin
-              poidsPrevu: stop.poids_prevu_kg
-            };
+          {/* Liste des arrêts suivants */}
+          {stops.length > 1 && (
+            <>
+              <View style={s.listHeader}>
+                <Text style={s.listTitle}>Arrêts suivants</Text>
+                <View style={s.listCount}>
+                  <Text style={s.listCountText}>{stops.length - 1}</Text>
+                </View>
+              </View>
 
-            return (
-              <StopCard
-                key={stop.tache_id}
-                stop={mappedStop}
-                isFirst={i === 0}
-                onValidate={() => handleValidate(stop)}
-                onSkip={() => handleSkip(stop)}
-              />
-            );
-          })}
+              {stops.slice(1).map((stop, i) => {
+                const mappedStop = {
+                  id: stop.tache_id,
+                  ordre: stop.ordre || i + 2,
+                  nom: stop.client_nom,
+                  ville: 'Var',
+                  poidsPrevu: stop.poids_prevu_kg,
+                };
+                return (
+                  <StopCard
+                    key={stop.tache_id}
+                    stop={mappedStop}
+                    isFirst={false}
+                    onValidate={() => handleValidate(stop)}
+                    onSkip={() => handleSkip(stop)}
+                  />
+                );
+              })}
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -281,7 +333,8 @@ const s = StyleSheet.create({
   // Progress
   progressWrap: {
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: '#E8F0EC',
@@ -289,20 +342,33 @@ const s = StyleSheet.create({
   progressLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'flex-end',
+    marginBottom: 10,
   },
-  progressLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+  progressKgBig: {
+    fontSize: 22,
+    fontWeight: '800',
     color: colors.text,
+    letterSpacing: -0.5,
   },
-  progressKg: {
-    fontSize: 13,
+  progressKgUnit: {
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.primaryLight,
+    color: colors.textMuted,
+  },
+  progressSub: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  progressPct: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.accent,
   },
   progressBarBg: {
-    height: 6,
+    height: 8,
     backgroundColor: '#EAF2EE',
     borderRadius: 99,
     overflow: 'hidden',
@@ -313,6 +379,107 @@ const s = StyleSheet.create({
     borderRadius: 99,
   },
 
+  // Hero stop
+  heroCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#C8E8D4',
+    padding: 22,
+    marginBottom: 24,
+    shadowColor: colors.primaryLight,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  heroLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  heroDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  heroLabelText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primaryLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  heroNumBadge: {
+    backgroundColor: '#E8F5EE',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: '#C8E8D4',
+  },
+  heroNumText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primaryLight,
+  },
+  heroClientName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.4,
+    marginBottom: 6,
+    lineHeight: 28,
+  },
+  heroPoids: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginBottom: 22,
+  },
+  heroActions: {
+    gap: 10,
+  },
+  heroValidate: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  heroActionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 15,
+  },
+  heroValidateText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  heroSkip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(231,111,81,0.3)',
+    backgroundColor: colors.coralLight,
+  },
+  heroSkipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.coral,
+  },
+
   // List
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
@@ -320,19 +487,18 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   listTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.text,
-    letterSpacing: -0.3,
   },
   listCount: {
     backgroundColor: colors.card,
     borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: '#EAF2EE',
   },

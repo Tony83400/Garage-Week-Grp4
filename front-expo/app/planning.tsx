@@ -185,126 +185,151 @@ export default function PlanningScreen() {
           </View>
         </View>
 
-        {/* Stats Bar */}
-        <View style={s.statsBar}>
-          <View style={s.statItem}>
-            <Text style={s.statValue}>{vehicles.length}</Text>
-            <Text style={s.statLabel}>Camions</Text>
-          </View>
-          <View style={s.statItem}>
-            <Text style={s.statValue}>{vehicles.reduce((acc, v) => acc + v.arrets.length, 0)}</Text>
-            <Text style={s.statLabel}>Arrêts</Text>
-          </View>
-          <View style={s.statItem}>
-            <Text style={s.statValue}>~{stats?.poids_prevu_kg || 0} kg</Text>
-            <Text style={s.statLabel}>Total prévu</Text>
-          </View>
-          <View style={s.statItem}>
-            <Text style={s.statValue}>{stats?.km_total || 0} km</Text>
-            <Text style={s.statLabel}>Distance</Text>
-          </View>
-        </View>
+        {/* ── MODE PRÉPARATION : aucune tournée générée ── */}
+        {!loading && vehicles.length === 0 && (
+          <>
+            <View style={s.prepCard}>
+              <View style={s.prepIconRow}>
+                <View style={s.prepIconBox}>
+                  <Ionicons name="sparkles-outline" size={28} color={colors.primaryLight} />
+                </View>
+              </View>
+              <Text style={s.prepTitle}>Prêt à planifier</Text>
+              <Text style={s.prepSub}>
+                {clients.length} site{clients.length !== 1 ? 's' : ''} enregistré{clients.length !== 1 ? 's' : ''} · IA OR-Tools
+              </Text>
+              <TouchableOpacity style={s.btnGenerateHero} onPress={handleGenerate} activeOpacity={0.85} disabled={generating}>
+                <LinearGradient colors={[colors.primaryLight, colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGenerateGradient}>
+                  {generating ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles-outline" size={18} color="#fff" />}
+                  <Text style={s.btnGenerateText}>{generating ? 'Calcul IA en cours...' : 'Générer les tournées'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
 
-        {stats && stats.alertes > 0 && (
-          <View style={s.alertBanner}>
-            <Ionicons name="warning-outline" size={18} color={colors.coral} />
-            <Text style={s.alertText}>
-              {stats.alertes} collecte{stats.alertes > 1 ? 's' : ''} en erreur aujourd'hui
-            </Text>
-          </View>
+            <TouchableOpacity style={s.btnSaisir} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
+              <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
+              <Text style={s.btnSaisirText}>+ Saisir un nouveau site</Text>
+            </TouchableOpacity>
+          </>
         )}
 
-        <TouchableOpacity style={s.btnSaisir} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
-          <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
-          <Text style={s.btnSaisirText}>+ Saisir un nouveau site</Text>
-        </TouchableOpacity>
+        {loading && (
+          <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
+        )}
 
-        <View style={s.actionBar}>
-          <TouchableOpacity style={s.btnGenerate} onPress={handleGenerate} activeOpacity={0.85} disabled={generating}>
-            <LinearGradient colors={[colors.primaryLight, colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGenerateGradient}>
-              {generating ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles-outline" size={16} color="#fff" />}
-              <Text style={s.btnGenerateText}>{generating ? 'Calcul en cours...' : 'Générer les tournées (IA)'}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
-            <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
-            <Text style={s.btnImprevusText}>Gérer les imprévus</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={s.mapCard}>
-          <View style={s.mapHeader}>
-            <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
-            <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
-            <View style={s.mapChip}>
-              <Text style={s.mapChipText}>{mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts</Text>
-            </View>
-          </View>
-          <MapTournees height={340} vehicles={mapVehicles} selectedStop={selectedStop} />
-        </View>
-
-        <View style={s.sitesPanel}>
-          <TouchableOpacity style={s.sitesPanelHeader} onPress={() => setSitesOpen(v => !v)} activeOpacity={0.75}>
-            <View style={s.sitesPanelLeft}>
-              <View style={s.sitesPanelIcon}><Ionicons name="location-outline" size={18} color={colors.primaryLight} /></View>
-              <View>
-                <Text style={s.sitesPanelTitle}>Sites de collecte enregistrés</Text>
-                <Text style={s.sitesPanelSub}>{clients.length} site{clients.length !== 1 ? 's' : ''} dans la base</Text>
+        {/* ── MODE SUPERVISION : tournées générées ── */}
+        {!loading && vehicles.length > 0 && (
+          <>
+            {/* Stats Bar */}
+            <View style={s.statsBar}>
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{vehicles.length}</Text>
+                <Text style={s.statLabel}>Camions</Text>
+              </View>
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{vehicles.reduce((acc, v) => acc + v.arrets.length, 0)}</Text>
+                <Text style={s.statLabel}>Arrêts</Text>
+              </View>
+              <View style={s.statItem}>
+                <Text style={s.statValue}>~{stats?.poids_prevu_kg || 0} kg</Text>
+                <Text style={s.statLabel}>Total prévu</Text>
+              </View>
+              <View style={s.statItem}>
+                <Text style={s.statValue}>{stats?.km_total || 0} km</Text>
+                <Text style={s.statLabel}>Distance</Text>
               </View>
             </View>
-            <Ionicons name={sitesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
-          </TouchableOpacity>
 
-          {sitesOpen && (
-            <View style={s.sitesList}>
-              {clients.length === 0 ? <Text style={s.sitesEmpty}>Aucun site chargé</Text> : (
-                clients.map((c, i) => (
-                  <TouchableOpacity
-                    key={c.id ?? i}
-                    style={[s.siteItem, i > 0 && s.siteDivider]}
-                    onPress={() => setSelectedStop({ lat: c.latitude, lon: c.longitude })}
-                    activeOpacity={0.7}
-                  >
-                    <View style={s.siteItemLeft}>
-                      <Text style={s.siteName}>{c.nom_entreprise}</Text>
-                      <Text style={s.siteCoords}>{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</Text>
-                    </View>
-                    <Ionicons name="location" size={14} color={colors.accentLight} />
-                  </TouchableOpacity>
-                ))
+            {stats && stats.alertes > 0 && (
+              <View style={s.alertBanner}>
+                <Ionicons name="warning-outline" size={18} color={colors.coral} />
+                <Text style={s.alertText}>
+                  {stats.alertes} collecte{stats.alertes > 1 ? 's' : ''} en erreur aujourd'hui
+                </Text>
+              </View>
+            )}
+
+            <View style={s.actionBar}>
+              <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
+                <Text style={s.btnImprevusText}>Gérer les imprévus</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.btnSaisir} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
+                <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
+                <Text style={s.btnSaisirText}>+ Nouveau site</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.mapCard}>
+              <View style={s.mapHeader}>
+                <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
+                <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
+                <View style={s.mapChip}>
+                  <Text style={s.mapChipText}>{mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts</Text>
+                </View>
+              </View>
+              <MapTournees height={340} vehicles={mapVehicles} selectedStop={selectedStop} />
+            </View>
+
+            <View style={s.sitesPanel}>
+              <TouchableOpacity style={s.sitesPanelHeader} onPress={() => setSitesOpen(v => !v)} activeOpacity={0.75}>
+                <View style={s.sitesPanelLeft}>
+                  <View style={s.sitesPanelIcon}><Ionicons name="location-outline" size={18} color={colors.primaryLight} /></View>
+                  <View>
+                    <Text style={s.sitesPanelTitle}>Sites de collecte enregistrés</Text>
+                    <Text style={s.sitesPanelSub}>{clients.length} site{clients.length !== 1 ? 's' : ''} dans la base</Text>
+                  </View>
+                </View>
+                <Ionicons name={sitesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+              {sitesOpen && (
+                <View style={s.sitesList}>
+                  {clients.length === 0 ? <Text style={s.sitesEmpty}>Aucun site chargé</Text> : (
+                    clients.map((c, i) => (
+                      <TouchableOpacity
+                        key={c.id ?? i}
+                        style={[s.siteItem, i > 0 && s.siteDivider]}
+                        onPress={() => setSelectedStop({ lat: c.latitude, lon: c.longitude })}
+                        activeOpacity={0.7}
+                      >
+                        <View style={s.siteItemLeft}>
+                          <Text style={s.siteName}>{c.nom_entreprise}</Text>
+                          <Text style={s.siteCoords}>{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</Text>
+                        </View>
+                        <Ionicons name="location" size={14} color={colors.accentLight} />
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
               )}
             </View>
-          )}
-        </View>
 
-        <View style={s.vehiclesSection}>
-          <Text style={s.sectionTitle}>Tournées du jour</Text>
-          <Text style={s.sectionSub}>
-            {vehicles.length > 0 ? `${vehicles.length} véhicule${vehicles.length > 1 ? 's' : ''} en service` : 'Aucune tournée assignée pour cette date'}
-          </Text>
-        </View>
+            <View style={s.vehiclesSection}>
+              <Text style={s.sectionTitle}>Tournées du jour</Text>
+              <Text style={s.sectionSub}>{vehicles.length} véhicule{vehicles.length > 1 ? 's' : ''} en service</Text>
+            </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 20 }} />
-        ) : vehicles.length === 0 ? (
-          <View style={s.emptyVehicles}>
-            <Ionicons name="car-outline" size={32} color={colors.textMuted} />
-            <Text style={s.emptyVehiclesText}>Aucune tournée planifiée pour le {DATE_DEMO}</Text>
-            <Text style={s.emptyVehiclesSub}>Générez les tournées ou vérifiez les données de la base</Text>
-          </View>
-        ) : (
-          vehicles.map((v, i) => (
-            <VehicleCard
-              key={`vehicle-card-${v.chauffeurId}-${i}`}
-              index={i}
-              chauffeurId={v.chauffeurId}
-              chauffeurNom={v.chauffeurNom}
-              heureDepart={v.heureDepart}
-              arrets={v.arrets}
-              onExport={() => handleExportBluebob(v.chauffeurNom)}
-              onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
-            />
-          ))
+            {vehicles.map((v, i) => (
+              <VehicleCard
+                key={`vehicle-card-${v.chauffeurId}-${i}`}
+                index={i}
+                chauffeurId={v.chauffeurId}
+                chauffeurNom={v.chauffeurNom}
+                heureDepart={v.heureDepart}
+                arrets={v.arrets}
+                animDelay={i * 80}
+                onExport={() => handleExportBluebob(v.chauffeurNom)}
+                onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
+              />
+            ))}
+
+            <TouchableOpacity style={[s.btnGenerate, { marginTop: 8 }]} onPress={handleGenerate} activeOpacity={0.85} disabled={generating}>
+              <LinearGradient colors={['#E8EDEB', '#E0EBE6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGenerateGradient}>
+                {generating ? <ActivityIndicator size="small" color={colors.textMuted} /> : <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />}
+                <Text style={[s.btnGenerateText, { color: colors.textMuted }]}>{generating ? 'Recalcul...' : 'Régénérer les tournées'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
         )}
       </ScrollView>
 
@@ -454,9 +479,53 @@ const s = StyleSheet.create({
     color: colors.primaryLight,
   },
 
+  // Mode préparation
+  prepCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#EAF2EE',
+    padding: 28,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  prepIconRow: { marginBottom: 16 },
+  prepIconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: '#E8F5EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prepTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  prepSub: {
+    fontSize: 13,
+    color: colors.textMuted,
+    fontWeight: '500',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  btnGenerateHero: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    width: '100%',
+  },
+
   // Action bar
   actionBar: { flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  btnGenerate: { borderRadius: 12, overflow: 'hidden', flex: 1, minWidth: 180 },
+  btnGenerate: { borderRadius: 12, overflow: 'hidden' },
   btnGenerateGradient: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 20, paddingVertical: 13,

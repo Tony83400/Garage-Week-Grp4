@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { colors } from '../constants/colors';
 
 type BadgeStyle = 'ok' | 'warn' | 'info';
@@ -8,9 +8,12 @@ interface Props {
   iconBg: string;
   icon: React.ReactNode;
   value: string;
+  numericValue?: number;
+  valueSuffix?: string;
   label: string;
   badgeText: string;
   badgeStyle: BadgeStyle;
+  animDelay?: number;
 }
 
 const badgeColors: Record<BadgeStyle, { bg: string; text: string }> = {
@@ -19,19 +22,54 @@ const badgeColors: Record<BadgeStyle, { bg: string; text: string }> = {
   info: { bg: '#E6F4FA', text: colors.secondary },
 };
 
-export default function StatCard({ iconBg, icon, value, label, badgeText, badgeStyle }: Props) {
+export default function StatCard({
+  iconBg, icon, value, numericValue, valueSuffix = '',
+  label, badgeText, badgeStyle, animDelay = 0,
+}: Props) {
   const badge = badgeColors[badgeStyle];
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(14)).current;
+  const countAnim = useRef(new Animated.Value(0)).current;
+  const [countDisplay, setCountDisplay] = useState('0');
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 380, delay: animDelay, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 380, delay: animDelay, useNativeDriver: true }),
+    ]).start();
+
+    if (numericValue !== undefined) {
+      countAnim.setValue(0);
+      Animated.timing(countAnim, {
+        toValue: numericValue,
+        duration: 700,
+        delay: animDelay + 80,
+        useNativeDriver: false,
+      }).start();
+      const listenerId = countAnim.addListener(({ value: v }) => {
+        setCountDisplay(Math.round(v).toLocaleString('fr-FR'));
+      });
+      return () => countAnim.removeListener(listenerId);
+    }
+  }, [numericValue]);
+
+  const displayedValue = numericValue !== undefined
+    ? `${countDisplay}${valueSuffix}`
+    : value;
+
   return (
-    <View style={styles.card}>
+    <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
         {icon}
       </View>
-      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
+      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {displayedValue}
+      </Text>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.badge, { backgroundColor: badge.bg }]}>
         <Text style={[styles.badgeText, { color: badge.text }]}>{badgeText}</Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

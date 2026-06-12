@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,17 +25,26 @@ function ImprevuItem({
   item,
   onReplan,
   onDelete,
+  animIndex = 0,
 }: {
   item: Imprevu;
   onReplan: () => void;
   onDelete: () => void;
+  animIndex?: number;
 }) {
-  const opacity = useRef(new Animated.Value(1)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
+  const opacity    = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(-20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity,    { toValue: 1, duration: 320, delay: animIndex * 70, useNativeDriver: true }),
+      Animated.timing(translateX, { toValue: 0, duration: 320, delay: animIndex * 70, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   function animateOut(callback: () => void) {
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+      Animated.timing(opacity,    { toValue: 0, duration: 260, useNativeDriver: true }),
       Animated.timing(translateX, { toValue: 80, duration: 260, useNativeDriver: true }),
     ]).start(() => callback());
   }
@@ -145,7 +155,9 @@ export default function ImprevusScreen() {
 
       {/* Content */}
       {loading ? (
-        <View style={s.emptyState}><Text>Chargement...</Text></View>
+        <View style={s.emptyState}>
+          <ActivityIndicator size="large" color={colors.primaryLight} />
+        </View>
       ) : imprevus.length === 0 ? (
         <View style={s.emptyState}>
           <View style={s.emptyIcon}>
@@ -162,10 +174,11 @@ export default function ImprevusScreen() {
             {imprevus.length} site{imprevus.length !== 1 ? 's' : ''} à replanifier
           </Text>
 
-          {imprevus.map(item => (
+          {imprevus.map((item, i) => (
             <ImprevuItem
               key={item.tache_id}
               item={item}
+              animIndex={i}
               onReplan={() => handleReplan(item)}
               onDelete={() => handleDelete(item)}
             />
@@ -257,10 +270,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#EAF2EE',
+    borderColor: colors.status.erreur.border,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.coral,
     padding: 16,
     marginBottom: 12,
-    shadowColor: colors.primaryDark,
+    shadowColor: colors.coral,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 8,

@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet, Pressable,
+  Animated, LayoutAnimation, Platform, UIManager,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import type { Arret } from '../services/chauffeur';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const VEHICLE_COLORS = [
   colors.primaryLight,
@@ -19,35 +26,53 @@ interface Props {
   heureDepart?: string;
   arrets: Arret[];
   capaciteMaxKg?: number;
+  animDelay?: number;
   onExport: () => void;
   onStopPress?: (lat: number, lon: number, clientNom: string) => void;
 }
 
 function StatutBadge({ statut }: { statut: Arret['statut'] }) {
-  const config = {
-    terminee:   { label: '✓ Fait',      bg: '#E8F5EE',        color: colors.primaryLight },
-    en_cours:   { label: '⟳ En cours',  bg: '#FFF3E0',        color: '#E67E22' },
-    en_attente: { label: 'En attente',  bg: colors.background, color: colors.textMuted },
-    erreur:     { label: '✗ Erreur',    bg: colors.coralLight, color: colors.coral },
-  }[statut] ?? { label: statut, bg: colors.background, color: colors.textMuted };
+  const labels: Record<string, string> = {
+    terminee:   '✓ Fait',
+    en_cours:   '⟳ En cours',
+    en_attente: 'En attente',
+    planifiee:  '· Planifié',
+    erreur:     '✗ Erreur',
+  };
+  const theme = colors.status[statut as keyof typeof colors.status]
+    ?? { bg: colors.background, fg: colors.textMuted, border: '#D4E0DC' };
 
   return (
-    <View style={[s.badge, { backgroundColor: config.bg }]}>
-      <Text style={[s.badgeText, { color: config.color }]}>{config.label}</Text>
+    <View style={[s.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+      <Text style={[s.badgeText, { color: theme.fg }]}>{labels[statut] ?? statut}</Text>
     </View>
   );
 }
 
-export default function VehicleCard({ index, chauffeurId, chauffeurNom, heureDepart, arrets, capaciteMaxKg = 750, onExport, onStopPress }: Props) {
+export default function VehicleCard({
+  index, chauffeurId, chauffeurNom, heureDepart, arrets,
+  capaciteMaxKg = 750, animDelay = 0, onExport, onStopPress,
+}: Props) {
   const [expanded, setExpanded] = useState(index === 0);
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 350, delay: animDelay, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 350, delay: animDelay, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  function toggleExpand() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(v => !v);
+  }
 
   const vehicleColor = VEHICLE_COLORS[index % VEHICLE_COLORS.length];
   const vehicleLabel = `VL${index + 1}`;
-  
-  // Poids total prévu pour la tournée
+
   const chargeTotaleKg = arrets.reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
-  
-  // Poids actuellement estimé dans le camion (arrêts terminés)
   const chargeActuelleKg = arrets
     .filter(a => a.statut === 'terminee')
     .reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
@@ -56,13 +81,9 @@ export default function VehicleCard({ index, chauffeurId, chauffeurNom, heureDep
   const isOverload = chargeActuelleKg >= capaciteMaxKg * 0.95;
 
   return (
-    <View style={s.card}>
+    <Animated.View style={[s.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       {/* Header */}
-      <TouchableOpacity
-        style={s.header}
-        onPress={() => setExpanded(v => !v)}
-        activeOpacity={0.75}
-      >
+      <TouchableOpacity style={s.header} onPress={toggleExpand} activeOpacity={0.75}>
         <View style={s.headerLeft}>
           <View style={[s.vehicleTag, { backgroundColor: vehicleColor + '22' }]}>
             <Text style={[s.vehicleTagText, { color: vehicleColor }]}>{vehicleLabel}</Text>
@@ -105,7 +126,7 @@ export default function VehicleCard({ index, chauffeurId, chauffeurNom, heureDep
       <View style={s.weightWrap}>
         <View style={s.weightLabelRow}>
           <Text style={s.weightLabel}>Charge actuelle estimée</Text>
-          <Text style={[s.weightValue, isOverload && { color: '#E67E22' }]}>
+          <Text style={[s.weightValue, isOverload && { color: colors.status.en_cours.fg }]}>
             {chargeActuelleKg} / {capaciteMaxKg} kg{isOverload ? ' ⚠' : ''}
           </Text>
         </View>
@@ -113,7 +134,7 @@ export default function VehicleCard({ index, chauffeurId, chauffeurNom, heureDep
           <View
             style={[
               s.weightBarFill,
-              { width: `${fillPct}%` as any, backgroundColor: isOverload ? '#E67E22' : vehicleColor },
+              { width: `${fillPct}%` as any, backgroundColor: isOverload ? colors.status.en_cours.fg : vehicleColor },
             ]}
           />
         </View>
@@ -137,7 +158,7 @@ export default function VehicleCard({ index, chauffeurId, chauffeurNom, heureDep
                 <View style={s.stopContent}>
                   <Text style={s.stopName} numberOfLines={1}>{a.client_nom}</Text>
                   {a.heure_estimee && (
-                    <Text style={s.stopTime}>Heure estimée : {a.heure_estimee}</Text>
+                    <Text style={s.stopTime}>{a.heure_estimee}</Text>
                   )}
                 </View>
                 <StatutBadge statut={a.statut} />
@@ -149,7 +170,7 @@ export default function VehicleCard({ index, chauffeurId, chauffeurNom, heureDep
           )}
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -342,6 +363,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 3,
     borderRadius: 20,
+    borderWidth: 1,
   },
   badgeText: {
     fontSize: 10,

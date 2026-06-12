@@ -14,4 +14,13 @@ export const colors = {
   coralLight: '#FFF0EB',
   sidebarDark: '#163d2b',
   white: '#FFFFFF',
+
+  // Statuts — source de vérité unique pour toute l'app
+  status: {
+    en_attente: { bg: '#F0F4F3', fg: '#8FA99F', border: '#D4E0DC' },
+    planifiee:  { bg: '#E6F4FA', fg: '#1A759F', border: '#B8DDE8' },
+    en_cours:   { bg: '#FFF5E6', fg: '#C17D1A', border: '#F5D9A0' },
+    terminee:   { bg: '#E8F5EE', fg: '#2D6A4F', border: '#C8E8D4' },
+    erreur:     { bg: '#FFF0EB', fg: '#E76F51', border: 'rgba(231,111,81,0.25)' },
+  },
 };

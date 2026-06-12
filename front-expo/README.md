@@ -114,6 +114,8 @@ front-expo/
 | chauffeur.ts | `updateStatutTache(id)` | POST `/api/chauffeur/tache/<id>/statut` |
 | clients.ts | `getClients()` | GET `/clients` |
 | clients.ts | `addClient(data)` | POST `/clients` |
+| imprevus.ts | `getImprevus(date)` | GET `/api/imprevus?date=` |
+| imprevus.ts | `replanifierImprevu(id)` | POST `/api/imprevus/<id>/replanifier` |
 
 ---
 
@@ -130,6 +132,30 @@ Le camion est le personnage principal du login. Phases :
 | `error` | Connexion KO | Secousse, hayon s'ouvre, bacs s'éjectent |
 
 Bacs dans la benne : apparaissent quand email (avec @) et mot de passe sont remplis.
+
+---
+
+## État session 4 — UX/UI redesign complet
+
+| Fichier | Changement |
+|---|---|
+| `constants/colors.ts` | Objet `colors.status` — source de vérité sémantique pour les statuts |
+| `components/StatCard.tsx` | Fade+slide à l'entrée, count-up animé 0 → valeur |
+| `app/dashboard.tsx` | BriefingCard 3 états, stats décalées, notifDot conditionnel |
+| `app/planning.tsx` | Deux modes : préparation (bouton Générer) / supervision (stats + carte + cascade) |
+| `app/driver.tsx` | Hero card 1er arrêt, progress bar kg, sous-titre dynamique |
+| `app/imprevus.tsx` | Stagger entry, bordure coral, exit animé, spinner loading |
+| `components/SiteModal.tsx` | 3 sections, focus states, spinner submit, erreur inline |
+| `app/_layout.tsx` | Transitions : fade (écrans principaux), slide_from_right (imprevus) |
+| `components/VehicleCard.tsx` | Nom chauffeur réel, heure départ réelle, entry animation |
+
+**Features fonctionnelles restantes :**
+- Date picker sur Planning (aujourd'hui hardcodé `DATE_DEMO = today`)
+- SiteModal — champs date début/fin + jours de semaine (nécessite migration DB)
+- Replanification — déjà câblé, à tester
+
+**Fix data à faire :**
+- `donnee.sql` lignes 171-172 : `'03:00:00'` → `'06:30:00'` pour les 2 chauffeurs
 
 ---
 

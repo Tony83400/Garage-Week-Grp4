@@ -29,33 +29,45 @@ function buildStats(s: DashboardStats) {
       iconBg: '#E8F5EE',
       icon: <Ionicons name="leaf-outline" size={20} color={colors.primaryLight} />,
       value: `${s.poids_collecte_kg.toLocaleString('fr-FR')} kg`,
+      numericValue: s.poids_collecte_kg,
+      valueSuffix: ' kg',
       label: 'Biodéchets collectés',
-      badgeText: `sur ${s.poids_prevu_kg.toLocaleString('fr-FR')} prévus`,
+      badgeText: `sur ${s.poids_prevu_kg.toLocaleString('fr-FR')} kg prévus`,
       badgeStyle: 'ok' as const,
+      animDelay: 0,
     },
     {
       iconBg: '#E6F4FA',
       icon: <Ionicons name="checkmark-circle-outline" size={20} color={colors.secondary} />,
       value: `${s.collectes_validees} / ${s.collectes_total}`,
+      numericValue: s.collectes_validees,
+      valueSuffix: ` / ${s.collectes_total}`,
       label: 'Collectes validées',
       badgeText: `${enCours} en cours`,
       badgeStyle: 'info' as const,
+      animDelay: 80,
     },
     {
       iconBg: colors.coralLight,
       icon: <Ionicons name="warning-outline" size={20} color={colors.coral} />,
       value: String(s.alertes),
+      numericValue: s.alertes,
+      valueSuffix: '',
       label: 'Alertes actives',
       badgeText: s.alertes > 0 ? '⚠ Action requise' : '✓ Aucune alerte',
       badgeStyle: s.alertes > 0 ? ('warn' as const) : ('ok' as const),
+      animDelay: 160,
     },
     {
       iconBg: '#E6F7F9',
       icon: <Ionicons name="navigate-outline" size={20} color={colors.secondaryLight} />,
       value: `${s.km_total} km`,
+      numericValue: s.km_total,
+      valueSuffix: ' km',
       label: 'Distance totale',
       badgeText: 'Optimisé par IA',
       badgeStyle: 'info' as const,
+      animDelay: 240,
     },
   ];
 }
@@ -63,11 +75,88 @@ function buildStats(s: DashboardStats) {
 function buildActivities(list: Activite[]) {
   return list.map((a) => ({
     type: a.statut === 'terminee' ? ('success' as const) : ('error' as const),
-    name: a.statut === 'terminee' ? `Collecte validée` : `Collecte en erreur`,
-    detail: `📍 ${a.client}`,
+    name: a.client,
+    detail: a.statut === 'terminee' ? '✓ Collecte terminée' : '✗ Collecte en erreur',
     time: '',
   }));
 }
+
+// ── Briefing card ─────────────────────────────────────────────────────────────
+
+function BriefingCard({ stats }: { stats: DashboardStats | null }) {
+  if (!stats) return null;
+  const isGenerated = stats.collectes_total > 0;
+  const isDone = isGenerated && stats.collectes_validees === stats.collectes_total;
+
+  if (!isGenerated) {
+    return (
+      <View style={[bs.card, { backgroundColor: '#F5F7F6', borderColor: '#D4E0DC' }]}>
+        <View style={[bs.iconBox, { backgroundColor: '#E8EDEB' }]}>
+          <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+        </View>
+        <View style={bs.text}>
+          <Text style={[bs.title, { color: colors.textMuted }]}>Tournées non générées</Text>
+          <Text style={bs.sub}>Allez dans Planning pour lancer l'IA</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (isDone) {
+    return (
+      <View style={[bs.card, { backgroundColor: colors.status.terminee.bg, borderColor: colors.status.terminee.border }]}>
+        <View style={[bs.iconBox, { backgroundColor: '#C8E8D4' }]}>
+          <Ionicons name="checkmark-circle" size={20} color={colors.status.terminee.fg} />
+        </View>
+        <View style={bs.text}>
+          <Text style={[bs.title, { color: colors.status.terminee.fg }]}>Journée terminée</Text>
+          <Text style={bs.sub}>
+            {stats.poids_collecte_kg.toLocaleString('fr-FR')} kg collectés · {stats.km_total} km parcourus
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[bs.card, { backgroundColor: colors.status.en_cours.bg, borderColor: colors.status.en_cours.border }]}>
+      <View style={[bs.iconBox, { backgroundColor: '#F5D9A0' }]}>
+        <Ionicons name="car-outline" size={20} color={colors.status.en_cours.fg} />
+      </View>
+      <View style={bs.text}>
+        <Text style={[bs.title, { color: colors.status.en_cours.fg }]}>
+          {stats.collectes_validees} / {stats.collectes_total} collectes terminées
+        </Text>
+        <Text style={bs.sub}>
+          {stats.alertes > 0 ? `${stats.alertes} alerte${stats.alertes > 1 ? 's' : ''} · ` : ''}
+          {stats.km_total} km planifiés
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const bs = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 20,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  text: { flex: 1 },
+  title: { fontSize: 14, fontWeight: '700', color: colors.text },
+  sub: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontWeight: '500' },
+});
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -109,7 +198,7 @@ export default function DashboardScreen() {
         </Text>
         <View style={styles.topbarRight}>
           <TouchableOpacity style={styles.notifBtn}>
-            <View style={styles.notifDot} />
+            {stats && stats.alertes > 0 && <View style={styles.notifDot} />}
             <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
           </TouchableOpacity>
           <LinearGradient
@@ -138,6 +227,8 @@ export default function DashboardScreen() {
           <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
         ) : (
           <>
+            <BriefingCard stats={stats} />
+
             {/* Stats — 2 × 2 grid */}
             {stats && (() => {
               const STATS = buildStats(stats);

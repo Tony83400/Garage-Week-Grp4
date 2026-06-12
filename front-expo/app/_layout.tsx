@@ -7,11 +7,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="dashboard" />
-        <Stack.Screen name="planning" />
-        <Stack.Screen name="driver" />
-        <Stack.Screen name="imprevus" />
+        <Stack.Screen name="index"     options={{ animation: 'fade' }} />
+        <Stack.Screen name="dashboard" options={{ animation: 'fade' }} />
+        <Stack.Screen name="planning"  options={{ animation: 'fade' }} />
+        <Stack.Screen name="driver"    options={{ animation: 'fade' }} />
+        <Stack.Screen name="imprevus"  options={{ animation: 'slide_from_right' }} />
       </Stack>
     </SafeAreaProvider>
   );
