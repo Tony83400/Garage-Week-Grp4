@@ -43,7 +43,7 @@ export default function LoginScreen() {
         router.replace('/dashboard');
       } else if (role === 'chauffeur') {
         console.log('Redirecting to /driver');
-        router.replace('/driver');
+        router.replace(`/driver?id=${response.user_id}`);
       } else {
         console.log('DEBUG', 'Rôle inconnu: ' + role);
       }

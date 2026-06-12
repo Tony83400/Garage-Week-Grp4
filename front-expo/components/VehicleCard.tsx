@@ -12,14 +12,11 @@ const VEHICLE_COLORS = [
   '#E67E22',
 ];
 
-// Capacité max par défaut — non fournie par le back actuel
-// Le back doit retourner capacite_max dans /api/admin/planning (voir BACK_PLANNING.md)
-const CHARGE_MAX_KG = 750;
-
 interface Props {
   index: number;
   chauffeurId: number;
   arrets: Arret[];
+  capaciteMaxKg?: number;
   onExport: () => void;
   onStopPress?: (lat: number, lon: number, clientNom: string) => void;
 }
@@ -39,13 +36,13 @@ function StatutBadge({ statut }: { statut: Arret['statut'] }) {
   );
 }
 
-export default function VehicleCard({ index, chauffeurId, arrets, onExport, onStopPress }: Props) {
+export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg = 750, onExport, onStopPress }: Props) {
   const [expanded, setExpanded] = useState(index === 0);
 
   const vehicleColor = VEHICLE_COLORS[index % VEHICLE_COLORS.length];
   const vehicleLabel = `VL${index + 1}`;
   const chargeKg = arrets.reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
-  const fillPct = Math.min(Math.round((chargeKg / CHARGE_MAX_KG) * 100), 100);
+  const fillPct = Math.min(Math.round((chargeKg / capaciteMaxKg) * 100), 100);
   const isOverload = fillPct >= 95;
 
   return (
@@ -62,7 +59,7 @@ export default function VehicleCard({ index, chauffeurId, arrets, onExport, onSt
           </View>
           <View>
             <Text style={s.chauffeurNom}>Chauffeur #{chauffeurId}</Text>
-            <Text style={s.vehiculeInfo}>VL · max {CHARGE_MAX_KG} kg</Text>
+            <Text style={s.vehiculeInfo}>VL · max {capaciteMaxKg} kg</Text>
           </View>
         </View>
         <View style={s.headerRight}>
@@ -100,7 +97,7 @@ export default function VehicleCard({ index, chauffeurId, arrets, onExport, onSt
         <View style={s.weightLabelRow}>
           <Text style={s.weightLabel}>Charge utile</Text>
           <Text style={[s.weightValue, isOverload && { color: '#E67E22' }]}>
-            {chargeKg} / {CHARGE_MAX_KG} kg{isOverload ? ' ⚠' : ''}
+            {chargeKg} / {capaciteMaxKg} kg{isOverload ? ' ⚠' : ''}
           </Text>
         </View>
         <View style={s.weightBarBg}>

@@ -1,6 +1,7 @@
 import sqlite3
 import math
 import datetime
+import requests
 
 def heure_vers_minutes(heure_str):
     h, m, s = map(int, heure_str.split(':'))
@@ -307,7 +308,7 @@ class TourneeRepository:
                 
                 # Récupération basique des arrêts du jour 
                 cursor.execute('''
-                    SELECT t.id, t.statut, t.poids_prevu_kg, c.nom_entreprise, t.ordre_passage
+                    SELECT t.id, t.statut, t.poids_prevu_kg, c.nom_entreprise, t.ordre_passage, c.latitude, c.longitude
                     FROM taches_collecte t
                     JOIN clients c ON t.client_id = c.id
                     WHERE t.date_planifiee = ?
@@ -323,7 +324,9 @@ class TourneeRepository:
                         "statut": a[1],
                         "poids_prevu_kg": a[2],
                         "client_nom": a[3],
-                        "ordre": a[4] or 0
+                        "ordre": a[4] or 0,
+                        "latitude": a[5],
+                        "longitude": a[6]
                     })
                 
                 resultat.append({

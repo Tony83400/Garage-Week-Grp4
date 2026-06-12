@@ -18,7 +18,7 @@ import MobileDrawer from '../components/MobileDrawer';
 import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activite } from '../services/dashboard';
 
 // Date des données de test — à remplacer par date.today() quand la BDD sera remplie au jour J
-const DATE_DEMO = '2026-06-15';
+const DATE_DEMO = new Date().toISOString().split('T')[0];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

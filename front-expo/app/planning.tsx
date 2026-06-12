@@ -25,7 +25,7 @@ import { getPlanningAdmin, genererBrouillons, optimiserTournees, type TourneeAdm
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
-type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: any[] };
+type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: any[]; capaciteMaxKg: number };
 
 export default function PlanningScreen() {
   const router = useRouter();
@@ -58,6 +58,7 @@ export default function PlanningScreen() {
         const rows: VehicleRow[] = planningRes.value.map(tournee => ({
           chauffeurId: tournee.chauffeur_id,
           chauffeurNom: tournee.chauffeur,
+          capaciteMaxKg: tournee.capacite_max_kg,
           arrets: tournee.arrets.map(a => ({
             id: a.tache_id,
             nom: a.client_nom,
@@ -270,6 +271,7 @@ export default function PlanningScreen() {
               index={i}
               chauffeurId={v.chauffeurId}
               arrets={v.arrets}
+              capaciteMaxKg={v.capaciteMaxKg}
               onExport={() => handleExportBluebob(v.chauffeurId)}
               onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
             />

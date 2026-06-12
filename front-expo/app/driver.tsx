@@ -11,17 +11,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../constants/colors';
 import StopCard from '../components/StopCard';
 import { StyleSheet } from 'react-native';
 import { getTournee, updateStatutTache, type TourneeDetails, type Arret } from '../services/chauffeur';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
-const ID_CHAUFFEUR_TEST = 1; // Remplacer plus tard par l'ID de l'utilisateur connecté
 
 export default function DriverScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const chauffeurId = Number(id) || 1;
   const [tournee, setTournee] = useState<TourneeDetails | null>(null);
   const [stops, setStops] = useState<Arret[]>([]);
   const [collectedKg, setCollectedKg] = useState(0);
@@ -32,7 +33,7 @@ export default function DriverScreen() {
   useEffect(() => {
     async function fetchTournee() {
       try {
-        const data = await getTournee(ID_CHAUFFEUR_TEST, DATE_DEMO);
+        const data = await getTournee(chauffeurId, DATE_DEMO);
         if (data && data.arrets) {
           setTournee(data);
           setStops(data.arrets.filter(a => a.statut !== 'terminee' && a.statut !== 'erreur'));
