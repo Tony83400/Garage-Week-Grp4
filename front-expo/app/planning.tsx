@@ -25,7 +25,7 @@ import { getPlanningAdmin, genererBrouillons, optimiserTournees, type TourneeAdm
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
-type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: any[]; capaciteMaxKg: number; distance_km: number };
+type VehicleRow = { chauffeurId: number; chauffeurNom: string; heureDepart: string; arrets: any[]; capaciteMaxKg: number; distance_km: number };
 
 export default function PlanningScreen() {
   const router = useRouter();
@@ -60,6 +60,7 @@ export default function PlanningScreen() {
         const rows: VehicleRow[] = planningRes.value.map(tournee => ({
           chauffeurId: tournee.chauffeur_id,
           chauffeurNom: tournee.chauffeur,
+          heureDepart: tournee.heure_depart || '–',
           capaciteMaxKg: tournee.capacite_max_kg,
           distance_km: (tournee as any).distance_km || 0,
           arrets: tournee.arrets.map(a => ({
@@ -126,8 +127,8 @@ export default function PlanningScreen() {
     router.push('/imprevus');
   }
 
-  function handleExportBluebob(chauffeurId: number) {
-    showToast(`Export BlueBob — Chauffeur #${chauffeurId}`);
+  function handleExportBluebob(chauffeurNom: string) {
+    showToast(`Export BlueBob — ${chauffeurNom}`);
   }
 
   const mapVehicles = useMemo<MapVehicle[]>(() =>
@@ -294,11 +295,13 @@ export default function PlanningScreen() {
         ) : (
           vehicles.map((v, i) => (
             <VehicleCard
-              key={`vehicle-card-${v.chauffeurId}-${i}`} // Clé composite parfaitement unique
+              key={`vehicle-card-${v.chauffeurId}-${i}`}
               index={i}
               chauffeurId={v.chauffeurId}
+              chauffeurNom={v.chauffeurNom}
+              heureDepart={v.heureDepart}
               arrets={v.arrets}
-              onExport={() => handleExportBluebob(v.chauffeurId)}
+              onExport={() => handleExportBluebob(v.chauffeurNom)}
               onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
             />
           ))

@@ -15,6 +15,8 @@ const VEHICLE_COLORS = [
 interface Props {
   index: number;
   chauffeurId: number;
+  chauffeurNom: string;
+  heureDepart?: string;
   arrets: Arret[];
   capaciteMaxKg?: number;
   onExport: () => void;
@@ -36,7 +38,7 @@ function StatutBadge({ statut }: { statut: Arret['statut'] }) {
   );
 }
 
-export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg = 750, onExport, onStopPress }: Props) {
+export default function VehicleCard({ index, chauffeurId, chauffeurNom, heureDepart, arrets, capaciteMaxKg = 750, onExport, onStopPress }: Props) {
   const [expanded, setExpanded] = useState(index === 0);
 
   const vehicleColor = VEHICLE_COLORS[index % VEHICLE_COLORS.length];
@@ -66,7 +68,7 @@ export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg 
             <Text style={[s.vehicleTagText, { color: vehicleColor }]}>{vehicleLabel}</Text>
           </View>
           <View>
-            <Text style={s.chauffeurNom}>Chauffeur #{chauffeurId}</Text>
+            <Text style={s.chauffeurNom}>{chauffeurNom}</Text>
             <Text style={s.vehiculeInfo}>VL · max {capaciteMaxKg} kg</Text>
           </View>
         </View>
@@ -94,8 +96,7 @@ export default function VehicleCard({ index, chauffeurId, arrets, capaciteMaxKg 
           <Text style={s.metaLabel}>Prévu</Text>
         </View>
         <View style={s.metaItem}>
-          {/* Heure de départ : non fournie par le back — voir BACK_PLANNING.md */}
-          <Text style={s.metaValue}>06h30</Text>
+          <Text style={s.metaValue}>{heureDepart ?? '–'}</Text>
           <Text style={s.metaLabel}>Départ</Text>
         </View>
       </View>
