@@ -49,7 +49,9 @@ front-expo/
 │   ├── _layout.tsx           # Stack navigator + SafeAreaProvider
 │   ├── index.tsx             # / → Login
 │   ├── dashboard.tsx         # /dashboard → Dashboard admin
-│   └── planning.tsx          # /planning → Planning & tournées admin
+│   ├── planning.tsx          # /planning → Planning & tournées admin
+│   ├── driver.tsx            # /driver → Vue conducteur (file d'arrêts)
+│   └── imprevus.tsx          # /imprevus → Gestion des imprévus
 │
 ├── components/               # Briques UI réutilisables
 │   ├── AnimatedBlob.tsx      # Cercle animé (fond login)
@@ -60,7 +62,9 @@ front-expo/
 │   ├── ActivityItem.tsx      # Ligne d'activité succès/erreur
 │   ├── Sidebar.tsx           # Barre de navigation latérale
 │   ├── MobileDrawer.tsx      # Overlay animé (hamburger → sidebar)
-│   └── VehicleCard.tsx       # Carte tournée véhicule (expandable)
+│   ├── VehicleCard.tsx       # Carte tournée véhicule (expandable)
+│   ├── StopCard.tsx          # Arrêt conducteur (valider / passer, slide-out)
+│   └── SiteModal.tsx         # Modal ajout site de collecte (bottom sheet)
 │
 ├── services/                 # Appels HTTP vers le back
 │   ├── api.ts                # Wrapper fetch (gestion erreurs)
@@ -113,8 +117,23 @@ front-expo/
 
 ---
 
-## Pages restantes
+## Connexion / rôles
 
-- [ ] Écran conducteur (`/driver`)
-- [ ] Navigation par rôle après login (`admin → /dashboard`, `chauffeur → /driver`)
-- [ ] Page imprévus / incidents
+| Email | Rôle | Destination |
+|---|---|---|
+| admin@archappli.fr | Admin (via back) | `/dashboard` |
+| driver@archappli.fr | Chauffeur (hardcodé) | `/driver` |
+
+Le chauffeur est identifié par email avant l'appel API. Le back doit retourner `"role": "chauffeur"` pour les vrais comptes conducteurs (cf. `BACK_PLANNING.md` à la racine).
+
+---
+
+## État des pages
+
+| Page | Route | Branché back | Notes |
+|---|---|---|---|
+| Login | `/` | ✅ | Logo leaf+sync-outline, bypass `driver@archappli.fr` |
+| Dashboard admin | `/dashboard` | ✅ | KPIs + activité récente |
+| Planning admin | `/planning` | ✅ partiel | SiteModal, bouton imprévus fonctionnels |
+| Vue conducteur | `/driver` | ❌ hardcodé | 5 arrêts fictifs, en attente back |
+| Imprévus | `/imprevus` | ❌ hardcodé | 3 imprévus fictifs, en attente back |

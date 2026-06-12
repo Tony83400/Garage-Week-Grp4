@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { login } from '../services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import AnimatedBlob from '../components/AnimatedBlob';
 import InputField from '../components/InputField';
@@ -106,7 +107,13 @@ export default function LoginScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.logoBox}
               >
-                <Text style={styles.logoText}>A</Text>
+                <Ionicons
+                  name="sync-outline"
+                  size={64}
+                  color="rgba(255,255,255,0.4)"
+                  style={{ position: 'absolute', top: 8, left: 8 }}
+                />
+                <Ionicons name="leaf" size={36} color="#fff" />
               </LinearGradient>
             </View>
 
@@ -195,11 +202,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 24,
     elevation: 8,
-  },
-  logoText: {
-    color: '#ffffff',
-    fontSize: 36,
-    fontWeight: 'bold',
   },
   title: {
     color: '#ffffff',
