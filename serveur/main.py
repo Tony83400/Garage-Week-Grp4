@@ -140,8 +140,33 @@ def replanifier_imprevu(tache_id):
         return jsonify({"message": "Tâche replanifiée avec succès."}), 200
     return jsonify({"erreur": "Tâche introuvable."}), 404
 
-@app.route('/api/tournees/generer', methods=['POST'])
-def api_generer_tournees():
+@app.route('/api/planning/generer', methods=['POST'])
+def api_generer_brouillons():
+    """
+    Étape 1 : Création des brouillons (tâches en attente)
+    """
+    data_req = request.get_json() or {}
+    date_cible = data_req.get('date', date.today().isoformat())
+    
+    try:
+        # On appelle la nouvelle fonction de génération
+        resultat = db.generer_brouillons_jour(date_cible) 
+        
+        if resultat["status"] == "erreur":
+            return jsonify({"erreur": resultat["message"]}), 400
+            
+        return jsonify({
+            "message": f"Succès : {resultat['taches_creees']} tâches de collecte générées en brouillon."
+        }), 201
+    except Exception as e:
+        return jsonify({"erreur": f"Erreur serveur : {str(e)}"}), 500
+
+
+@app.route('/api/planning/optimiser', methods=['POST'])
+def api_optimiser_tournees():
+    """
+    Étape 2 : Optimisation OR-Tools et affectation des chauffeurs
+    """
     data_req = request.get_json() or {}
     date_cible = data_req.get('date', date.today().isoformat())
     
@@ -149,20 +174,30 @@ def api_generer_tournees():
     DEPOT_LAT, DEPOT_LON = 43.1670, 6.0430
     
     try:
-        # Extraction et formatage (similaire à test.py)
+        # 1. Préparation des données pour le solveur
         data_ortools = db.preparer_donnees_ortools(date_cible, DEPOT_LAT, DEPOT_LON)
         
-        # Exécution du moteur Google OR-Tools
-        resoudre_et_exporter(data_ortools)
+        # S'il n'y a que le dépôt (index 0) et pas de clients
+        if len(data_ortools.get('tache_ids', [])) <= 1:
+            return jsonify({"erreur": "Aucune tâche de collecte en attente pour cette date."}), 400
+        
+        # 2. Exécution du moteur Google OR-Tools
+        routes_optimales = resoudre_et_exporter(data_ortools)
+        
+        if not routes_optimales:
+            return jsonify({"erreur": "Le solveur n'a pas pu trouver de solution."}), 500
+        
+        # 3. Sauvegarde en BDD
+        db.sauvegarder_resultat_optimisation(date_cible, routes_optimales, data_ortools)
         
         return jsonify({
-            "message": "Tournées générées avec succès",
-            "tournees_creees": data_ortools.get('num_vehicles', 0),
-            "arrets_total": len(data_ortools.get('demands', [])) - 1
+            "message": "L'optimisation des tournées a été calculée et enregistrée avec succès !"
         }), 200
         
     except Exception as e:
-        return jsonify({"erreur": f"Erreur lors de la génération IA : {str(e)}"}), 500    
-    
+        return jsonify({"erreur": f"Erreur lors de l'optimisation : {str(e)}"}), 500 
+
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)

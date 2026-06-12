@@ -158,14 +158,36 @@ def resoudre_et_exporter(data):
       
     # Application des fenêtres horaires DES CHAUFFEURS (Planning)
     # Au lieu de (0, 1440), impose la fenêtre globale sur tous les véhicules
-    MIN_GLOBAL = 180 # 3h00
-    MAX_GLOBAL = 825 # 13h45
-
+    # Application des fenêtres horaires DES CHAUFFEURS dynamiquement
     for vehicle_id in range(data['num_vehicles']):
         index_depart = routing.Start(vehicle_id)
         index_arrivee = routing.End(vehicle_id)
-        time_dimension.CumulVar(index_depart).SetRange(MIN_GLOBAL, MAX_GLOBAL)
-        time_dimension.CumulVar(index_arrivee).SetRange(MIN_GLOBAL, MAX_GLOBAL)
+        
+        # On récupère les vrais horaires du chauffeur (envoyés par repo_tournees.py)
+        start_time, end_time = data['vehicle_time_windows'][vehicle_id]
+        
+        time_dimension.CumulVar(index_depart).SetRange(start_time, end_time)
+        time_dimension.CumulVar(index_arrivee).SetRange(start_time, end_time)
+
+    # -------------------------------------------------------------
+    # GESTION DU MULTI-TRIP (Variable selon le chauffeur)
+    # -------------------------------------------------------------
+    # On s'assure que si un chauffeur (ex: Jean) a 3 véhicules virtuels (T1, T2, T3),
+    # le T2 ne commence qu'APRÈS que le T1 soit rentré au dépôt (avec 30 min de vidage).
+    if 'groupes_vehicules' in data:
+        groupes = data['groupes_vehicules']
+        DUREE_VIDAGE = 30 # minutes
+        
+        for v in range(data['num_vehicles'] - 1):
+            # Si le véhicule v et v+1 appartiennent au même chauffeur
+            if groupes[v] == groupes[v+1]:
+                fin_t1 = routing.End(v)
+                debut_t2 = routing.Start(v+1)
+                
+                # Le temps de départ du T2 doit être >= au retour du T1 + temps de vidage
+                routing.solver().Add(
+                    time_dimension.CumulVar(debut_t2) >= time_dimension.CumulVar(fin_t1) + DUREE_VIDAGE
+                )
         
 
     """"
@@ -193,8 +215,28 @@ def resoudre_et_exporter(data):
     if solution:
         print(f"Solution trouvée ! Distance mathématique totale : {solution.ObjectiveValue()}")
         sauvegarder_en_csv(data, manager, routing, solution, time_dimension)
+        
+        # --- NOUVEAUTÉ : On construit le dictionnaire pour l'API ---
+        routes_optimales = {}
+        for vehicle_id in range(data['num_vehicles']):
+            index = routing.Start(vehicle_id)
+            route = []
+            
+            # On parcours les arrêts du véhicule
+            while not routing.IsEnd(index):
+                node_index = manager.IndexToNode(index)
+                route.append(node_index)
+                index = solution.Value(routing.NextVar(index))
+                
+            # On ajoute le dépôt d'arrivée (la fin)
+            route.append(manager.IndexToNode(index))
+            
+            routes_optimales[vehicle_id] = route
+            
+        return routes_optimales # <-- C'EST ÇA QUI MANQUAIT !
     else:
-        print("Aucune solution n'a pu être trouvée avec ces contraintes (Vérifiez si les camions ont assez de capacité ou si les horaires sont compatibles).")
+        print("Aucune solution n'a pu être trouvée.")
+        return None
     # DEBUG : Afficher les contraintes avant le solve
     print("\n--- DIAGNOSTIC DES CONTRAINTES ---")
     print(f"Nombre de clients à visiter : {len(data['demands']) - 1}")
