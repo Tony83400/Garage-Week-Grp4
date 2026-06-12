@@ -21,6 +21,8 @@ export default function LoginScreen() {
   const [showError, setShowError] = useState(false);
 
   const handleLogin = async () => {
+    Alert.alert('DEBUG', 'Bouton cliqué sur Mobile');
+    console.log('--- BOUTON LOGIN CLIQUÉ ---');
     setShowError(false);
     setError('');
 
@@ -33,21 +35,24 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // Connexion conducteur hardcodée — à remplacer quand le back retournera role='chauffeur'
-    if (email.trim().toLowerCase() === 'driver@archappli.fr') {
-      router.replace('/driver');
-      return;
-    }
-
     try {
-      const { role } = await login(email, password);
+      const response = await login(email.trim(), password);
+      Alert.alert('DEBUG', 'Réponse reçue: ' + response.role);
+      console.log('Login success response:', response);
+      const { role } = response;
+      
       if (role === 'admin') {
+        console.log('Redirecting to /dashboard');
         router.replace('/dashboard');
+      } else if (role === 'chauffeur') {
+        console.log('Redirecting to /driver');
+        router.replace('/driver');
       } else {
-        router.replace('/dashboard');
+        Alert.alert('DEBUG', 'Rôle inconnu: ' + role);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur de connexion.';
+      Alert.alert('Erreur', message);
       setError(message);
       setShowError(true);
     } finally {

@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS clients;
 DROP TABLE IF EXISTS camions;
 DROP TABLE IF EXISTS chauffeurs;
 DROP TABLE IF EXISTS utilisateurs;
+DROP TABLE IF EXISTS depots;
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE utilisateurs (
@@ -109,6 +110,7 @@ INSERT INTO depots (nom, latitude, longitude) VALUES
 
 -- 1. CRÉATION DU PERSONNEL (5 Chauffeurs)
 INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES 
+('admin@logistic.fr', '1234', 'admin'),
 ('jean@logistic.fr', '1234', 'chauffeur'),
 ('alice@logistic.fr', '1234', 'chauffeur'),
 ('paul@logistic.fr', '1234', 'chauffeur'),
@@ -116,11 +118,11 @@ INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES
 ('luc@logistic.fr', '1234', 'chauffeur');
 
 INSERT INTO chauffeurs (utilisateur_id, nom, prenom, telephone) VALUES 
-(1, 'Dupont', 'Jean', '0601000000'),
-(2, 'Martin', 'Alice', '0602000000'),
-(3, 'Bernard', 'Paul', '0603000000'),
-(4, 'Lefevre', 'Marie', '0604000000'),
-(5, 'Durand', 'Luc', '0605000000');
+(2, 'Dupont', 'Jean', '0601000000'),
+(3, 'Martin', 'Alice', '0602000000'),
+(4, 'Bernard', 'Paul', '0603000000'),
+(5, 'Lefevre', 'Marie', '0604000000'),
+(6, 'Durand', 'Luc', '0605000000');
 
 -- 2. CRÉATION DE LA FLOTTE (5 Camions pour couvrir le Var)
 INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES 
