@@ -170,6 +170,23 @@ class TourneeRepository:
     def recuperer_tournee_chauffeur(self, chauffeur_id, date_jour):
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # 1. Infos globales de la tournée
+            cursor.execute('''
+                SELECT ch.prenom || ' ' || ch.nom, c.immatriculation, c.charge_max_kg, tj.heure_debut_service
+                FROM tournees_jour tj
+                JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
+                JOIN camions c ON tj.camion_id = c.id
+                WHERE tj.chauffeur_id = ? AND tj.date_tournee = ?
+            ''', (chauffeur_id, date_jour))
+            
+            tournee_info = cursor.fetchone()
+            if not tournee_info:
+                return None
+                
+            chauffeur_nom, immatriculation, capacite, heure_depart = tournee_info
+
+            # 2. Liste des arrêts
             cursor.execute('''
                 SELECT t.id, t.statut, t.bacs_prevus, t.poids_prevu_kg, t.ordre_passage,
                        c.nom_entreprise, c.latitude, c.longitude
@@ -193,7 +210,15 @@ class TourneeRepository:
                     "latitude": l[6],
                     "longitude": l[7]
                 })
-            return arrets
+                
+            return {
+                "chauffeur": chauffeur_nom,
+                "vehicule": f"VL{chauffeur_id}", 
+                "immatriculation": immatriculation,
+                "capacite_max_kg": capacite,
+                "heure_depart": heure_depart,
+                "arrets": arrets
+            }
 
     def get_dashboard_stats(self, date_jour):
         with self.db_core.get_connection() as conn:
@@ -250,7 +275,7 @@ class TourneeRepository:
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT tj.id, c.immatriculation, c.charge_max_kg, ch.nom, ch.prenom
+                SELECT tj.id, tj.chauffeur_id, c.immatriculation, c.charge_max_kg, ch.nom, ch.prenom, tj.heure_debut_service
                 FROM tournees_jour tj
                 JOIN camions c ON tj.camion_id = c.id
                 JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
@@ -260,9 +285,11 @@ class TourneeRepository:
             
             resultat = []
             for t in tournees:
-                tournee_id, immatriculation, charge_max, nom, prenom = t
+                tournee_id, chauffeur_id, immatriculation, charge_max, nom, prenom, heure_depart = t
+                
+                # Récupération basique des arrêts du jour 
                 cursor.execute('''
-                    SELECT t.id, t.statut, t.poids_prevu_kg, c.nom_entreprise, c.latitude, c.longitude
+                    SELECT t.id, t.statut, t.poids_prevu_kg, c.nom_entreprise, t.ordre_passage
                     FROM taches_collecte t
                     JOIN clients c ON t.client_id = c.id
                     WHERE t.date_planifiee = ?
@@ -274,20 +301,44 @@ class TourneeRepository:
                 for a in arrets:
                     charge_actuelle += (a[2] or 0)
                     liste_arrets.append({
-                        "id": a[0],
+                        "tache_id": a[0],
                         "statut": a[1],
-                        "client": a[3],
-                        "lat": a[4],
-                        "lon": a[5]
+                        "poids_prevu_kg": a[2],
+                        "client_nom": a[3],
+                        "ordre": a[4] or 0
                     })
                 
                 resultat.append({
-                    "tournee_id": tournee_id,
-                    "vehicule": immatriculation,
-                    "capacite_max": charge_max,
-                    "charge_actuelle": charge_actuelle,
+                    "chauffeur_id": chauffeur_id,
                     "chauffeur": f"{prenom} {nom}",
+                    "vehicule": f"VL{chauffeur_id}",
+                    "immatriculation": immatriculation,
+                    "capacite_max_kg": charge_max,
+                    "heure_depart": heure_depart,
                     "arrets": liste_arrets
                 })
-                
             return resultat
+        
+    def recuperer_imprevus(self, date_jour):
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT t.id, c.nom_entreprise, t.commentaire
+                FROM taches_collecte t
+                JOIN clients c ON t.client_id = c.id
+                WHERE t.date_planifiee = ? AND t.statut = 'erreur'
+            ''', (date_jour,))
+            
+            lignes = cursor.fetchall()
+            imprevus = []
+            for l in lignes:
+                imprevus.append({
+                    "tache_id": l[0],
+                    "client_nom": l[1],
+                    "adresse": "À compléter", 
+                    "ville": "À compléter",
+                    "chauffeur": "Inconnu", 
+                    "raison": l[2] or "Site inaccessible ou erreur signalée",
+                    "heure": "N/A"
+                })
+            return imprevus

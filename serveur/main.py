@@ -3,6 +3,8 @@ from database.database_manager import DatabaseManager
 from client import Client
 from datetime import date
 from flask_cors import CORS
+
+from solveur_ortools import resoudre_et_exporter
 app = Flask(__name__)
 CORS(app)
 # On demande explicitement de réinitialiser/créer la base de données au démarrage
@@ -21,7 +23,8 @@ def login():
         return jsonify({
             "message": "Connexion réussie !",
             "user_id": utilisateur["id"],
-            "role": utilisateur["role"]
+            "role": utilisateur["role"],
+            "nom": utilisateur["nom"]
         }), 200
     else:
         return jsonify({"erreur": "Email ou mot de passe incorrect."}), 401
@@ -35,19 +38,24 @@ def get_clients():
 
 @app.route('/clients', methods=['POST'])
 def add_client():
-    """Route pour ajouter un nouveau client."""
     data = request.get_json()
-    required_fields = ['nom_entreprise', 'latitude', 'longitude']
     
-    if not data or not all(field in data for field in required_fields):
-        return jsonify({"erreur": "Données manquantes. Champs requis : nom_entreprise, latitude, longitude"}), 400
+    # Le front envoie 'nom', le back d'origine voulait 'nom_entreprise'
+    nom = data.get('nom') or data.get('nom_entreprise')
+    if not nom:
+        return jsonify({"erreur": "Le champ 'nom' est requis."}), 400
     
-    nouveau_client = Client(nom_entreprise=data['nom_entreprise'], latitude=data['latitude'], longitude=data['longitude'])
+    # Simulation géolocalisation pour un nouveau client si non fournie
+    lat = data.get('latitude', 43.1200)
+    lon = data.get('longitude', 5.9300)
+    
+    nouveau_client = Client(nom_entreprise=nom, latitude=lat, longitude=lon)
     
     if db.ajouter_client(nouveau_client):
-        return jsonify({"message": f"Client '{nouveau_client.nom_entreprise}' ajouté avec succès."}), 201
+        # On retourne un succès même si adresse/ville/etc. ne sont pas encore gérés en BDD
+        return jsonify({"message": f"Site '{nouveau_client.nom_entreprise}' enregistré avec succès."}), 201
     else:
-        return jsonify({"erreur": f"Le client '{nouveau_client.nom_entreprise}' n'a pas pu être ajouté."}), 409
+        return jsonify({"erreur": f"Le site '{nouveau_client.nom_entreprise}' n'a pas pu être ajouté."}), 409
 
 @app.route('/api/dashboard/stats', methods=['GET'])
 def api_dashboard_stats():
@@ -111,7 +119,50 @@ def api_update_statut_tache(tache_id):
         }), 200
     else:
         return jsonify({"erreur": "Tâche introuvable."}), 404
+
+@app.route('/api/admin/planning', methods=['GET'])
+def api_admin_planning():
+    date_jour = request.args.get('date', date.today().isoformat())
+    tournees = db.get_tournees_detaillees(date_jour)
+    return jsonify(tournees), 200
+
+@app.route('/api/imprevus', methods=['GET'])
+def get_imprevus():
+    date_jour = request.args.get('date', date.today().isoformat())
+    imprevus = db.recuperer_imprevus(date_jour)
+    return jsonify(imprevus), 200
+
+@app.route('/api/imprevus/<int:tache_id>/replanifier', methods=['POST'])
+def replanifier_imprevu(tache_id):
+    # Remet la tâche en attente, annule les bacs réels et réinitialise le commentaire
+    succes = db.mettre_a_jour_statut_etape(tache_id, 'en_attente', 0, "Replanifié par l'administration")
+    if succes:
+        return jsonify({"message": "Tâche replanifiée avec succès."}), 200
+    return jsonify({"erreur": "Tâche introuvable."}), 404
+
+@app.route('/api/tournees/generer', methods=['POST'])
+def api_generer_tournees():
+    data_req = request.get_json() or {}
+    date_cible = data_req.get('date', date.today().isoformat())
     
+    # Coordonnées du Dépôt Central (La Farlède, Var)
+    DEPOT_LAT, DEPOT_LON = 43.1670, 6.0430
+    
+    try:
+        # Extraction et formatage (similaire à test.py)
+        data_ortools = db.preparer_donnees_ortools(date_cible, DEPOT_LAT, DEPOT_LON)
+        
+        # Exécution du moteur Google OR-Tools
+        resoudre_et_exporter(data_ortools)
+        
+        return jsonify({
+            "message": "Tournées générées avec succès",
+            "tournees_creees": data_ortools.get('num_vehicles', 0),
+            "arrets_total": len(data_ortools.get('demands', [])) - 1
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"erreur": f"Erreur lors de la génération IA : {str(e)}"}), 500    
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)

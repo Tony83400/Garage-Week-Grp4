@@ -54,7 +54,10 @@ class DatabaseManager:
 
     def mettre_a_jour_statut_etape(self, tache_id, statut, bacs_reels=None, commentaire=None):
         return self.repo_tournees.mettre_a_jour_statut_etape(tache_id, statut, bacs_reels, commentaire)
-
+    
+    def recuperer_imprevus(self, date_jour):
+        return self.repo_tournees.recuperer_imprevus(date_jour)
+    
     # 5. ENDPOINTS POUR LE FRONT-END
     def get_dashboard_stats(self, date_jour):
         return self.repo_tournees.get_dashboard_stats(date_jour)
