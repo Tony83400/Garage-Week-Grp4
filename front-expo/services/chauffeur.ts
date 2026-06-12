@@ -1,7 +1,5 @@
 import { api } from './api';
 
-// Correspond à GET /api/chauffeur/<chauffeur_id>/tournee?date=YYYY-MM-DD
-// Champs exacts retournés par repo_tournees.recuperer_tournee_chauffeur()
 export interface Arret {
   tache_id: number;
   statut: 'en_attente' | 'en_cours' | 'terminee' | 'erreur';
@@ -13,12 +11,20 @@ export interface Arret {
   longitude: number;
 }
 
-export function getTournee(chauffeur_id: number, date?: string) {
-  const query = date ? `?date=${date}` : '';
-  return api.get<Arret[]>(`/api/chauffeur/${chauffeur_id}/tournee${query}`);
+export interface TourneeDetails {
+  chauffeur: string;
+  vehicule: string;
+  immatriculation: string;
+  capacite_max_kg: number;
+  heure_depart: string;
+  arrets: Arret[];
 }
 
-// Correspond à POST /api/chauffeur/tache/<tache_id>/statut
+export function getTournee(chauffeur_id: number, date?: string) {
+  const query = date ? `?date=${date}` : '';
+  return api.get<TourneeDetails | null>(`/api/chauffeur/${chauffeur_id}/tournee${query}`);
+}
+
 export interface UpdateStatutPayload {
   statut: 'terminee' | 'erreur';
   bacs_reels?: number;

@@ -21,6 +21,7 @@ import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
 import { getTournee, type Arret } from '../services/chauffeur';
 import { getPlanningAdmin } from '../services/planning';
+import MapTournees, { type MapMarker } from '../components/MapTournees';
 
 const DATE_DEMO = '2026-06-15';
 
@@ -28,7 +29,7 @@ const DATE_DEMO = '2026-06-15';
 // Voir BACK_PLANNING.md
 const CHAUFFEUR_IDS = [1, 2, 3, 4, 5];
 
-type VehicleRow = { chauffeurId: number; arrets: Arret[] };
+type VehicleRow = { chauffeurId: number; chauffeurNom: string; arrets: Arret[] };
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -72,7 +73,8 @@ export default function PlanningScreen() {
           const rows: VehicleRow[] = results
             .map((r, i) => ({
               chauffeurId: CHAUFFEUR_IDS[i],
-              arrets: r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : [],
+              chauffeurNom: r.status === 'fulfilled' && r.value ? r.value.chauffeur : `Chauffeur ${CHAUFFEUR_IDS[i]}`,
+              arrets: r.status === 'fulfilled' && r.value ? r.value.arrets : [],
             }))
             .filter(row => row.arrets.length > 0);
           setVehicles(rows);
@@ -211,28 +213,31 @@ export default function PlanningScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Map placeholder — nécessite react-native-maps + /api/admin/planning */}
+        {/* Carte des tournées — OpenStreetMap via Leaflet */}
         <View style={s.mapCard}>
-          <LinearGradient
-            colors={['#E8F5EE', '#F0F7F4']}
-            style={s.mapGradient}
-          >
-            <View style={s.mapContent}>
-              <View style={s.mapIconWrap}>
-                <Ionicons name="map-outline" size={28} color={colors.primaryLight} />
-              </View>
-              <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
-              <Text style={s.mapSubtitle}>
-                {clients.length > 0
-                  ? `${clients.length} sites chargés depuis GET /clients`
-                  : 'Chargement des sites...'}
+          <View style={s.mapHeader}>
+            <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
+            <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
+            <View style={s.mapChip}>
+              <Text style={s.mapChipText}>
+                {vehicles.flatMap(v => v.arrets).filter(a => a.latitude && a.longitude).length} arrêts
               </Text>
-              <View style={s.mapChip}>
-                <Ionicons name="information-circle-outline" size={13} color={colors.secondary} />
-                <Text style={s.mapChipText}>Nécessite react-native-maps · voir BACK_PLANNING.md</Text>
-              </View>
             </View>
-          </LinearGradient>
+          </View>
+          <MapTournees
+            height={320}
+            markers={vehicles.flatMap((v, idx) =>
+              v.arrets
+                .filter(a => a.latitude && a.longitude)
+                .map<MapMarker>(a => ({
+                  lat: a.latitude,
+                  lon: a.longitude,
+                  label: a.client_nom,
+                  statut: a.statut,
+                  vehiculeIndex: idx,
+                }))
+            )}
+          />
         </View>
 
         {/* Panel sites de collecte */}
@@ -456,7 +461,7 @@ const s = StyleSheet.create({
   },
   btnImprevusText: { color: colors.coral, fontSize: 14, fontWeight: '600' },
 
-  // Map placeholder
+  // Map
   mapCard: {
     borderRadius: 18, overflow: 'hidden',
     borderWidth: 1, borderColor: '#EAF2EE',
@@ -464,30 +469,19 @@ const s = StyleSheet.create({
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+    backgroundColor: colors.card,
   },
-  mapGradient: { minHeight: 160 },
-  mapContent: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 32, paddingHorizontal: 20,
+  mapHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#EAF2EE',
   },
-  mapIconWrap: {
-    width: 52, height: 52, borderRadius: 16,
-    backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 6, elevation: 2,
-  },
-  mapTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 4 },
-  mapSubtitle: { fontSize: 13, color: colors.textMuted, fontWeight: '500', marginBottom: 12 },
+  mapTitle: { fontSize: 14, fontWeight: '700', color: colors.text, flex: 1 },
   mapChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#fff',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
-    borderWidth: 1, borderColor: '#D4E8DC',
+    backgroundColor: '#E8F5EE',
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
   },
-  mapChipText: { fontSize: 11, color: colors.secondary, fontWeight: '600' },
+  mapChipText: { fontSize: 11, color: colors.primaryLight, fontWeight: '600' },
 
   // Sites panel
   sitesPanel: {
