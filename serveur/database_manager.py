@@ -37,6 +37,7 @@ def calculer_distance_matrice(coordonnees):
         print(f"OSRM indisponible ({e}), fallback vers euclidienne.")
         return calculer_distance_euclidienne_fallback(coordonnees)
 
+
 def calculer_distance_euclidienne_fallback(coordonnees):
     """Ton ancienne fonction de secours si OSRM échoue"""
     n = len(coordonnees)
