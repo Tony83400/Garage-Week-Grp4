@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { login } from '../services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import AnimatedBlob from '../components/AnimatedBlob';
 import InputField from '../components/InputField';
@@ -9,6 +13,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import { colors } from '../constants/colors';
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,26 +33,30 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // Simulation de l'appel API
-    setTimeout(() => {
-      setLoading(false);
+    // Connexion conducteur hardcodée — à remplacer quand le back retournera role='chauffeur'
+    if (email.trim().toLowerCase() === 'driver@archappli.fr') {
+      router.replace('/driver');
+      return;
+    }
 
-      if (email === 'admin@archappli.fr') {
-        Alert.alert('✅ Connexion réussie', 'Connexion Admin réussie !');
-        // TODO: Navigation vers dashboard admin
-        // router.push('/admin/dashboard');
-      } else if (email === 'driver@archappli.fr') {
-        Alert.alert('✅ Connexion réussie', 'Connexion Conducteur réussie !');
-        // TODO: Navigation vers écran conducteur
-        // router.push('/driver/route');
+    try {
+      const { role } = await login(email, password);
+      if (role === 'admin') {
+        router.replace('/dashboard');
       } else {
-        setError('Email ou mot de passe incorrect. Veuillez réessayer.');
-        setShowError(true);
+        router.replace('/dashboard');
       }
-    }, 1400);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur de connexion.';
+      setError(message);
+      setShowError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
+    <SafeAreaView style={styles.container}>
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
@@ -98,7 +107,13 @@ export default function LoginScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.logoBox}
               >
-                <Text style={styles.logoText}>A</Text>
+                <Ionicons
+                  name="sync-outline"
+                  size={64}
+                  color="rgba(255,255,255,0.4)"
+                  style={{ position: 'absolute', top: 8, left: 8 }}
+                />
+                <Ionicons name="leaf" size={36} color="#fff" />
               </LinearGradient>
             </View>
 
@@ -141,6 +156,7 @@ export default function LoginScreen() {
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -186,11 +202,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 24,
     elevation: 8,
-  },
-  logoText: {
-    color: '#ffffff',
-    fontSize: 36,
-    fontWeight: 'bold',
   },
   title: {
     color: '#ffffff',

@@ -69,15 +69,23 @@ CREATE TABLE tournees_jour (
     statut TEXT DEFAULT 'brouillon' CHECK (statut IN ('brouillon', 'affectee', 'demarree', 'terminee'))
 );
 
-CREATE TABLE taches_collecte (
+CREATE TABLE IF NOT EXISTS taches_collecte (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    tournee_id INTEGER REFERENCES tournees_jour(id) ON DELETE SET NULL, 
-    date_planifiee TEXT NOT NULL,
+    client_id INTEGER NOT NULL,
+    date_planifiee DATE NOT NULL,
+    
+    -- Ce qui est calculé/prévu par l'IA ou le planning
     bacs_prevus INTEGER NOT NULL,
-    poids_prevu_kg INTEGER NOT NULL, -- NOUVELLE COLONNE
-    bacs_reels INTEGER,
-    statut TEXT DEFAULT 'en_attente' CHECK (statut IN ('en_attente', 'en_cours', 'terminee', 'annulee', 'echec_client_absent'))
+    poids_prevu_kg REAL,
+    
+    -- Ce qui est réellement fait sur le terrain
+    bacs_reels INTEGER DEFAULT NULL,
+    
+    statut TEXT DEFAULT 'en_attente', -- 'en_attente', 'planifiee', 'terminee', 'erreur'
+    ordre_passage INTEGER DEFAULT NULL,
+    commentaire TEXT DEFAULT NULL, -- Utile si le chauffeur signale une erreur
+    
+    FOREIGN KEY (client_id) REFERENCES clients(id)
 );
 
 
