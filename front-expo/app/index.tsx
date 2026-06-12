@@ -43,7 +43,7 @@ export default function LoginScreen() {
       if (role === 'admin') {
         router.replace('/dashboard');
       } else {
-        router.replace('/driver');
+        router.replace('/dashboard');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur de connexion.';

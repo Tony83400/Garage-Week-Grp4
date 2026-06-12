@@ -12,8 +12,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
 import MobileDrawer from '../components/MobileDrawer';
+import SiteModal from '../components/SiteModal';
 import VehicleCard from '../components/VehicleCard';
 import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
@@ -31,6 +33,8 @@ type VehicleRow = { chauffeurId: number; arrets: Arret[] };
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function PlanningScreen() {
+  const router = useRouter();
+  const [siteModalOpen, setSiteModalOpen] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRow[]>([]);
@@ -106,8 +110,7 @@ export default function PlanningScreen() {
   }
 
   function handleImprevus() {
-    // Page non implémentée — voir BACK_PLANNING.md : GET /api/imprevus
-    showToast('Page imprévus bientôt disponible');
+    router.push('/imprevus');
   }
 
   function handleExportBluebob(chauffeurId: number) {
@@ -171,6 +174,11 @@ export default function PlanningScreen() {
         )}
 
         {/* Action bar */}
+        <TouchableOpacity style={s.btnSaisir} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
+          <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
+          <Text style={s.btnSaisirText}>+ Saisir un nouveau site</Text>
+        </TouchableOpacity>
+
         <View style={s.actionBar}>
           {/* Générer tournées — non fonctionnel (OR-Tools non exposé) */}
           <TouchableOpacity
@@ -315,6 +323,12 @@ export default function PlanningScreen() {
         </Animated.View>
       )}
 
+      <SiteModal
+        visible={siteModalOpen}
+        onClose={() => setSiteModalOpen(false)}
+        onSuccess={(msg) => showToast(msg)}
+      />
+
       <MobileDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -404,6 +418,26 @@ const s = StyleSheet.create({
     marginBottom: 18,
   },
   alertText: { fontSize: 13, fontWeight: '600', color: colors.coral, flex: 1 },
+
+  // Saisir site
+  btnSaisir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C8E8D4',
+    backgroundColor: '#E8F5EE',
+    marginBottom: 14,
+    alignSelf: 'flex-start',
+  },
+  btnSaisirText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primaryLight,
+  },
 
   // Action bar
   actionBar: { flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
