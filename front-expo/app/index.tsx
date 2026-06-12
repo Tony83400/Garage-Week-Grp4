@@ -1,57 +1,90 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { login } from '../services/auth';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+} from 'react-native-reanimated';
 import AnimatedBlob from '../components/AnimatedBlob';
 import InputField from '../components/InputField';
 import LoginButton from '../components/LoginButton';
 import ErrorMessage from '../components/ErrorMessage';
+import TruckAnimation, { type TruckPhase } from '../components/TruckAnimation';
 import { colors } from '../constants/colors';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+  const truckWidth = Math.min(Math.round(screenWidth * 0.68), 260);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showError, setShowError] = useState(false);
+  const [phase, setPhase] = useState<TruckPhase>('arriving');
+
+  // Le formulaire tombe du camion quand la benne s'ouvre
+  const cardY = useSharedValue(-260);
+  const cardRot = useSharedValue(3);
+  const cardOpacity = useSharedValue(0);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: cardY.value },
+      { rotate: `${cardRot.value}deg` },
+    ],
+    opacity: cardOpacity.value,
+  }));
+
+  function handleFormReady() {
+    setPhase('idle');
+    cardOpacity.value = withTiming(1, { duration: 200 });
+    cardY.value = withSpring(0, { damping: 13, stiffness: 95, mass: 1.1 });
+    cardRot.value = withSpring(0, { damping: 14, stiffness: 80 });
+  }
+
+  const emailFilled = email.trim().includes('@') && email.trim().length > 4;
+  const passwordFilled = password.length > 0;
 
   const handleLogin = async () => {
     setShowError(false);
     setError('');
 
-    // Validation
     if (!email.trim() || !password) {
       setError('Veuillez remplir tous les champs.');
       setShowError(true);
+      setPhase('error');
+      setTimeout(() => setPhase('idle'), 1200);
       return;
     }
 
     setLoading(true);
+    setPhase('starting');
 
     try {
       const response = await login(email.trim(), password);
-      console.log('Login success response:', response);
+      setPhase('departing');
       const { role } = response;
-      
-      if (role === 'admin') {
-        console.log('Redirecting to /dashboard');
-        router.replace('/dashboard');
-      } else if (role === 'chauffeur') {
-        console.log('Redirecting to /driver');
-        router.replace(`/driver?id=${response.user_id}`);
-      } else {
-        console.log('DEBUG', 'Rôle inconnu: ' + role);
-      }
+
+      setTimeout(() => {
+        if (role === 'admin') {
+          router.replace('/dashboard');
+        } else if (role === 'chauffeur') {
+          router.replace(`/driver?id=${response.user_id}`);
+        }
+      }, 680);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur de connexion.';
-      console.log('Erreur', message);
       setError(message);
       setShowError(true);
+      setPhase('error');
+      setTimeout(() => setPhase('idle'), 1400);
     } finally {
       setLoading(false);
     }
@@ -59,105 +92,83 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <LinearGradient
-        colors={[colors.primaryDark, colors.primaryMid, colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        {/* Animated Blobs */}
-        <AnimatedBlob
-          size={520}
-          color={colors.primaryLight}
-          top={-120}
-          left={-100}
-          delay={0}
-        />
-        <AnimatedBlob
-          size={400}
-          color={colors.secondary}
-          bottom={-80}
-          right={-80}
-          delay={4000}
-        />
-        <AnimatedBlob
-          size={280}
-          color={colors.accent}
-          top="40%"
-          left="55%"
-          delay={7000}
-        />
-
-        {/* Main Content */}
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+        <LinearGradient
+          colors={[colors.primaryDark, colors.primaryMid, colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradient}
         >
-          <Animated.View
-            entering={FadeInDown.duration(600).springify()}
-            style={styles.card}
+          {/* Blobs de fond */}
+          <AnimatedBlob size={520} color={colors.primaryLight} top={-120} left={-100} delay={0} />
+          <AnimatedBlob size={400} color={colors.secondary} bottom={-80} right={-80} delay={4000} />
+          <AnimatedBlob size={280} color={colors.accent} top="40%" left="55%" delay={7000} />
+
+          {/* Camion — reste visible en haut pendant toute l'interaction */}
+          <View style={styles.truckRow}>
+            <TruckAnimation
+              phase={phase}
+              emailFilled={emailFilled}
+              passwordFilled={passwordFilled}
+              onFormReady={handleFormReady}
+              truckWidth={truckWidth}
+            />
+          </View>
+
+          {/* Formulaire — tombe depuis le camion */}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {/* Logo */}
-            <View style={styles.logoWrapper}>
-              <LinearGradient
-                colors={[colors.primaryLight, colors.accent]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.logoBox}
-              >
-                <Ionicons
-                  name="sync-outline"
-                  size={64}
-                  color="rgba(255,255,255,0.4)"
-                  style={{ position: 'absolute', top: 8, left: 8 }}
-                />
-                <Ionicons name="leaf" size={36} color="#fff" />
-              </LinearGradient>
-            </View>
+            <Animated.View style={[styles.card, cardStyle]}>
+              {/* Logo */}
+              <View style={styles.logoWrapper}>
+                <LinearGradient
+                  colors={[colors.primaryLight, colors.accent]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.logoBox}
+                >
+                  <Text style={styles.logoEmoji}>🌿</Text>
+                </LinearGradient>
+              </View>
 
-            {/* Title */}
-            <Text style={styles.title}>ArchAppli</Text>
-            <Text style={styles.tagline}>
-              Collecte intelligente. Impact réel.
-            </Text>
+              <Text style={styles.title}>ArchAppli</Text>
+              <Text style={styles.tagline}>Collecte intelligente. Impact réel.</Text>
 
-            {/* Email Field */}
-            <InputField
-              label="Email"
-              placeholder="votre@email.fr"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              editable={!loading}
-            />
+              <InputField
+                label="Email"
+                placeholder="votre@email.fr"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                editable={!loading}
+              />
 
-            {/* Password Field */}
-            <InputField
-              label="Mot de passe"
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-              editable={!loading}
-              onSubmitEditing={handleLogin}
-            />
+              <InputField
+                label="Mot de passe"
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="password"
+                editable={!loading}
+                onSubmitEditing={handleLogin}
+              />
 
-            {/* Login Button */}
-            <LoginButton onPress={handleLogin} loading={loading} />
+              <LoginButton onPress={handleLogin} loading={loading} />
 
-            {/* Error Message */}
-            <ErrorMessage message={error} visible={showError} />
-          </Animated.View>
-        </ScrollView>
-      </LinearGradient>
-    </KeyboardAvoidingView>
+              <ErrorMessage message={error} visible={showError} />
+            </Animated.View>
+          </ScrollView>
+        </LinearGradient>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -169,11 +180,18 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
+  truckRow: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 8,
+    overflow: 'hidden',
+  },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   card: {
     width: '100%',
@@ -194,8 +212,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logoBox: {
-    width: 80,
-    height: 80,
+    width: 72,
+    height: 72,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -205,9 +223,12 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 8,
   },
+  logoEmoji: {
+    fontSize: 34,
+  },
   title: {
     color: '#ffffff',
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 6,

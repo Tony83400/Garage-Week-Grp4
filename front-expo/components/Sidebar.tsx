@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ interface Props {
 
 export default function Sidebar({ activeRoute, style }: Props) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
     <LinearGradient
@@ -36,7 +38,7 @@ export default function Sidebar({ activeRoute, style }: Props) {
       end={{ x: 0, y: 1 }}
       style={[styles.sidebar, style]}
     >
-      <View style={styles.logoSection}>
+      <View style={[styles.logoSection, { paddingTop: Math.max(24, insets.top + 10) }]}>
         <LinearGradient
           colors={[colors.primaryLight, colors.accent]}
           start={{ x: 0, y: 0 }}
