@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,7 @@ import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
 import { getTournee, type Arret } from '../services/chauffeur';
 import { getPlanningAdmin } from '../services/planning';
-import MapTournees, { type MapMarker } from '../components/MapTournees';
+import MapTournees, { type MapVehicle, type MapStop } from '../components/MapTournees';
 
 const DATE_DEMO = '2026-06-15';
 
@@ -42,6 +42,7 @@ export default function PlanningScreen() {
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sitesOpen, setSitesOpen] = useState(false);
+  const [selectedStop, setSelectedStop] = useState<{ lat: number; lon: number } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
@@ -119,6 +120,25 @@ export default function PlanningScreen() {
     // Export côté client uniquement — voir BACK_PLANNING.md pour format
     showToast(`Export BlueBob — Chauffeur #${chauffeurId}`);
   }
+
+  // ── Map data ──────────────────────────────────────────────────────────────────
+
+  const mapVehicles = useMemo<MapVehicle[]>(() =>
+    vehicles.map((v, idx) => ({
+      vehiculeIndex: idx,
+      label: `VL${idx + 1}`,
+      stops: v.arrets
+        .filter(a => a.latitude && a.longitude)
+        .map<MapStop>(a => ({
+          lat: a.latitude,
+          lon: a.longitude,
+          label: a.client_nom,
+          statut: a.statut,
+          ordre: a.ordre,
+        })),
+    })),
+    [vehicles]
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -213,30 +233,21 @@ export default function PlanningScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Carte des tournées — OpenStreetMap via Leaflet */}
+        {/* Carte des tournées — OpenStreetMap via Leaflet + OSRM */}
         <View style={s.mapCard}>
           <View style={s.mapHeader}>
             <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
             <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
             <View style={s.mapChip}>
               <Text style={s.mapChipText}>
-                {vehicles.flatMap(v => v.arrets).filter(a => a.latitude && a.longitude).length} arrêts
+                {mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts
               </Text>
             </View>
           </View>
           <MapTournees
-            height={320}
-            markers={vehicles.flatMap((v, idx) =>
-              v.arrets
-                .filter(a => a.latitude && a.longitude)
-                .map<MapMarker>(a => ({
-                  lat: a.latitude,
-                  lon: a.longitude,
-                  label: a.client_nom,
-                  statut: a.statut,
-                  vehiculeIndex: idx,
-                }))
-            )}
+            height={340}
+            vehicles={mapVehicles}
+            selectedStop={selectedStop}
           />
         </View>
 
@@ -271,7 +282,12 @@ export default function PlanningScreen() {
                 <Text style={s.sitesEmpty}>Aucun site chargé</Text>
               ) : (
                 clients.map((c, i) => (
-                  <View key={c.id ?? i} style={[s.siteItem, i > 0 && s.siteDivider]}>
+                  <TouchableOpacity
+                    key={c.id ?? i}
+                    style={[s.siteItem, i > 0 && s.siteDivider]}
+                    onPress={() => setSelectedStop({ lat: c.latitude, lon: c.longitude })}
+                    activeOpacity={0.7}
+                  >
                     <View style={s.siteItemLeft}>
                       <Text style={s.siteName}>{c.nom_entreprise}</Text>
                       <Text style={s.siteCoords}>
@@ -279,7 +295,7 @@ export default function PlanningScreen() {
                       </Text>
                     </View>
                     <Ionicons name="location" size={14} color={colors.accentLight} />
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </View>
@@ -316,6 +332,7 @@ export default function PlanningScreen() {
               chauffeurId={v.chauffeurId}
               arrets={v.arrets}
               onExport={() => handleExportBluebob(v.chauffeurId)}
+              onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
             />
           ))
         )}

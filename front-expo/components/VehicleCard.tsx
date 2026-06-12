@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import type { Arret } from '../services/chauffeur';
@@ -21,6 +21,7 @@ interface Props {
   chauffeurId: number;
   arrets: Arret[];
   onExport: () => void;
+  onStopPress?: (lat: number, lon: number, clientNom: string) => void;
 }
 
 function StatutBadge({ statut }: { statut: Arret['statut'] }) {
@@ -38,7 +39,7 @@ function StatutBadge({ statut }: { statut: Arret['statut'] }) {
   );
 }
 
-export default function VehicleCard({ index, chauffeurId, arrets, onExport }: Props) {
+export default function VehicleCard({ index, chauffeurId, arrets, onExport, onStopPress }: Props) {
   const [expanded, setExpanded] = useState(index === 0);
 
   const vehicleColor = VEHICLE_COLORS[index % VEHICLE_COLORS.length];
@@ -119,13 +120,20 @@ export default function VehicleCard({ index, chauffeurId, arrets, onExport }: Pr
             <Text style={s.emptyStops}>Aucun arrêt planifié</Text>
           ) : (
             arrets.map((a, i) => (
-              <View key={a.tache_id} style={[s.stopItem, i > 0 && s.stopDivider]}>
+              <Pressable
+                key={a.tache_id}
+                style={({ pressed }) => [s.stopItem, i > 0 && s.stopDivider, pressed && s.stopPressed]}
+                onPress={() => a.latitude && a.longitude && onStopPress?.(a.latitude, a.longitude, a.client_nom)}
+              >
                 <View style={s.stopNum}>
                   <Text style={s.stopNumText}>{a.ordre ?? i + 1}</Text>
                 </View>
                 <Text style={s.stopName} numberOfLines={1}>{a.client_nom}</Text>
                 <StatutBadge statut={a.statut} />
-              </View>
+                {a.latitude && a.longitude && (
+                  <Ionicons name="location-outline" size={13} color={colors.accentLight} />
+                )}
+              </Pressable>
             ))
           )}
         </View>
@@ -282,6 +290,9 @@ const s = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 9,
+  },
+  stopPressed: {
+    backgroundColor: '#F0F7F4',
   },
   stopDivider: {
     borderTopWidth: 1,
