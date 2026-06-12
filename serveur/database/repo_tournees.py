@@ -83,18 +83,20 @@ class TourneeRepository:
 
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
         data = {}
-        MIN_GLOBAL = 180  # 3h00 (Temps minimum par défaut pour les clients)
-        MAX_GLOBAL = 825  # 13h45 (Temps maximum par défaut pour les clients)
+        MIN_GLOBAL = 180  # 3h00
+        MAX_GLOBAL = 1200 # 20h00
+        
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             
-            # 1. On récupère les horaires réels des chauffeurs
+            # On récupère l'ID du chauffeur (ch.id) pour grouper les shifts
             cursor.execute('''
-                SELECT c.bacs_max, c.charge_max_kg, ch.nom, tj.heure_debut_service, tj.heure_fin_service
+                SELECT c.bacs_max, c.charge_max_kg, ch.nom, tj.heure_debut_service, tj.heure_fin_service, ch.id
                 FROM tournees_jour tj
                 JOIN camions c ON tj.camion_id = c.id
                 JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
                 WHERE tj.date_tournee = ?
+                ORDER BY tj.id ASC
             ''', (date_jour,))
             camions_jour = cursor.fetchall()
             
@@ -102,34 +104,23 @@ class TourneeRepository:
             data['vehicle_weights'] = []
             data['vehicle_time_windows'] = []
             data['driver_names'] = []
-            data['groupes_vehicules'] = [] # NOUVEAU : Pour lier les tournées virtuelles à un seul chauffeur
+            data['groupes_vehicules'] = [] 
             
-            MAX_TOURS = 3 # On autorise jusqu'à 3 retours au dépôt par chauffeur
-            
-            for index_chauffeur, c in enumerate(camions_jour):
-                bacs_max, charge_max, nom_chauffeur, heure_debut, heure_fin = c
+            for index, c in enumerate(camions_jour):
+                bacs_max, charge_max, nom_chauffeur, heure_debut, heure_fin, chauffeur_id = c
                 
-                # Conversion des heures du chauffeur en minutes (ex: 08:00 = 480)
                 debut_min = heure_vers_minutes(heure_debut)
                 fin_min = heure_vers_minutes(heure_fin)
                 
-                # On génère 3 "slots" de tournées potentiels pour CE chauffeur
-                # OR-Tools n'utilisera le T2 ou T3 que s'il y a assez de place dans son amplitude horaire
-                for numero_tournee in range(1, MAX_TOURS + 1):
-                    data['vehicle_capacities'].append(bacs_max)
-                    data['vehicle_weights'].append(charge_max)
-                    data['driver_names'].append(f"{nom_chauffeur} (T{numero_tournee})")
-                    
-                    # La "Time Window" du véhicule virtuel est strictement limitée au shift du chauffeur
-                    data['vehicle_time_windows'].append((debut_min, fin_min))
-                    
-                    # On mémorise que ce véhicule virtuel appartient à 'index_chauffeur'
-                    data['groupes_vehicules'].append(index_chauffeur)
+                # CORRECTION : 1 ligne en base de données = 1 véhicule OR-Tools. Fini les fantômes !
+                data['vehicle_capacities'].append(bacs_max)
+                data['vehicle_weights'].append(charge_max)
+                data['driver_names'].append(nom_chauffeur)
+                data['vehicle_time_windows'].append((debut_min, fin_min))
+                data['groupes_vehicules'].append(chauffeur_id)
             
             data['num_vehicles'] = len(data['vehicle_capacities'])
             data['depot'] = 0 
-            
-            # ... (La suite du code pour récupérer les tâches reste identique) ...
             
             cursor.execute('''
                 SELECT t.id, t.bacs_prevus, t.poids_prevu_kg, c.latitude, c.longitude, c.nom_entreprise
@@ -160,6 +151,10 @@ class TourneeRepository:
                 data['time_windows'].append((MIN_GLOBAL, MAX_GLOBAL))
 
             data['distance_matrix'] = calculer_distance_matrice(coordonnees)
+            
+            # MODE SAFE : On divise les valeurs de l'API OSRM si elles sont en secondes
+            data['time_matrix'] = [[int(val/60) if val > 500 else val for val in row] for row in data['distance_matrix']]
+
             return data
 
     def valider_collecte(self, tache_id, bacs_reels):
@@ -306,19 +301,18 @@ class TourneeRepository:
             for t in tournees:
                 tournee_id, chauffeur_id, immatriculation, charge_max, nom, prenom, heure_depart = t
                 
-                # Récupération basique des arrêts du jour 
+                # CORRECTION ICI : On ne prend QUE les arrêts liés à CE tournee_id
                 cursor.execute('''
                     SELECT t.id, t.statut, t.poids_prevu_kg, c.nom_entreprise, t.ordre_passage, c.latitude, c.longitude
                     FROM taches_collecte t
                     JOIN clients c ON t.client_id = c.id
-                    WHERE t.date_planifiee = ?
-                ''', (date_jour,)) 
+                    WHERE t.date_planifiee = ? AND t.tournee_id = ?
+                    ORDER BY t.ordre_passage ASC
+                ''', (date_jour, tournee_id)) 
                 arrets = cursor.fetchall()
                 
                 liste_arrets = []
-                charge_actuelle = 0
                 for a in arrets:
-                    charge_actuelle += (a[2] or 0)
                     liste_arrets.append({
                         "tache_id": a[0],
                         "statut": a[1],
@@ -329,15 +323,17 @@ class TourneeRepository:
                         "longitude": a[6]
                     })
                 
-                resultat.append({
-                    "chauffeur_id": chauffeur_id,
-                    "chauffeur": f"{prenom} {nom}",
-                    "vehicule": f"VL{chauffeur_id}",
-                    "immatriculation": immatriculation,
-                    "capacite_max_kg": charge_max,
-                    "heure_depart": heure_depart,
-                    "arrets": liste_arrets
-                })
+                # NOUVEAU : On n'envoie pas la tournée au Front si elle est vide (facultatif mais plus propre)
+                if len(liste_arrets) > 0:
+                    resultat.append({
+                        "chauffeur_id": chauffeur_id,
+                        "chauffeur": f"{prenom} {nom}",
+                        "vehicule": f"VL{chauffeur_id}",
+                        "immatriculation": immatriculation,
+                        "capacite_max_kg": charge_max,
+                        "heure_depart": heure_depart,
+                        "arrets": liste_arrets
+                    })
             return resultat
         
     def recuperer_imprevus(self, date_jour):
@@ -420,61 +416,69 @@ class TourneeRepository:
             conn.commit()
             return {"status": "succes", "taches_creees": taches_inserees}
     def sauvegarder_resultat_optimisation(self, date_jour, routes_optimales, data_ortools):
-        """
-        Prend le résultat d'OR-Tools et met à jour la table 'taches_collecte'
-        en associant chaque tâche à sa tournée et son ordre de passage.
-        """
-        with self.db_core.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            # 1. Récupérer les ID réels des tournées créées pour ce jour
-            cursor.execute('''
-                SELECT id FROM tournees_jour 
-                WHERE date_tournee = ? 
-                ORDER BY id ASC
-            ''', (date_jour,))
-            tournees_reelles_ids = [row[0] for row in cursor.fetchall()]
-            
-            if not tournees_reelles_ids:
-                print("Attention : Aucune tournée configurée pour cette date.")
-                return
+            """
+            Prend le résultat d'OR-Tools et met à jour la table 'taches_collecte'
+            en associant chaque tâche à sa tournée et son ordre de passage réel.
+            """
+            with self.db_core.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 1. Récupérer les ID uniques de TOUTES les tournées planifiées ce jour-là
+                cursor.execute('''
+                    SELECT id FROM tournees_jour 
+                    WHERE date_tournee = ? 
+                    ORDER BY id ASC
+                ''', (date_jour,))
+                tournees_reelles_ids = [row[0] for row in cursor.fetchall()]
+                
+                if not tournees_reelles_ids:
+                    print("Erreur sauvegarde : Aucune tournée configurée en BDD pour cette date.")
+                    return
 
-            # 2. Parcourir les routes calculées par OR-Tools
-            for vehicule_id, sequence_noeuds in routes_optimales.items():
-                
-                # Correspondance simple : véhicule IA = camion réel
-                index_tournee_physique = vehicule_id
-                
-                # Sécurité si l'IA génère plus de routes que prévu
-                if index_tournee_physique >= len(tournees_reelles_ids):
-                    continue
-                
-                tournee_bdd_id = tournees_reelles_ids[index_tournee_physique]
-                
-                ordre_passage = 1
-                for noeud_index in sequence_noeuds:
-                    # Le nœud 0 correspond au dépôt (départ/arrivée), on ne le sauvegarde pas
-                    if noeud_index == 0:
+                # 2. Nettoyage initial : on désaffecte les tâches de ce jour avant réécriture
+                cursor.execute('''
+                    UPDATE taches_collecte 
+                    SET tournee_id = NULL, ordre_passage = NULL, statut = 'en_attente'
+                    WHERE date_planifiee = ?
+                ''', (date_jour,))
+
+                # 3. Traitement des routes calculées par l'IA
+                for vehicule_id, sequence_noeuds in routes_optimales.items():
+                    # On ignore les véhicules vides (qui ne contiennent que le dépôt départ/arrivée)
+                    if len(sequence_noeuds) <= 2:
                         continue
                     
-                    # On récupère l'ID en base de données de cette collecte
-                    tache_id = data_ortools['tache_ids'][noeud_index]
+                    # Alignement strict de l'index OR-Tools avec l'identifiant en base de données
+                    if vehicule_id >= len(tournees_reelles_ids):
+                        print(f"Alerte : L'IA a utilisé plus de véhicules ({vehicule_id}) que de tournées disponibles.")
+                        continue
+                        
+                    tournee_bdd_id = tournees_reelles_ids[vehicule_id]
                     
-                    if tache_id:
-                        # On met à jour la tâche avec son camion et son ordre
-                        cursor.execute('''
-                            UPDATE taches_collecte 
-                            SET tournee_id = ?, ordre_passage = ?, statut = 'planifiee'
-                            WHERE id = ?
-                        ''', (tournee_bdd_id, ordre_passage, tache_id))
-                        ordre_passage += 1
-            
-            # 3. Passer le statut des camions de "brouillon" à "affectee"
-            cursor.execute('''
-                UPDATE tournees_jour 
-                SET statut = 'affectee' 
-                WHERE date_tournee = ?
-            ''', (date_jour,))
-            
-            conn.commit()
+                    ordre_passage = 1
+                    for noeud_index in sequence_noeuds:
+                        # On ignore le nœud du dépôt (0)
+                        if noeud_index == 0:
+                            continue
+                        
+                        # Récupération de l'ID unique de la tâche associée à ce nœud
+                        tache_id = data_ortools['tache_ids'][noeud_index]
+                        
+                        if tache_id:
+                            cursor.execute('''
+                                UPDATE taches_collecte 
+                                SET tournee_id = ?, ordre_passage = ?, statut = 'planifiee'
+                                WHERE id = ?
+                            ''', (tournee_bdd_id, ordre_passage, tache_id))
+                            ordre_passage += 1
+                
+                # 4. Passage des tournées concernées au statut 'affectee'
+                cursor.execute('''
+                    UPDATE tournees_jour 
+                    SET statut = 'affectee' 
+                    WHERE date_tournee = ?
+                ''', (date_jour,))
+                
+                conn.commit()
+                print("💾 Résultats de l'optimisation IA enregistrés avec succès en base de données !")
             

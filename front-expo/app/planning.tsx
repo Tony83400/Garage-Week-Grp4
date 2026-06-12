@@ -55,6 +55,8 @@ export default function PlanningScreen() {
       if (clientsRes.status === 'fulfilled') setClients(clientsRes.value);
 
       if (planningRes.status === 'fulfilled' && planningRes.value) {
+        // LOG 2 : Vérification de la liste des tournées
+        console.log("=== LOG 2 : NOMBRE DE TOURNÉES REÇUES ===", planningRes.value.length);
         const rows: VehicleRow[] = planningRes.value.map(tournee => ({
           chauffeurId: tournee.chauffeur_id,
           chauffeurNom: tournee.chauffeur,
@@ -71,6 +73,9 @@ export default function PlanningScreen() {
             ordre: a.ordre
           }))
         }));
+        // LOG 3 : Ce qui est envoyé aux composants (VehicleCard)
+        console.log("=== LOG 3 : ROWS PRÊTES POUR L'AFFICHAGE ===");
+        console.log(JSON.stringify(rows.map(r => ({ id: r.chauffeurId, nom: r.chauffeurNom, arrets: r.arrets.length })), null, 2));
         setVehicles(rows);
       }
     } catch (e) {
@@ -267,11 +272,10 @@ export default function PlanningScreen() {
         ) : (
           vehicles.map((v, i) => (
             <VehicleCard
-              key={v.chauffeurId}
+              key={`vehicle-card-${v.chauffeurId}-${i}`} // Clé composite parfaitement unique
               index={i}
               chauffeurId={v.chauffeurId}
               arrets={v.arrets}
-              capaciteMaxKg={v.capaciteMaxKg}
               onExport={() => handleExportBluebob(v.chauffeurId)}
               onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
             />

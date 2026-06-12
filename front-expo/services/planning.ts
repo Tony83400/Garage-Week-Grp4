@@ -21,7 +21,13 @@ export interface TourneeAdmin {
 // 1. Récupérer le planning existant
 export async function getPlanningAdmin(date: string): Promise<TourneeAdmin[]> {
   try {
-    return await api.get<TourneeAdmin[]>(`/api/admin/planning?date=${date}`);
+    const data = await api.get<TourneeAdmin[]>(`/api/admin/planning?date=${date}`);
+    
+    // LOG 1 : Ce que le Backend envoie réellement
+    console.log("=== LOG 1 : RÉPONSE BRUTE DU BACKEND ===");
+    console.log(JSON.stringify(data, null, 2)); 
+    
+    return data;
   } catch (e) {
     console.error("Erreur getPlanningAdmin:", e);
     return [];
