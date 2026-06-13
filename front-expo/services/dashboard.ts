@@ -9,7 +9,7 @@ export interface DashboardStats {
   collectes_validees: number;
   alertes: number;
   km_total: number;
-  flotte: { chauffeur: string; dernier_point: string }[];
+  flotte: { chauffeur: string; dernier_point: string; termine: boolean }[];
 }
 
 // Correspond à GET /api/dashboard/activite?date=YYYY-MM-DD

@@ -23,12 +23,23 @@ import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
 import { getPlanningAdmin, genererBrouillons, optimiserTournees, type TourneeAdmin } from '../services/planning';
 
-const DATE_DEMO = new Date().toISOString().split('T')[0];
-
 type VehicleRow = { chauffeurId: number; chauffeurNom: string; heureDepart: string; arrets: any[]; capaciteMaxKg: number; distance_km: number };
+
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+
+function shiftDate(iso: string, delta: number): string {
+  const d = new Date(iso);
+  d.setDate(d.getDate() + delta);
+  return d.toISOString().split('T')[0];
+}
+
+function formatDateFR(iso: string): string {
+  return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+}
 
 export default function PlanningScreen() {
   const router = useRouter();
+  const [selectedDate, setSelectedDate] = useState(todayISO);
   const [siteModalOpen, setSiteModalOpen] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -41,14 +52,20 @@ export default function PlanningScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
+  function navigateDate(delta: number) {
+    setVehicles([]);
+    setStats(null);
+    setSelectedDate(prev => shiftDate(prev, delta));
+  }
+
   // ── Chargement des données ───────────────────────────────────────────
-  async function fetchData() {
+  async function fetchData(date: string) {
     setLoading(true);
     try {
       const [statsRes, clientsRes, planningRes] = await Promise.allSettled([
-        getDashboardStats(DATE_DEMO),
+        getDashboardStats(date),
         getClients(),
-        getPlanningAdmin(DATE_DEMO),
+        getPlanningAdmin(date),
       ]);
 
       if (statsRes.status === 'fulfilled') setStats(statsRes.value);
@@ -89,8 +106,8 @@ export default function PlanningScreen() {
   }
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(selectedDate);
+  }, [selectedDate]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -105,19 +122,20 @@ export default function PlanningScreen() {
   async function handleGenerate() {
     setGenerating(true);
     showToast('Création des brouillons de collecte...');
-    
     try {
-      await genererBrouillons(DATE_DEMO);
+      await genererBrouillons(selectedDate);
       showToast('Calcul IA en cours (OR-Tools)...');
-      
-      await optimiserTournees(DATE_DEMO);
+      await optimiserTournees(selectedDate);
       showToast('Tournées générées avec succès !');
-      
-      // On rafraîchit la page
-      await fetchData();
+      await fetchData(selectedDate);
     } catch (e: any) {
       console.error(e);
-      showToast(e?.response?.data?.erreur || 'Erreur lors de la génération IA');
+      const msg = e?.message || '';
+      if (msg.includes('400') || msg.includes('tâche')) {
+        showToast('Aucun client disponible ce jour-là');
+      } else {
+        showToast('Erreur lors de la génération IA');
+      }
     } finally {
       setGenerating(false);
     }
@@ -140,7 +158,7 @@ export default function PlanningScreen() {
         .map<MapStop>(a => ({
           lat: a.latitude,
           lon: a.longitude,
-          label: a.nom,
+          label: a.client_nom,
           statut: a.statut,
           ordre: a.ordre,
         })),
@@ -179,9 +197,18 @@ export default function PlanningScreen() {
             <Text style={s.pageTitle}>Planning & Tournées</Text>
             <Text style={s.pageSubtitle}>Optimisation IA par jour et par véhicule</Text>
           </View>
-          <View style={s.dateBadge}>
-            <Ionicons name="calendar-outline" size={14} color={colors.primaryLight} />
-            <Text style={s.dateBadgeText}>{DATE_DEMO}</Text>
+          <View style={s.dateNav}>
+            <TouchableOpacity style={s.dateNavBtn} onPress={() => navigateDate(-1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-back" size={16} color={colors.primaryLight} />
+            </TouchableOpacity>
+            <View style={s.dateNavCenter}>
+              <Ionicons name="calendar-outline" size={12} color={colors.primaryLight} />
+              <Text style={s.dateNavText}>{formatDateFR(selectedDate)}</Text>
+              {selectedDate === todayISO() && <View style={s.todayDot} />}
+            </View>
+            <TouchableOpacity style={s.dateNavBtn} onPress={() => navigateDate(1)} activeOpacity={0.7}>
+              <Ionicons name="chevron-forward" size={16} color={colors.primaryLight} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -305,7 +332,7 @@ export default function PlanningScreen() {
             </View>
 
             <View style={s.vehiclesSection}>
-              <Text style={s.sectionTitle}>Tournées du jour</Text>
+              <Text style={s.sectionTitle}>Tournées · {formatDateFR(selectedDate)}</Text>
               <Text style={s.sectionSub}>{vehicles.length} véhicule{vehicles.length > 1 ? 's' : ''} en service</Text>
             </View>
 
@@ -406,16 +433,37 @@ const s = StyleSheet.create({
   },
   pageTitle: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   pageSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 3, fontWeight: '500' },
-  dateBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+  dateNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.card,
     borderWidth: 1, borderColor: '#D4E8DC',
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 12,
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    overflow: 'hidden',
   },
-  dateBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primaryLight },
+  dateNavBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateNavCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    borderLeftWidth: 1, borderRightWidth: 1,
+    borderColor: '#D4E8DC',
+  },
+  dateNavText: { fontSize: 12, fontWeight: '700', color: colors.primaryLight },
+  todayDot: {
+    width: 5, height: 5, borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
 
   // Stats Bar
   statsBar: {

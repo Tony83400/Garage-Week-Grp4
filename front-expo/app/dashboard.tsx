@@ -247,23 +247,42 @@ export default function DashboardScreen() {
             })()}
 
             {/* Flotte en temps réel */}
-            {stats && stats.flotte.length > 0 && (
-              <View style={[styles.activityCard, { marginBottom: 24 }]}>
-                <View style={styles.activityHeader}>
-                  <Text style={styles.activityTitle}>Positions de la flotte</Text>
-                  <View style={styles.activityCount}>
-                    <Text style={styles.activityCountText}>En cours</Text>
+            {stats && stats.flotte.length > 0 && (() => {
+              const allDone = stats.flotte.every(f => f.termine);
+              return (
+                <View style={[styles.activityCard, { marginBottom: 24 }]}>
+                  <View style={styles.activityHeader}>
+                    <Text style={styles.activityTitle}>Positions de la flotte</Text>
+                    <View style={[
+                      styles.activityCount,
+                      allDone && { backgroundColor: colors.status.terminee.bg },
+                    ]}>
+                      <Text style={[
+                        styles.activityCountText,
+                        allDone && { color: colors.status.terminee.fg },
+                      ]}>
+                        {allDone ? 'Terminé' : 'En cours'}
+                      </Text>
+                    </View>
                   </View>
+                  {stats.flotte.map((f, i) => (
+                    <View key={i} style={styles.fleetRow}>
+                      <View style={[
+                        styles.fleetDot,
+                        { backgroundColor: f.termine ? colors.status.terminee.fg : colors.accent },
+                      ]} />
+                      <Text style={styles.fleetName}>{f.chauffeur} :</Text>
+                      <Text style={[
+                        styles.fleetPoint,
+                        f.termine && { color: colors.status.terminee.fg },
+                      ]}>
+                        {f.dernier_point}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-                {stats.flotte.map((f, i) => (
-                  <View key={i} style={styles.fleetRow}>
-                    <View style={styles.fleetDot} />
-                    <Text style={styles.fleetName}>{f.chauffeur} :</Text>
-                    <Text style={styles.fleetPoint}>{f.dernier_point}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+              );
+            })()}
 
             {/* Activity */}
             <View style={styles.activityCard}>

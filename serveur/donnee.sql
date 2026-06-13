@@ -149,27 +149,132 @@ INSERT INTO clients (nom_entreprise, latitude, longitude) VALUES
 
 
 -- =============================================================================
--- 3. CONFIGURATION PARFAITE POUR LE TEST IA (Jour 5 - Vendredi)
+-- 3. DISPONIBILITÉS ET TOURNÉES — Semaine du 16 au 20 juin 2026
 -- =============================================================================
 
--- A. Les clients ouverts le vendredi (Disponibilité de 3h à 16h)
+-- A. Disponibilités variées par client (tous les 20 sites, jours aléatoires)
+--    Lun=1  Mar=2  Mer=3  Jeu=4  Ven=5
 INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin, poids_prevu_kg) VALUES
-(1, 5, '03:00:00', '16:00:00', 250.5),
-(2, 5, '03:00:00', '16:00:00', 120.0),
-(3, 5, '03:00:00', '16:00:00', 180.0),
-(4, 5, '03:00:00', '16:00:00', 300.0),
-(5, 5, '03:00:00', '16:00:00', 150.0),
-(6, 5, '03:00:00', '16:00:00', 200.0),
-(7, 5, '03:00:00', '16:00:00', 90.0),
-(8, 5, '03:00:00', '16:00:00', 60.0),
-(9, 5, '03:00:00', '16:00:00', 45.0),
-(10, 5, '03:00:00', '16:00:00', 75.0);
+-- Supermarché Port : Lun, Mer, Ven (grosses livraisons)
+(1, 1, '06:30:00', '14:00:00', 250.0),
+(1, 3, '06:30:00', '14:00:00', 270.0),
+(1, 5, '07:00:00', '15:00:00', 230.0),
+-- Restaurant Plage : Mar, Jeu (après rush week-end)
+(2, 2, '07:00:00', '12:00:00', 120.0),
+(2, 4, '07:00:00', '12:00:00', 110.0),
+-- Usine Tech : tous les jours
+(3, 1, '06:30:00', '16:00:00', 180.0),
+(3, 2, '06:30:00', '16:00:00', 175.0),
+(3, 3, '06:30:00', '16:00:00', 190.0),
+(3, 4, '06:30:00', '16:00:00', 185.0),
+(3, 5, '06:30:00', '16:00:00', 160.0),
+-- Hôpital Sud : Lun, Mer, Ven
+(4, 1, '06:00:00', '10:00:00', 300.0),
+(4, 3, '06:00:00', '10:00:00', 310.0),
+(4, 5, '06:00:00', '10:00:00', 290.0),
+-- Lycée Campus : Mar, Jeu (rythme scolaire)
+(5, 2, '07:30:00', '11:30:00', 150.0),
+(5, 4, '07:30:00', '11:30:00', 140.0),
+-- Centre Commercial : tous les jours
+(6, 1, '07:00:00', '16:00:00', 200.0),
+(6, 2, '07:00:00', '16:00:00', 210.0),
+(6, 3, '07:00:00', '16:00:00', 195.0),
+(6, 4, '07:00:00', '16:00:00', 205.0),
+(6, 5, '07:00:00', '16:00:00', 220.0),
+-- Hôtel de la Baie : Lun, Jeu (après week-end et milieu de semaine)
+(7, 1, '08:00:00', '13:00:00', 90.0),
+(7, 4, '08:00:00', '13:00:00', 95.0),
+-- Boulangerie Matin : tous les jours, tôt
+(8, 1, '06:30:00', '09:00:00', 60.0),
+(8, 2, '06:30:00', '09:00:00', 55.0),
+(8, 3, '06:30:00', '09:00:00', 65.0),
+(8, 4, '06:30:00', '09:00:00', 58.0),
+(8, 5, '06:30:00', '09:00:00', 70.0),
+-- Cinéma Central : Mer, Ven (après séances)
+(9, 3, '10:00:00', '15:00:00', 45.0),
+(9, 5, '10:00:00', '15:00:00', 50.0),
+-- Gare Routière : Lun, Mer, Ven
+(10, 1, '07:00:00', '14:00:00', 75.0),
+(10, 3, '07:00:00', '14:00:00', 80.0),
+(10, 5, '07:00:00', '14:00:00', 72.0),
+-- Camping Les Pins : Mar, Jeu (saisonnier)
+(11, 2, '08:00:00', '14:00:00', 110.0),
+(11, 4, '08:00:00', '14:00:00', 125.0),
+-- Port de Plaisance : Lun, Ven
+(12, 1, '07:30:00', '13:00:00', 130.0),
+(12, 5, '07:30:00', '13:00:00', 145.0),
+-- Marché Provençal : Mer uniquement (jour de marché)
+(13, 3, '06:00:00', '11:00:00', 220.0),
+-- Entreprise Logistique : tous les jours
+(14, 1, '06:30:00', '16:00:00', 85.0),
+(14, 2, '06:30:00', '16:00:00', 90.0),
+(14, 3, '06:30:00', '16:00:00', 88.0),
+(14, 4, '06:30:00', '16:00:00', 82.0),
+(14, 5, '06:30:00', '16:00:00', 92.0),
+-- Mairie Centrale : Jeu uniquement (ramassage hebdo)
+(15, 4, '09:00:00', '14:00:00', 95.0),
+-- Clinique Vallée : Lun, Mar, Mer, Jeu, Ven
+(16, 1, '06:30:00', '15:00:00', 140.0),
+(16, 2, '06:30:00', '15:00:00', 135.0),
+(16, 3, '06:30:00', '15:00:00', 145.0),
+(16, 4, '06:30:00', '15:00:00', 138.0),
+(16, 5, '06:30:00', '15:00:00', 142.0),
+-- Magasin Bio : Mer, Ven
+(17, 3, '08:00:00', '14:00:00', 70.0),
+(17, 5, '08:00:00', '14:00:00', 75.0),
+-- Pharmacie Littoral : Mar, Jeu
+(18, 2, '09:00:00', '15:00:00', 55.0),
+(18, 4, '09:00:00', '15:00:00', 50.0),
+-- Bibliothèque Municipale : Lun uniquement
+(19, 1, '09:00:00', '13:00:00', 40.0),
+-- Musée d'Art : Ven + Sam + Dim (tourisme)
+(20, 5, '10:00:00', '16:00:00', 65.0),
+(20, 6, '10:00:00', '16:00:00', 80.0),
+(20, 7, '11:00:00', '17:00:00', 70.0),
+-- Week-end : clients ouverts Sam (6) et/ou Dim (7)
+-- Restaurant Plage : peak week-end
+(2, 6, '07:00:00', '13:00:00', 160.0),
+(2, 7, '08:00:00', '13:00:00', 140.0),
+-- Hôtel de la Baie : plein le week-end
+(7, 6, '07:00:00', '14:00:00', 130.0),
+(7, 7, '08:00:00', '14:00:00', 120.0),
+-- Camping Les Pins : haute saison sam+dim
+(11, 6, '07:00:00', '14:00:00', 180.0),
+(11, 7, '08:00:00', '14:00:00', 165.0),
+-- Port de Plaisance : samedi très chargé
+(12, 6, '07:00:00', '13:00:00', 200.0),
+-- Centre Commercial : samedi = gros jour
+(6, 6, '07:00:00', '16:00:00', 280.0),
+-- Marché Provençal : samedi = jour principal
+(13, 6, '05:30:00', '11:00:00', 320.0),
+-- Cinéma Central : samedi soir
+(9, 6, '10:00:00', '16:00:00', 60.0);
 
--- B. Les plannings de travail des chauffeurs (Où l'IA va répartir les tâches)
--- On affecte 2 camions en service de 3h00 à 16h00 sans interruption.
+-- B. Tournées du sam 13/06 au sam 20/06/2026
+--    Lun-Ven : Jean (id=1) + Alice (id=2)
+--    Sam     : Jean uniquement (service réduit)
+--    Dim     : Alice uniquement (service réduit)
 INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, heure_debut_service, heure_fin_service, statut) VALUES
-('2026-06-12', 1, 1, '03:00:00', '16:00:00', 'brouillon'),
-('2026-06-12', 2, 2, '03:00:00', '16:00:00', 'brouillon');
+-- Sam 13 juin
+('2026-06-13', 1, 1, '06:30:00', '14:00:00', 'brouillon'),
+-- Dim 14 juin
+('2026-06-14', 2, 2, '07:00:00', '14:00:00', 'brouillon'),
+-- Lun 15 juin
+('2026-06-15', 1, 1, '06:30:00', '16:00:00', 'brouillon'),
+('2026-06-15', 2, 2, '06:30:00', '16:00:00', 'brouillon'),
+-- Mar 16 juin
+('2026-06-16', 1, 1, '06:30:00', '16:00:00', 'brouillon'),
+('2026-06-16', 2, 2, '06:30:00', '16:00:00', 'brouillon'),
+-- Mer 17 juin
+('2026-06-17', 1, 1, '06:30:00', '16:00:00', 'brouillon'),
+('2026-06-17', 2, 2, '06:30:00', '16:00:00', 'brouillon'),
+-- Jeu 18 juin
+('2026-06-18', 1, 1, '06:30:00', '16:00:00', 'brouillon'),
+('2026-06-18', 2, 2, '06:30:00', '16:00:00', 'brouillon'),
+-- Ven 19 juin
+('2026-06-19', 1, 1, '06:30:00', '16:00:00', 'brouillon'),
+('2026-06-19', 2, 2, '06:30:00', '16:00:00', 'brouillon'),
+-- Sam 20 juin
+('2026-06-20', 1, 1, '06:30:00', '14:00:00', 'brouillon');
 
--- C. AUCUNE TÂCHE N'EST INSÉRÉE (La table taches_collecte reste vide). 
--- C'est le clic sur le bouton "Générer les tournées (IA)" qui va les créer !
+-- C. AUCUNE TÂCHE N'EST INSÉRÉE — créées par le bouton "Générer les tournées (IA)"

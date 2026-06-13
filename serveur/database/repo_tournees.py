@@ -239,18 +239,18 @@ class TourneeRepository:
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             
-            # 1. Stats de poids et collectes
+            # 1. Stats de poids et collectes (vidage_depot exclus — pas des collectes clients)
             cursor.execute('''
-                SELECT 
+                SELECT
                     SUM(poids_prevu_kg),
                     COUNT(id),
                     SUM(CASE WHEN statut = 'terminee' THEN 1 ELSE 0 END),
                     SUM(CASE WHEN statut = 'terminee' THEN poids_prevu_kg ELSE 0 END)
                 FROM taches_collecte
-                WHERE date_planifiee = ?
+                WHERE date_planifiee = ? AND type_tache = 'collecte'
             ''', (date_jour,))
             resultat = cursor.fetchone()
-            
+
             poids_total = resultat[0] or 0
             total_collectes = resultat[1] or 0
             collectes_validees = resultat[2] or 0
@@ -270,23 +270,39 @@ class TourneeRepository:
             ''', (date_jour,))
             km_total = cursor.fetchone()[0] or 0
 
-            # 4. Statut de la flotte (Dernier point par chauffeur)
+            # 4. Statut de la flotte par chauffeur
             cursor.execute('''
-                SELECT ch.prenom, c.nom_entreprise, MAX(t.ordre_passage)
+                SELECT
+                    ch.prenom,
+                    c.nom_entreprise,
+                    COUNT(CASE WHEN t.type_tache = 'collecte' THEN 1 END) AS total_collectes,
+                    COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'terminee' THEN 1 END) AS done_collectes
                 FROM tournees_jour tj
                 JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
                 JOIN taches_collecte t ON tj.id = t.tournee_id
-                JOIN clients c ON t.client_id = c.id
-                WHERE tj.date_tournee = ? AND t.statut = 'terminee'
-                GROUP BY tj.id
+                LEFT JOIN clients c ON t.client_id = c.id AND t.statut = 'terminee'
+                    AND t.ordre_passage = (
+                        SELECT MAX(t2.ordre_passage) FROM taches_collecte t2
+                        WHERE t2.tournee_id = tj.id AND t2.statut = 'terminee' AND t2.type_tache = 'collecte'
+                    )
+                WHERE tj.date_tournee = ?
+                GROUP BY tj.id, ch.prenom
             ''', (date_jour,))
             flotte_lignes = cursor.fetchall()
-            
+
             flotte_statut = []
             for f in flotte_lignes:
+                prenom, dernier_client, total, done = f[0], f[1], f[2] or 0, f[3] or 0
+                if total > 0 and done >= total:
+                    dernier_point = 'Retour dépôt · La Farlède'
+                    termine = True
+                else:
+                    dernier_point = dernier_client or 'En route'
+                    termine = False
                 flotte_statut.append({
-                    "chauffeur": f[0],
-                    "dernier_point": f[1]
+                    "chauffeur": prenom,
+                    "dernier_point": dernier_point,
+                    "termine": termine
                 })
 
             return {
