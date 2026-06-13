@@ -46,7 +46,6 @@ export default function PlanningScreen() {
   const [vehicles, setVehicles] = useState<VehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sitesOpen, setSitesOpen] = useState(false);
   const [selectedStop, setSelectedStop] = useState<{ lat: number; lon: number } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -194,7 +193,7 @@ export default function PlanningScreen() {
 
         <View style={s.pageHeader}>
           <View>
-            <Text style={s.pageTitle}>Planning & Tournées</Text>
+            <Text style={s.pageTitle}>Planning</Text>
             <Text style={s.pageSubtitle}>Optimisation IA par jour et par véhicule</Text>
           </View>
           <View style={s.dateNav}>
@@ -281,10 +280,6 @@ export default function PlanningScreen() {
                 <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
                 <Text style={s.btnImprevusText}>Gérer les imprévus</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.btnSaisir} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
-                <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
-                <Text style={s.btnSaisirText}>+ Nouveau site</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={s.mapCard}>
@@ -296,39 +291,6 @@ export default function PlanningScreen() {
                 </View>
               </View>
               <MapTournees height={340} vehicles={mapVehicles} selectedStop={selectedStop} />
-            </View>
-
-            <View style={s.sitesPanel}>
-              <TouchableOpacity style={s.sitesPanelHeader} onPress={() => setSitesOpen(v => !v)} activeOpacity={0.75}>
-                <View style={s.sitesPanelLeft}>
-                  <View style={s.sitesPanelIcon}><Ionicons name="location-outline" size={18} color={colors.primaryLight} /></View>
-                  <View>
-                    <Text style={s.sitesPanelTitle}>Sites de collecte enregistrés</Text>
-                    <Text style={s.sitesPanelSub}>{clients.length} site{clients.length !== 1 ? 's' : ''} dans la base</Text>
-                  </View>
-                </View>
-                <Ionicons name={sitesOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-              {sitesOpen && (
-                <View style={s.sitesList}>
-                  {clients.length === 0 ? <Text style={s.sitesEmpty}>Aucun site chargé</Text> : (
-                    clients.map((c, i) => (
-                      <TouchableOpacity
-                        key={c.id ?? i}
-                        style={[s.siteItem, i > 0 && s.siteDivider]}
-                        onPress={() => setSelectedStop({ lat: c.latitude, lon: c.longitude })}
-                        activeOpacity={0.7}
-                      >
-                        <View style={s.siteItemLeft}>
-                          <Text style={s.siteName}>{c.nom_entreprise}</Text>
-                          <Text style={s.siteCoords}>{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</Text>
-                        </View>
-                        <Ionicons name="location" size={14} color={colors.accentLight} />
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </View>
-              )}
             </View>
 
             <View style={s.vehiclesSection}>
@@ -609,39 +571,6 @@ const s = StyleSheet.create({
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
   },
   mapChipText: { fontSize: 11, color: colors.primaryLight, fontWeight: '600' },
-
-  // Sites panel
-  sitesPanel: {
-    backgroundColor: colors.card,
-    borderRadius: 18, borderWidth: 1, borderColor: '#EAF2EE',
-    overflow: 'hidden', marginBottom: 24,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
-  },
-  sitesPanelHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingVertical: 14,
-  },
-  sitesPanelLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  sitesPanelIcon: {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: '#E8F5EE',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  sitesPanelTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
-  sitesPanelSub: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
-  sitesList: { borderTopWidth: 1, borderTopColor: '#EAF2EE' },
-  sitesEmpty: { fontSize: 13, color: colors.textMuted, textAlign: 'center', padding: 16 },
-  siteItem: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 18, paddingVertical: 10,
-  },
-  siteDivider: { borderTopWidth: 1, borderTopColor: '#F0F7F4' },
-  siteItemLeft: { flex: 1 },
-  siteName: { fontSize: 13, fontWeight: '600', color: colors.text },
-  siteCoords: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
 
   // Vehicles section
   vehiclesSection: { marginBottom: 14 },

@@ -12,6 +12,7 @@ export default function RootLayout() {
         <Stack.Screen name="planning"  options={{ animation: 'fade' }} />
         <Stack.Screen name="driver"    options={{ animation: 'fade' }} />
         <Stack.Screen name="imprevus"  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="sites"     options={{ animation: 'slide_from_right' }} />
       </Stack>
     </SafeAreaProvider>
   );

@@ -23,7 +23,7 @@ function LogoIcon() {
 }
 
 interface Props {
-  activeRoute: 'dashboard' | 'planning';
+  activeRoute: 'dashboard' | 'planning' | 'sites';
   style?: object;
 }
 
@@ -78,7 +78,21 @@ export default function Sidebar({ activeRoute, style }: Props) {
             color={activeRoute === 'planning' ? colors.accentLight : 'rgba(255,255,255,0.55)'}
           />
           <Text style={[styles.navText, activeRoute === 'planning' && styles.navTextActive]}>
-            Planning & Tournées
+            Planning
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.navItem, activeRoute === 'sites' && styles.navItemActive]}
+          onPress={() => router.push('/sites')}
+        >
+          <Ionicons
+            name="location-outline"
+            size={18}
+            color={activeRoute === 'sites' ? colors.accentLight : 'rgba(255,255,255,0.55)'}
+          />
+          <Text style={[styles.navText, activeRoute === 'sites' && styles.navTextActive]}>
+            Sites de collecte
           </Text>
         </TouchableOpacity>
       </View>
