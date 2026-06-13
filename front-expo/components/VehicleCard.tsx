@@ -31,6 +31,12 @@ interface Props {
   onStopPress?: (lat: number, lon: number, clientNom: string) => void;
 }
 
+function getInitials(nom: string): string {
+  const parts = nom.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return nom.slice(0, 2).toUpperCase();
+}
+
 function StatutBadge({ statut }: { statut: Arret['statut'] }) {
   const labels: Record<string, string> = {
     terminee:   '✓ Fait',
@@ -47,6 +53,12 @@ function StatutBadge({ statut }: { statut: Arret['statut'] }) {
       <Text style={[s.badgeText, { color: theme.fg }]}>{labels[statut] ?? statut}</Text>
     </View>
   );
+}
+
+function getDotStyle(statut: Arret['statut']) {
+  const filled = statut === 'terminee' || statut === 'en_cours' || statut === 'erreur';
+  const color = colors.status[statut as keyof typeof colors.status]?.fg ?? colors.textMuted;
+  return { filled, color };
 }
 
 export default function VehicleCard({
@@ -71,42 +83,65 @@ export default function VehicleCard({
 
   const vehicleColor = VEHICLE_COLORS[index % VEHICLE_COLORS.length];
   const vehicleLabel = `VL${index + 1}`;
+  const initials     = getInitials(chauffeurNom);
 
-  const chargeTotaleKg = arrets.reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
-  const chargeActuelleKg = arrets
-    .filter(a => a.statut === 'terminee')
-    .reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
+  const done            = arrets.filter(a => a.statut === 'terminee').length;
+  const chargeTotaleKg  = arrets.reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
+  const fillPct         = capaciteMaxKg > 0 ? Math.min(Math.round((chargeTotaleKg / capaciteMaxKg) * 100), 100) : 0;
+  const isOverload      = fillPct >= 95;
 
-  const fillPct = Math.min(Math.round((chargeActuelleKg / capaciteMaxKg) * 100), 100);
-  const isOverload = chargeActuelleKg >= capaciteMaxKg * 0.95;
+  const barColor = fillPct > 90 ? colors.coral : fillPct > 70 ? colors.accent : vehicleColor;
+
+  const progressColor = done === arrets.length && arrets.length > 0
+    ? colors.status.terminee.fg
+    : done > 0
+      ? colors.status.en_cours.fg
+      : colors.textMuted;
 
   return (
     <Animated.View style={[s.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-      {/* Header */}
+
+      {/* Bande couleur gauche */}
+      <View style={[s.colorStrip, { backgroundColor: vehicleColor }]} />
+
+      {/* ── Header ─────────────────────────────────────────────── */}
       <TouchableOpacity style={s.header} onPress={toggleExpand} activeOpacity={0.75}>
-        <View style={s.headerLeft}>
-          <View style={[s.vehicleTag, { backgroundColor: vehicleColor + '22' }]}>
-            <Text style={[s.vehicleTagText, { color: vehicleColor }]}>{vehicleLabel}</Text>
+
+        {/* Avatar + VL tag */}
+        <View style={s.avatarCol}>
+          <View style={[s.avatarCircle, { backgroundColor: vehicleColor + '1A', borderColor: vehicleColor + '50' }]}>
+            <Text style={[s.avatarInitials, { color: vehicleColor }]}>{initials}</Text>
           </View>
-          <View>
-            <Text style={s.chauffeurNom}>{chauffeurNom}</Text>
-            <Text style={s.vehiculeInfo}>VL · max {capaciteMaxKg} kg</Text>
+          <View style={[s.vlTag, { backgroundColor: vehicleColor + '15' }]}>
+            <Text style={[s.vlTagText, { color: vehicleColor }]}>{vehicleLabel}</Text>
           </View>
         </View>
+
+        {/* Infos chauffeur */}
+        <View style={s.headerInfo}>
+          <Text style={s.chauffeurNom} numberOfLines={1}>{chauffeurNom}</Text>
+          {heureDepart && heureDepart !== '–' && (
+            <View style={s.departRow}>
+              <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+              <Text style={s.departText}>Départ {heureDepart}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Droite : progression + export + chevron */}
         <View style={s.headerRight}>
+          <View style={[s.progressBadge, { backgroundColor: progressColor + '18', borderColor: progressColor + '40' }]}>
+            <Text style={[s.progressText, { color: progressColor }]}>{done}/{arrets.length}</Text>
+          </View>
           <TouchableOpacity style={s.exportBtn} onPress={onExport} activeOpacity={0.8}>
             <Ionicons name="download-outline" size={12} color="#fff" />
             <Text style={s.exportBtnText}>BlueBob</Text>
           </TouchableOpacity>
-          <Ionicons
-            name={expanded ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color={colors.textMuted}
-          />
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
         </View>
       </TouchableOpacity>
 
-      {/* Meta strip */}
+      {/* ── Meta strip ─────────────────────────────────────────── */}
       <View style={s.metaStrip}>
         <View style={[s.metaItem, s.metaBorder]}>
           <Text style={s.metaValue}>{arrets.length}</Text>
@@ -114,59 +149,72 @@ export default function VehicleCard({
         </View>
         <View style={[s.metaItem, s.metaBorder]}>
           <Text style={s.metaValue}>≈ {chargeTotaleKg} kg</Text>
-          <Text style={s.metaLabel}>Prévu</Text>
+          <Text style={s.metaLabel}>Chargement</Text>
         </View>
         <View style={s.metaItem}>
-          <Text style={s.metaValue}>{heureDepart ?? '–'}</Text>
-          <Text style={s.metaLabel}>Départ</Text>
+          <Text style={[s.metaValue, { color: barColor }]}>{fillPct}%</Text>
+          <Text style={s.metaLabel}>Capacité</Text>
         </View>
       </View>
 
-      {/* Weight bar */}
+      {/* ── Barre de charge ────────────────────────────────────── */}
       <View style={s.weightWrap}>
         <View style={s.weightLabelRow}>
-          <Text style={s.weightLabel}>Charge actuelle estimée</Text>
-          <Text style={[s.weightValue, isOverload && { color: colors.status.en_cours.fg }]}>
-            {chargeActuelleKg} / {capaciteMaxKg} kg{isOverload ? ' ⚠' : ''}
+          <Text style={s.weightLabel}>Remplissage estimé</Text>
+          <Text style={[s.weightValue, { color: barColor }]}>
+            {chargeTotaleKg} / {capaciteMaxKg} kg{isOverload ? ' ⚠' : ''}
           </Text>
         </View>
         <View style={s.weightBarBg}>
-          <View
-            style={[
-              s.weightBarFill,
-              { width: `${fillPct}%` as any, backgroundColor: isOverload ? colors.status.en_cours.fg : vehicleColor },
-            ]}
-          />
+          <View style={[s.weightBarFill, { width: `${fillPct}%` as any, backgroundColor: barColor }]} />
         </View>
       </View>
 
-      {/* Stops list */}
+      {/* ── Liste des arrêts (timeline) ─────────────────────────── */}
       {expanded && (
         <View style={s.stopsList}>
+          {/* Ligne verticale absolue */}
+          <View style={[s.timelineAbsLine, { backgroundColor: vehicleColor + '28' }]} />
+
           {arrets.length === 0 ? (
             <Text style={s.emptyStops}>Aucun arrêt planifié</Text>
           ) : (
-            arrets.map((a, i) => (
-              <Pressable
-                key={a.tache_id}
-                style={({ pressed }) => [s.stopItem, i > 0 && s.stopDivider, pressed && s.stopPressed]}
-                onPress={() => a.latitude && a.longitude && onStopPress?.(a.latitude, a.longitude, a.client_nom)}
-              >
-                <View style={s.stopNum}>
-                  <Text style={s.stopNumText}>{a.ordre ?? i + 1}</Text>
-                </View>
-                <View style={s.stopContent}>
-                  <Text style={s.stopName} numberOfLines={1}>{a.client_nom}</Text>
-                  {a.heure_estimee && (
-                    <Text style={s.stopTime}>{a.heure_estimee}</Text>
+            arrets.map((a, i) => {
+              const { filled, color: dotColor } = getDotStyle(a.statut);
+              return (
+                <Pressable
+                  key={a.tache_id}
+                  style={({ pressed }) => [s.stopItem, pressed && s.stopPressed]}
+                  onPress={() => a.latitude && a.longitude && onStopPress?.(a.latitude, a.longitude, a.client_nom)}
+                >
+                  {/* Point de timeline */}
+                  <View style={s.timelineDotWrap}>
+                    <View style={[
+                      s.timelineDot,
+                      filled
+                        ? { backgroundColor: dotColor, borderColor: dotColor }
+                        : { backgroundColor: colors.card, borderColor: vehicleColor + '70' },
+                    ]}>
+                      <Text style={[s.timelineDotNum, { color: filled ? '#fff' : vehicleColor }]}>
+                        {a.ordre ?? i + 1}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Contenu */}
+                  <View style={s.stopContent}>
+                    <Text style={s.stopName} numberOfLines={1}>{a.client_nom}</Text>
+                    {a.heure_estimee && <Text style={s.stopTime}>{a.heure_estimee}</Text>}
+                  </View>
+
+                  <StatutBadge statut={a.statut} />
+
+                  {a.latitude && a.longitude && (
+                    <Ionicons name="location-outline" size={13} color={colors.accentLight} />
                   )}
-                </View>
-                <StatutBadge statut={a.statut} />
-                {a.latitude && a.longitude && (
-                  <Ionicons name="location-outline" size={13} color={colors.accentLight} />
-                )}
-              </Pressable>
-            ))
+                </Pressable>
+              );
+            })
           )}
         </View>
       )}
@@ -182,52 +230,92 @@ const s = StyleSheet.create({
     borderColor: '#EAF2EE',
     overflow: 'hidden',
     shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.09,
+    shadowRadius: 10,
+    elevation: 4,
     marginBottom: 14,
+    position: 'relative',
   },
+  colorStrip: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: 4,
+    zIndex: 1,
+  },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
+    paddingLeft: 18,
+    paddingRight: 14,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#EAF2EE',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
-    flex: 1,
   },
-  vehicleTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  avatarCol: {
+    alignItems: 'center',
+    gap: 5,
   },
-  vehicleTagText: {
-    fontSize: 11,
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  vlTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  vlTagText: {
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  headerInfo: {
+    flex: 1,
+    gap: 4,
   },
   chauffeurNom: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.text,
   },
-  vehiculeInfo: {
-    fontSize: 11,
+  departRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  departText: {
+    fontSize: 12,
     color: colors.textMuted,
     fontWeight: '500',
-    marginTop: 1,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+  },
+  progressBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   exportBtn: {
     flexDirection: 'row',
@@ -248,23 +336,26 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+
+  // Meta strip
   metaStrip: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#EAF2EE',
+    marginLeft: 4,
   },
   metaItem: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
   metaBorder: {
     borderRightWidth: 1,
     borderRightColor: '#EAF2EE',
   },
   metaValue: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: colors.text,
   },
   metaLabel: {
@@ -273,17 +364,20 @@ const s = StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: 2,
+    marginTop: 3,
   },
+
+  // Barre de charge
   weightWrap: {
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 11,
     paddingBottom: 14,
+    marginLeft: 4,
   },
   weightLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 7,
   },
   weightLabel: {
     fontSize: 11,
@@ -293,10 +387,9 @@ const s = StyleSheet.create({
   weightValue: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.primaryLight,
   },
   weightBarBg: {
-    height: 6,
+    height: 8,
     backgroundColor: '#EAF2EE',
     borderRadius: 99,
     overflow: 'hidden',
@@ -305,10 +398,21 @@ const s = StyleSheet.create({
     height: '100%',
     borderRadius: 99,
   },
+
+  // Timeline
   stopsList: {
     borderTopWidth: 1,
     borderTopColor: '#EAF2EE',
     paddingBottom: 4,
+    marginLeft: 4,
+    position: 'relative',
+  },
+  timelineAbsLine: {
+    position: 'absolute',
+    left: 26,
+    top: 0,
+    bottom: 0,
+    width: 2,
   },
   emptyStops: {
     fontSize: 13,
@@ -320,34 +424,33 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingLeft: 14,
+    paddingRight: 14,
+    paddingVertical: 10,
   },
   stopPressed: {
     backgroundColor: '#F0F7F4',
   },
-  stopDivider: {
-    borderTopWidth: 1,
-    borderTopColor: '#F0F7F4',
+  timelineDotWrap: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
-  stopNum: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.background,
+  timelineDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#D4E8DC',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stopNumText: {
+  timelineDotNum: {
     fontSize: 10,
-    fontWeight: '700',
-    color: colors.primaryLight,
+    fontWeight: '800',
   },
   stopContent: {
     flex: 1,
-    justifyContent: 'center',
   },
   stopName: {
     fontSize: 13,

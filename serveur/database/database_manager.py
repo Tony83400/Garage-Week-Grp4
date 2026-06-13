@@ -68,6 +68,9 @@ class DatabaseManager:
     def get_tournees_detaillees(self, date_jour):
         return self.repo_tournees.get_tournees_detaillees(date_jour)
     
+    def get_planning_preview(self, date_jour):
+        return self.repo_tournees.get_planning_preview(date_jour)
+
     def generer_brouillons_jour(self, date_jour):
         return self.repo_tournees.generer_brouillons_jour(date_jour)
         

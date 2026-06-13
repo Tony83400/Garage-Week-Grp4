@@ -44,3 +44,12 @@ export async function genererBrouillons(date: string): Promise<any> {
 export async function optimiserTournees(date: string): Promise<any> {
   return await api.post('/api/planning/optimiser', { date });
 }
+
+// 4. Contexte du jour pour la PrepCard
+export async function getPlanningPreview(date: string): Promise<{ clients_dispo: number; chauffeurs_dispo: number }> {
+  try {
+    return await api.get(`/api/planning/preview?date=${date}`);
+  } catch {
+    return { clients_dispo: 0, chauffeurs_dispo: 0 };
+  }
+}

@@ -140,6 +140,13 @@ def replanifier_imprevu(tache_id):
         return jsonify({"message": "Tâche replanifiée avec succès."}), 200
     return jsonify({"erreur": "Tâche introuvable."}), 404
 
+@app.route('/api/planning/preview', methods=['GET'])
+def api_planning_preview():
+    """Retourne les compteurs contextuels du jour (clients dispo, chauffeurs planifiés)."""
+    date_jour = request.args.get('date', date.today().isoformat())
+    preview = db.get_planning_preview(date_jour)
+    return jsonify(preview), 200
+
 @app.route('/api/planning/generer', methods=['POST'])
 def api_generer_brouillons():
     """

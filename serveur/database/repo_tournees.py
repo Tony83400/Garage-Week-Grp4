@@ -239,7 +239,7 @@ class TourneeRepository:
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             
-            # 1. Stats de poids et collectes (vidage_depot exclus — pas des collectes clients)
+            # 1. Stats de poids et collectes — uniquement les tâches affectées à une tournée
             cursor.execute('''
                 SELECT
                     SUM(poids_prevu_kg),
@@ -247,7 +247,7 @@ class TourneeRepository:
                     SUM(CASE WHEN statut = 'terminee' THEN 1 ELSE 0 END),
                     SUM(CASE WHEN statut = 'terminee' THEN poids_prevu_kg ELSE 0 END)
                 FROM taches_collecte
-                WHERE date_planifiee = ? AND type_tache = 'collecte'
+                WHERE date_planifiee = ? AND type_tache = 'collecte' AND tournee_id IS NOT NULL
             ''', (date_jour,))
             resultat = cursor.fetchone()
 
@@ -322,7 +322,7 @@ class TourneeRepository:
                 SELECT t.statut, c.nom_entreprise, c.latitude, c.longitude
                 FROM taches_collecte t
                 JOIN clients c ON t.client_id = c.id
-                WHERE t.date_planifiee = ? AND t.statut != 'en_attente'
+                WHERE t.date_planifiee = ? AND t.statut IN ('terminee', 'erreur')
                 ORDER BY t.id DESC LIMIT ?
             ''', (date_jour, limite))
             lignes = cursor.fetchall()
@@ -413,6 +413,32 @@ class TourneeRepository:
                 })
             return imprevus
     
+    def get_planning_preview(self, date_jour):
+        """Retourne le nombre de clients disponibles et de chauffeurs planifiés pour un jour."""
+        date_obj = datetime.datetime.strptime(date_jour, '%Y-%m-%d')
+        jour_semaine = date_obj.weekday() + 1
+
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT COUNT(DISTINCT d.client_id)
+                FROM disponibilites_clients d
+                WHERE d.jour_semaine = ?
+                AND d.client_id NOT IN (
+                    SELECT client_id FROM exceptions_calendrier_clients
+                    WHERE date_exception = ? AND est_ferme = 1
+                )
+            ''', (jour_semaine, date_jour))
+            clients_dispo = cursor.fetchone()[0] or 0
+
+            cursor.execute('''
+                SELECT COUNT(*) FROM tournees_jour WHERE date_tournee = ?
+            ''', (date_jour,))
+            chauffeurs_dispo = cursor.fetchone()[0] or 0
+
+            return {"clients_dispo": clients_dispo, "chauffeurs_dispo": chauffeurs_dispo}
+
     def generer_brouillons_jour(self, date_jour):
         """
         Génère automatiquement les tâches de collecte pour un jour donné,

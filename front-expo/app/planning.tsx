@@ -15,13 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
 import MobileDrawer from '../components/MobileDrawer';
-import SiteModal from '../components/SiteModal';
 import VehicleCard from '../components/VehicleCard';
 import MapTournees, { type MapVehicle, type MapStop } from '../components/MapTournees';
 
 import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
-import { getPlanningAdmin, genererBrouillons, optimiserTournees, type TourneeAdmin } from '../services/planning';
+import { getPlanningAdmin, genererBrouillons, optimiserTournees, getPlanningPreview, type TourneeAdmin } from '../services/planning';
 
 type VehicleRow = { chauffeurId: number; chauffeurNom: string; heureDepart: string; arrets: any[]; capaciteMaxKg: number; distance_km: number };
 
@@ -40,8 +39,9 @@ function formatDateFR(iso: string): string {
 export default function PlanningScreen() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(todayISO);
-  const [siteModalOpen, setSiteModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'routes' | 'carte'>('routes');
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [preview, setPreview] = useState<{ clients_dispo: number; chauffeurs_dispo: number } | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +54,8 @@ export default function PlanningScreen() {
   function navigateDate(delta: number) {
     setVehicles([]);
     setStats(null);
+    setPreview(null);
+    setViewMode('routes');
     setSelectedDate(prev => shiftDate(prev, delta));
   }
 
@@ -61,17 +63,18 @@ export default function PlanningScreen() {
   async function fetchData(date: string) {
     setLoading(true);
     try {
-      const [statsRes, clientsRes, planningRes] = await Promise.allSettled([
+      const [statsRes, clientsRes, planningRes, previewRes] = await Promise.allSettled([
         getDashboardStats(date),
         getClients(),
         getPlanningAdmin(date),
+        getPlanningPreview(date),
       ]);
 
       if (statsRes.status === 'fulfilled') setStats(statsRes.value);
       if (clientsRes.status === 'fulfilled') setClients(clientsRes.value);
+      if (previewRes.status === 'fulfilled') setPreview(previewRes.value);
 
       if (planningRes.status === 'fulfilled' && planningRes.value) {
-        // LOG 2 : Vérification de la liste des tournées
         console.log("=== LOG 2 : NOMBRE DE TOURNÉES REÇUES ===", planningRes.value.length);
         const rows: VehicleRow[] = planningRes.value.map(tournee => ({
           chauffeurId: tournee.chauffeur_id,
@@ -92,7 +95,6 @@ export default function PlanningScreen() {
             heure_estimee: a.heure_estimee
           }))
         }));
-        // LOG 3 : Ce qui est envoyé aux composants (VehicleCard)
         console.log("=== LOG 3 : ROWS PRÊTES POUR L'AFFICHAGE ===");
         console.log(JSON.stringify(rows.map(r => ({ id: r.chauffeurId, nom: r.chauffeurNom, arrets: r.arrets.length, km: r.distance_km })), null, 2));
         setVehicles(rows);
@@ -120,12 +122,13 @@ export default function PlanningScreen() {
   // ── Génération par l'IA (OR-Tools) ──────────────────────────────────
   async function handleGenerate() {
     setGenerating(true);
-    showToast('Création des brouillons de collecte...');
+    showToast('Création des tâches de collecte...');
     try {
       await genererBrouillons(selectedDate);
-      showToast('Calcul IA en cours (OR-Tools)...');
+      showToast('Optimisation des tournées en cours...');
       await optimiserTournees(selectedDate);
       showToast('Tournées générées avec succès !');
+      setViewMode('routes');
       await fetchData(selectedDate);
     } catch (e: any) {
       console.error(e);
@@ -165,6 +168,12 @@ export default function PlanningScreen() {
     [vehicles]
   );
 
+  const totalArrets = vehicles.reduce((acc, v) => acc + v.arrets.length, 0);
+  const validees = stats?.collectes_validees ?? 0;
+  const totalCollectes = stats?.collectes_total ?? 0;
+  const isToday = selectedDate === todayISO();
+  const inSupervision = !loading && vehicles.length > 0;
+
   return (
     <SafeAreaView style={s.container}>
       <StatusBar style="dark" />
@@ -174,98 +183,128 @@ export default function PlanningScreen() {
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={s.menuBtn}>
           <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
         </TouchableOpacity>
-        <Text style={s.greeting}>
-          Bonjour, <Text style={s.greetingName}>Nicolas</Text> 👋
-        </Text>
+        <Text style={s.topbarTitle}>Planning</Text>
         <View style={s.topbarRight}>
           <TouchableOpacity style={s.notifBtn}>
             {stats && stats.alertes > 0 && <View style={s.notifDot} />}
             <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
           </TouchableOpacity>
-          <LinearGradient colors={[colors.primaryLight, colors.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.avatar}>
+          <LinearGradient
+            colors={[colors.primaryLight, colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.avatar}
+          >
             <Text style={s.avatarText}>N</Text>
           </LinearGradient>
         </View>
       </View>
 
-      {/* Content */}
-      <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false}>
-
-        <View style={s.pageHeader}>
-          <View>
-            <Text style={s.pageTitle}>Planning</Text>
-            <Text style={s.pageSubtitle}>Optimisation IA par jour et par véhicule</Text>
-          </View>
-          <View style={s.dateNav}>
-            <TouchableOpacity style={s.dateNavBtn} onPress={() => navigateDate(-1)} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={16} color={colors.primaryLight} />
-            </TouchableOpacity>
-            <View style={s.dateNavCenter}>
-              <Ionicons name="calendar-outline" size={12} color={colors.primaryLight} />
-              <Text style={s.dateNavText}>{formatDateFR(selectedDate)}</Text>
-              {selectedDate === todayISO() && <View style={s.todayDot} />}
+      {/* Navigateur de date — pleine largeur, toujours visible */}
+      <View style={s.dateStrip}>
+        <TouchableOpacity style={s.dateBtn} onPress={() => navigateDate(-1)} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={20} color={colors.primaryLight} />
+        </TouchableOpacity>
+        <View style={s.dateCenterBlock}>
+          <Text style={s.dateText}>{formatDateFR(selectedDate)}</Text>
+          {isToday && (
+            <View style={s.todayBadge}>
+              <Text style={s.todayBadgeText}>aujourd'hui</Text>
             </View>
-            <TouchableOpacity style={s.dateNavBtn} onPress={() => navigateDate(1)} activeOpacity={0.7}>
-              <Ionicons name="chevron-forward" size={16} color={colors.primaryLight} />
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
+        <TouchableOpacity style={s.dateBtn} onPress={() => navigateDate(1)} activeOpacity={0.7}>
+          <Ionicons name="chevron-forward" size={20} color={colors.primaryLight} />
+        </TouchableOpacity>
+      </View>
 
-        {/* ── MODE PRÉPARATION : aucune tournée générée ── */}
+      {/* Contenu scrollable */}
+      <ScrollView
+        style={s.content}
+        contentContainerStyle={[s.contentContainer, inSupervision && { paddingBottom: 84 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── MODE PRÉPARATION ── */}
         {!loading && vehicles.length === 0 && (
-          <>
-            <View style={s.prepCard}>
-              <View style={s.prepIconRow}>
-                <View style={s.prepIconBox}>
-                  <Ionicons name="sparkles-outline" size={28} color={colors.primaryLight} />
+          <View style={s.prepCard}>
+            <View style={s.prepIconBox}>
+              <Ionicons name="sparkles-outline" size={28} color={colors.primaryLight} />
+            </View>
+            <Text style={s.prepTitle}>Prêt à planifier</Text>
+
+            {preview ? (
+              <View style={s.prepMetrics}>
+                <View style={s.prepMetricItem}>
+                  <Text style={s.prepMetricValue}>{preview.clients_dispo}</Text>
+                  <Text style={s.prepMetricLabel}>clients disponibles</Text>
+                </View>
+                <View style={s.prepMetricDivider} />
+                <View style={s.prepMetricItem}>
+                  <Text style={s.prepMetricValue}>{preview.chauffeurs_dispo}</Text>
+                  <Text style={s.prepMetricLabel}>chauffeurs planifiés</Text>
                 </View>
               </View>
-              <Text style={s.prepTitle}>Prêt à planifier</Text>
+            ) : (
               <Text style={s.prepSub}>
-                {clients.length} site{clients.length !== 1 ? 's' : ''} enregistré{clients.length !== 1 ? 's' : ''} · IA OR-Tools
+                {clients.length} sites enregistrés
               </Text>
-              <TouchableOpacity style={s.btnGenerateHero} onPress={handleGenerate} activeOpacity={0.85} disabled={generating}>
-                <LinearGradient colors={[colors.primaryLight, colors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGenerateGradient}>
-                  {generating ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="sparkles-outline" size={18} color="#fff" />}
-                  <Text style={s.btnGenerateText}>{generating ? 'Calcul IA en cours...' : 'Générer les tournées'}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+            )}
 
-            <TouchableOpacity style={s.btnSaisir} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
-              <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
-              <Text style={s.btnSaisirText}>+ Saisir un nouveau site</Text>
+            <TouchableOpacity
+              style={s.btnGenerateHero}
+              onPress={handleGenerate}
+              activeOpacity={0.85}
+              disabled={generating}
+            >
+              <LinearGradient
+                colors={[colors.primaryLight, colors.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.btnGenerateGradient}
+              >
+                {generating
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="sparkles-outline" size={18} color="#fff" />
+                }
+                <Text style={s.btnGenerateText}>
+                  {generating ? 'Calcul IA en cours...' : 'Générer les tournées'}
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
-          </>
+          </View>
         )}
 
         {loading && (
           <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
         )}
 
-        {/* ── MODE SUPERVISION : tournées générées ── */}
-        {!loading && vehicles.length > 0 && (
+        {/* ── MODE SUPERVISION ── */}
+        {inSupervision && (
           <>
-            {/* Stats Bar */}
+            {/* Stats rapides */}
             <View style={s.statsBar}>
               <View style={s.statItem}>
                 <Text style={s.statValue}>{vehicles.length}</Text>
                 <Text style={s.statLabel}>Camions</Text>
               </View>
+              <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={s.statValue}>{vehicles.reduce((acc, v) => acc + v.arrets.length, 0)}</Text>
+                <Text style={s.statValue}>{totalArrets}</Text>
                 <Text style={s.statLabel}>Arrêts</Text>
               </View>
+              <View style={s.statDivider} />
               <View style={s.statItem}>
-                <Text style={s.statValue}>~{stats?.poids_prevu_kg || 0} kg</Text>
-                <Text style={s.statLabel}>Total prévu</Text>
+                <Text style={s.statValue}>{validees}/{totalCollectes}</Text>
+                <Text style={s.statLabel}>Validées</Text>
               </View>
+              <View style={s.statDivider} />
               <View style={s.statItem}>
                 <Text style={s.statValue}>{stats?.km_total || 0} km</Text>
                 <Text style={s.statLabel}>Distance</Text>
               </View>
             </View>
 
+            {/* Alerte erreurs */}
             {stats && stats.alertes > 0 && (
               <View style={s.alertBanner}>
                 <Ionicons name="warning-outline" size={18} color={colors.coral} />
@@ -275,52 +314,105 @@ export default function PlanningScreen() {
               </View>
             )}
 
-            <View style={s.actionBar}>
-              <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
-                <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
-                <Text style={s.btnImprevusText}>Gérer les imprévus</Text>
+            {/* Toggle Tournées / Carte */}
+            <View style={s.viewToggle}>
+              <TouchableOpacity
+                style={[s.viewToggleBtn, viewMode === 'routes' && s.viewToggleActive]}
+                onPress={() => setViewMode('routes')}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="list-outline"
+                  size={15}
+                  color={viewMode === 'routes' ? colors.primaryLight : colors.textMuted}
+                />
+                <Text style={[s.viewToggleText, viewMode === 'routes' && s.viewToggleTextActive]}>
+                  Tournées
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.viewToggleBtn, viewMode === 'carte' && s.viewToggleActive]}
+                onPress={() => setViewMode('carte')}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="map-outline"
+                  size={15}
+                  color={viewMode === 'carte' ? colors.primaryLight : colors.textMuted}
+                />
+                <Text style={[s.viewToggleText, viewMode === 'carte' && s.viewToggleTextActive]}>
+                  Carte
+                </Text>
               </TouchableOpacity>
             </View>
 
-            <View style={s.mapCard}>
-              <View style={s.mapHeader}>
-                <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
-                <Text style={s.mapTitle}>Carte des tournées — Var (83)</Text>
-                <View style={s.mapChip}>
-                  <Text style={s.mapChipText}>{mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts</Text>
+            {/* Vue Tournées */}
+            {viewMode === 'routes' && (
+              <>
+                <View style={s.vehiclesSection}>
+                  <Text style={s.sectionTitle}>Tournées · {formatDateFR(selectedDate)}</Text>
+                  <Text style={s.sectionSub}>
+                    {vehicles.length} véhicule{vehicles.length > 1 ? 's' : ''} en service
+                  </Text>
                 </View>
+                {vehicles.map((v, i) => (
+                  <VehicleCard
+                    key={`vehicle-card-${v.chauffeurId}-${i}`}
+                    index={i}
+                    chauffeurId={v.chauffeurId}
+                    chauffeurNom={v.chauffeurNom}
+                    heureDepart={v.heureDepart}
+                    arrets={v.arrets}
+                    animDelay={i * 80}
+                    onExport={() => handleExportBluebob(v.chauffeurNom)}
+                    onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* Vue Carte */}
+            {viewMode === 'carte' && (
+              <View style={s.mapCard}>
+                <View style={s.mapHeader}>
+                  <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
+                  <Text style={s.mapTitle}>Carte des tournées</Text>
+                  <View style={s.mapChip}>
+                    <Text style={s.mapChipText}>
+                      {mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts
+                    </Text>
+                  </View>
+                </View>
+                <MapTournees height={400} vehicles={mapVehicles} selectedStop={selectedStop} />
               </View>
-              <MapTournees height={340} vehicles={mapVehicles} selectedStop={selectedStop} />
-            </View>
-
-            <View style={s.vehiclesSection}>
-              <Text style={s.sectionTitle}>Tournées · {formatDateFR(selectedDate)}</Text>
-              <Text style={s.sectionSub}>{vehicles.length} véhicule{vehicles.length > 1 ? 's' : ''} en service</Text>
-            </View>
-
-            {vehicles.map((v, i) => (
-              <VehicleCard
-                key={`vehicle-card-${v.chauffeurId}-${i}`}
-                index={i}
-                chauffeurId={v.chauffeurId}
-                chauffeurNom={v.chauffeurNom}
-                heureDepart={v.heureDepart}
-                arrets={v.arrets}
-                animDelay={i * 80}
-                onExport={() => handleExportBluebob(v.chauffeurNom)}
-                onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
-              />
-            ))}
-
-            <TouchableOpacity style={[s.btnGenerate, { marginTop: 8 }]} onPress={handleGenerate} activeOpacity={0.85} disabled={generating}>
-              <LinearGradient colors={['#E8EDEB', '#E0EBE6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGenerateGradient}>
-                {generating ? <ActivityIndicator size="small" color={colors.textMuted} /> : <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />}
-                <Text style={[s.btnGenerateText, { color: colors.textMuted }]}>{generating ? 'Recalcul...' : 'Régénérer les tournées'}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            )}
           </>
         )}
       </ScrollView>
+
+      {/* Footer fixe — toujours visible en mode supervision */}
+      {inSupervision && (
+        <View style={s.fixedFooter}>
+          <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
+            <Text style={s.btnImprevusText}>Imprévus</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.btnRegenerate}
+            onPress={handleGenerate}
+            activeOpacity={0.85}
+            disabled={generating}
+          >
+            {generating
+              ? <ActivityIndicator size="small" color={colors.textMuted} />
+              : <Ionicons name="refresh-outline" size={16} color={colors.textMuted} />
+            }
+            <Text style={s.btnRegenerateText}>
+              {generating ? 'Recalcul...' : 'Régénérer'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {toast && (
         <Animated.View style={[s.toast, { opacity: toastOpacity }]}>
@@ -328,12 +420,10 @@ export default function PlanningScreen() {
         </Animated.View>
       )}
 
-      <SiteModal visible={siteModalOpen} onClose={() => setSiteModalOpen(false)} onSuccess={(msg) => showToast(msg)} />
       <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} activeRoute="planning" />
     </SafeAreaView>
   );
 }
-
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -357,8 +447,7 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   menuBtn: { marginRight: 12, padding: 4 },
-  greeting: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 },
-  greetingName: { color: colors.primaryLight },
+  topbarTitle: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 },
   topbarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   notifBtn: {
     width: 40, height: 40, borderRadius: 12,
@@ -380,114 +469,41 @@ const s = StyleSheet.create({
   },
   avatarText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-  // Content
-  content: { flex: 1 },
-  contentContainer: { padding: 24, paddingBottom: 40 },
-
-  // Page header
-  pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
-  pageSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 3, fontWeight: '500' },
-  dateNav: {
+  // Navigateur de date
+  dateStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderWidth: 1, borderColor: '#D4E8DC',
-    borderRadius: 12,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-    overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8F0EC',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
-  dateNavBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+  dateBtn: {
+    width: 40, height: 40,
+    alignItems: 'center', justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: colors.background,
+  },
+  dateCenterBlock: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  dateNavCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 8,
-    borderLeftWidth: 1, borderRightWidth: 1,
-    borderColor: '#D4E8DC',
-  },
-  dateNavText: { fontSize: 12, fontWeight: '700', color: colors.primaryLight },
-  todayDot: {
-    width: 5, height: 5, borderRadius: 3,
-    backgroundColor: colors.accent,
-  },
-
-  // Stats Bar
-  statsBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1, borderColor: '#EAF2EE',
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#EAF2EE',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 4,
-  },
-
-  // Alert banner
-  alertBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: colors.coralLight,
-    borderWidth: 1, borderColor: 'rgba(231,111,81,0.25)',
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11,
-    marginBottom: 18,
-  },
-  alertText: { fontSize: 13, fontWeight: '600', color: colors.coral, flex: 1 },
-
-  // Saisir site
-  btnSaisir: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#C8E8D4',
+  },
+  dateText: { fontSize: 16, fontWeight: '700', color: colors.text },
+  todayBadge: {
     backgroundColor: '#E8F5EE',
-    marginBottom: 14,
-    alignSelf: 'flex-start',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  btnSaisirText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primaryLight,
-  },
+  todayBadgeText: { fontSize: 11, fontWeight: '600', color: colors.primaryLight },
+
+  // Contenu
+  content: { flex: 1 },
+  contentContainer: { padding: 20, paddingBottom: 40 },
 
   // Mode préparation
   prepCard: {
@@ -495,66 +511,140 @@ const s = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#EAF2EE',
-    padding: 28,
+    padding: 32,
     alignItems: 'center',
-    marginBottom: 16,
+    marginTop: 8,
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 4,
   },
-  prepIconRow: { marginBottom: 16 },
   prepIconBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+    width: 56, height: 56, borderRadius: 18,
     backgroundColor: '#E8F5EE',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 16,
   },
   prepTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 6,
-    letterSpacing: -0.3,
+    fontSize: 18, fontWeight: '800', color: colors.text,
+    marginBottom: 6, letterSpacing: -0.3,
   },
   prepSub: {
-    fontSize: 13,
-    color: colors.textMuted,
-    fontWeight: '500',
-    marginBottom: 24,
-    textAlign: 'center',
+    fontSize: 13, color: colors.textMuted, fontWeight: '500',
+    marginBottom: 24, textAlign: 'center',
   },
-  btnGenerateHero: {
-    borderRadius: 14,
+  prepMetrics: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F7F4',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#C8E8D4',
+    marginBottom: 24,
     overflow: 'hidden',
     width: '100%',
   },
-
-  // Action bar
-  actionBar: { flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  btnGenerate: { borderRadius: 12, overflow: 'hidden' },
+  prepMetricItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  prepMetricDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#C8E8D4',
+  },
+  prepMetricValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.primaryLight,
+    letterSpacing: -0.5,
+  },
+  prepMetricLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginTop: 3,
+  },
+  btnGenerateHero: { borderRadius: 14, overflow: 'hidden', width: '100%' },
   btnGenerateGradient: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 20, paddingVertical: 13,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingHorizontal: 20, paddingVertical: 14,
   },
-  btnGenerateText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  btnImprevus: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 13,
-    borderRadius: 12,
-    borderWidth: 1.5, borderColor: 'rgba(231,111,81,0.3)',
-    backgroundColor: colors.coralLight,
-  },
-  btnImprevusText: { color: colors.coral, fontSize: 14, fontWeight: '600' },
+  btnGenerateText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-  // Map
+  // Stats Bar
+  statsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginBottom: 14,
+    borderWidth: 1, borderColor: '#EAF2EE',
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  },
+  statItem: { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, height: 32, backgroundColor: '#EAF2EE' },
+  statValue: { fontSize: 15, fontWeight: '800', color: colors.text },
+  statLabel: {
+    fontSize: 10, fontWeight: '600', color: colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4,
+  },
+
+  // Alerte
+  alertBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: colors.coralLight,
+    borderWidth: 1, borderColor: 'rgba(231,111,81,0.25)',
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11,
+    marginBottom: 14,
+  },
+  alertText: { fontSize: 13, fontWeight: '600', color: colors.coral, flex: 1 },
+
+  // Toggle Tournées / Carte
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    borderRadius: 13,
+    padding: 3,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#DDE8E3',
+  },
+  viewToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  viewToggleActive: {
+    backgroundColor: colors.card,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  viewToggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  viewToggleTextActive: { color: colors.primaryLight },
+
+  // Section tournées
+  vehiclesSection: { marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  sectionSub: { fontSize: 13, color: colors.textMuted, marginTop: 2, fontWeight: '500' },
+
+  // Carte
   mapCard: {
     borderRadius: 18, overflow: 'hidden',
     borderWidth: 1, borderColor: '#EAF2EE',
-    marginBottom: 18,
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
@@ -567,33 +657,45 @@ const s = StyleSheet.create({
   },
   mapTitle: { fontSize: 14, fontWeight: '700', color: colors.text, flex: 1 },
   mapChip: {
-    backgroundColor: '#E8F5EE',
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
+    backgroundColor: '#E8F5EE', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 3,
   },
   mapChipText: { fontSize: 11, color: colors.primaryLight, fontWeight: '600' },
 
-  // Vehicles section
-  vehiclesSection: { marginBottom: 14 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  sectionSub: { fontSize: 13, color: colors.textMuted, marginTop: 2, fontWeight: '500' },
-
-  // Empty vehicles
-  emptyVehicles: {
+  // Footer fixe
+  fixedFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
     backgroundColor: colors.card,
-    borderRadius: 18, borderWidth: 1, borderColor: '#EAF2EE',
-    alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E8F0EC',
     shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 8,
   },
-  emptyVehiclesText: {
-    fontSize: 14, fontWeight: '600', color: colors.text,
-    marginTop: 12, textAlign: 'center',
+  btnImprevus: {
+    flex: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: 1.5, borderColor: 'rgba(231,111,81,0.3)',
+    backgroundColor: colors.coralLight,
   },
-  emptyVehiclesSub: {
-    fontSize: 13, color: colors.textMuted, marginTop: 6,
-    textAlign: 'center', lineHeight: 18,
+  btnImprevusText: { color: colors.coral, fontSize: 14, fontWeight: '600' },
+  btnRegenerate: {
+    flex: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: 1, borderColor: '#D4E8DC',
+    backgroundColor: '#F0F7F4',
   },
+  btnRegenerateText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
 
   // Toast
   toast: {
