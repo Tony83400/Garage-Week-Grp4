@@ -17,12 +17,14 @@ import { colors } from '../constants/colors';
 import MobileDrawer from '../components/MobileDrawer';
 import VehicleCard from '../components/VehicleCard';
 import MapTournees, { type MapVehicle, type MapStop } from '../components/MapTournees';
+import GenerationModal from '../components/GenerationModal';
+import EditPlanningModal from '../components/EditPlanningModal';
 
 import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
 import { getPlanningAdmin, genererBrouillons, optimiserTournees, getPlanningPreview, type TourneeAdmin } from '../services/planning';
 
-type VehicleRow = { chauffeurId: number; chauffeurNom: string; heureDepart: string; arrets: any[]; capaciteMaxKg: number; distance_km: number };
+type VehicleRow = { chauffeurId: number; chauffeurNom: string; heureDepart: string; heureFin: string; arrets: any[]; capaciteMaxKg: number; distance_km: number; immatriculation: string };
 
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 
@@ -48,6 +50,8 @@ export default function PlanningScreen() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedStop, setSelectedStop] = useState<{ lat: number; lon: number } | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [showGenModal, setShowGenModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -80,7 +84,9 @@ export default function PlanningScreen() {
           chauffeurId: tournee.chauffeur_id,
           chauffeurNom: tournee.chauffeur,
           heureDepart: tournee.heure_depart || '–',
+          heureFin: tournee.heure_fin || '–',
           capaciteMaxKg: tournee.capacite_max_kg,
+          immatriculation: tournee.immatriculation || '',
           distance_km: (tournee as any).distance_km || 0,
           arrets: tournee.arrets.map(a => ({
             tache_id: a.tache_id,
@@ -127,9 +133,9 @@ export default function PlanningScreen() {
       await genererBrouillons(selectedDate);
       showToast('Optimisation des tournées en cours...');
       await optimiserTournees(selectedDate);
-      showToast('Tournées générées avec succès !');
       setViewMode('routes');
       await fetchData(selectedDate);
+      setShowGenModal(true);
     } catch (e: any) {
       console.error(e);
       const msg = e?.message || '';
@@ -145,6 +151,11 @@ export default function PlanningScreen() {
 
   function handleImprevus() {
     router.push('/imprevus');
+  }
+
+  function handleSaveEdit(updated: VehicleRow[]) {
+    setVehicles(updated);
+    setShowEditModal(false);
   }
 
   function handleExportBluebob(chauffeurNom: string) {
@@ -304,14 +315,17 @@ export default function PlanningScreen() {
               </View>
             </View>
 
-            {/* Alerte erreurs */}
+            {/* Alerte erreurs — cliquable */}
             {stats && stats.alertes > 0 && (
-              <View style={s.alertBanner}>
-                <Ionicons name="warning-outline" size={18} color={colors.coral} />
-                <Text style={s.alertText}>
-                  {stats.alertes} collecte{stats.alertes > 1 ? 's' : ''} en erreur aujourd'hui
-                </Text>
-              </View>
+              <TouchableOpacity onPress={handleImprevus} activeOpacity={0.85}>
+                <View style={s.alertBanner}>
+                  <Ionicons name="warning-outline" size={18} color={colors.coral} />
+                  <Text style={s.alertText}>
+                    {stats.alertes} imprévu{stats.alertes > 1 ? 's' : ''} à traiter
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.coral} />
+                </View>
+              </TouchableOpacity>
             )}
 
             {/* Toggle Tournées / Carte */}
@@ -362,7 +376,10 @@ export default function PlanningScreen() {
                     chauffeurId={v.chauffeurId}
                     chauffeurNom={v.chauffeurNom}
                     heureDepart={v.heureDepart}
+                    heureFin={v.heureFin}
+                    immatriculation={v.immatriculation}
                     arrets={v.arrets}
+                    capaciteMaxKg={v.capaciteMaxKg}
                     animDelay={i * 80}
                     onExport={() => handleExportBluebob(v.chauffeurNom)}
                     onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
@@ -396,6 +413,11 @@ export default function PlanningScreen() {
           <TouchableOpacity style={s.btnImprevus} onPress={handleImprevus} activeOpacity={0.8}>
             <Ionicons name="alert-circle-outline" size={16} color={colors.coral} />
             <Text style={s.btnImprevusText}>Imprévus</Text>
+            {stats && stats.alertes > 0 && (
+              <View style={s.imprevusBadge}>
+                <Text style={s.imprevusBadgeText}>{stats.alertes}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={s.btnRegenerate}
@@ -421,6 +443,21 @@ export default function PlanningScreen() {
       )}
 
       <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} activeRoute="planning" />
+
+      <GenerationModal
+        visible={showGenModal}
+        vehicles={vehicles}
+        date={selectedDate}
+        kmTotal={stats?.km_total ?? 0}
+        onValider={() => setShowGenModal(false)}
+        onModifier={() => { setShowGenModal(false); setShowEditModal(true); }}
+      />
+      <EditPlanningModal
+        visible={showEditModal}
+        vehicles={vehicles}
+        onSave={handleSaveEdit}
+        onClose={() => setShowEditModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -685,8 +722,19 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5, borderColor: 'rgba(231,111,81,0.3)',
     backgroundColor: colors.coralLight,
+    position: 'relative',
   },
   btnImprevusText: { color: colors.coral, fontSize: 14, fontWeight: '600' },
+  imprevusBadge: {
+    backgroundColor: colors.coral,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imprevusBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   btnRegenerate: {
     flex: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

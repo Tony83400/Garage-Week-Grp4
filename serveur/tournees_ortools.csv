@@ -1,8 +1,14 @@
 Chauffeur,Ordre,Nom_Etape,Latitude,Longitude,Heure_Arrivee,Distance_Cumulee_Unite,Bacs_a_Collecter,Poids_a_Collecter_Kg
 Tournée de Dupont,1,Dépôt,43.167,6.043,06:30,0,0,0
-Tournée de Dupont,2,Cinéma Central,43.4,6.05,07:39,44797,2,60.0
-Tournée de Dupont,3,Musée d'Art,43.15,6.35,09:54,105230,2,80.0
-Tournée de Dupont,4,Hôtel de la Baie,43.1167,5.8,11:51,156667,4,130.0
-Tournée de Dupont,5,Centre Commercial,43.0936,5.8385,12:18,162769,7,280.0
-Tournée de Dupont,6,Restaurant Plage,43.1,5.88,12:42,167278,4,160.0
-Tournée de Dupont,7,Retour Dépôt,43.167,6.043,13:36,187077,0,0
+Tournée de Dupont,2,Clinique Vallée,43.1833,6.0333,06:35,12673,4,140.0
+Tournée de Dupont,3,Entreprise Logistique,43.3833,6.3167,08:22,58877,3,85.0
+Tournée de Dupont,4,Port de Plaisance,43.2667,6.6333,10:03,101969,4,130.0
+Tournée de Dupont,5,Hôpital Sud,43.1205,6.1286,11:58,152343,8,300.0
+Tournée de Dupont,6,Bibliothèque Municipale,43.0833,6.0833,12:30,161178,1,40.0
+Tournée de Dupont,7,Retour Dépôt,43.167,6.043,13:12,175117,0,0
+Tournée de Martin,1,Dépôt,43.167,6.043,06:30,0,0,0
+Tournée de Martin,2,Usine Tech,43.1381,5.9822,06:43,16923,5,180.0
+Tournée de Martin,3,Hôtel de la Baie,43.1167,5.8,07:32,34394,3,90.0
+Tournée de Martin,4,Boulangerie Matin,43.1333,5.75,08:00,40919,2,60.0
+Tournée de Martin,5,Centre Commercial,43.0936,5.8385,08:36,51555,5,200.0
+Tournée de Martin,6,Retour Dépôt,43.167,6.043,09:37,74914,0,0

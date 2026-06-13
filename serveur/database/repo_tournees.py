@@ -340,17 +340,17 @@ class TourneeRepository:
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT tj.id, tj.chauffeur_id, c.immatriculation, c.charge_max_kg, ch.nom, ch.prenom, tj.heure_debut_service, tj.distance_km
+                SELECT tj.id, tj.chauffeur_id, c.immatriculation, c.charge_max_kg, ch.nom, ch.prenom, tj.heure_debut_service, tj.heure_fin_service, tj.distance_km
                 FROM tournees_jour tj
                 JOIN camions c ON tj.camion_id = c.id
                 JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
                 WHERE tj.date_tournee = ?
             ''', (date_jour,))
             tournees = cursor.fetchall()
-            
+
             resultat = []
             for t in tournees:
-                tournee_id, chauffeur_id, immatriculation, charge_max, nom, prenom, heure_depart, dist_km = t
+                tournee_id, chauffeur_id, immatriculation, charge_max, nom, prenom, heure_depart, heure_fin, dist_km = t
                 
                 # CORRECTION ICI : On ne prend QUE les arrêts liés à CE tournee_id
                 cursor.execute('''
@@ -384,6 +384,7 @@ class TourneeRepository:
                         "immatriculation": immatriculation,
                         "capacite_max_kg": charge_max,
                         "heure_depart": heure_depart,
+                        "heure_fin": heure_fin,
                         "distance_km": dist_km,
                         "arrets": liste_arrets
                     })

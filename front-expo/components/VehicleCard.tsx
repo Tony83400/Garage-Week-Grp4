@@ -24,6 +24,8 @@ interface Props {
   chauffeurId: number;
   chauffeurNom: string;
   heureDepart?: string;
+  heureFin?: string;
+  immatriculation?: string;
   arrets: Arret[];
   capaciteMaxKg?: number;
   animDelay?: number;
@@ -62,7 +64,7 @@ function getDotStyle(statut: Arret['statut']) {
 }
 
 export default function VehicleCard({
-  index, chauffeurId, chauffeurNom, heureDepart, arrets,
+  index, chauffeurId, chauffeurNom, heureDepart, heureFin, immatriculation, arrets,
   capaciteMaxKg = 750, animDelay = 0, onExport, onStopPress,
 }: Props) {
   const [expanded, setExpanded] = useState(index === 0);
@@ -86,11 +88,16 @@ export default function VehicleCard({
   const initials     = getInitials(chauffeurNom);
 
   const done            = arrets.filter(a => a.statut === 'terminee').length;
+  const chargeActuelleKg = arrets
+    .filter(a => a.statut === 'terminee')
+    .reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
   const chargeTotaleKg  = arrets.reduce((acc, a) => acc + (a.poids_prevu_kg ?? 0), 0);
-  const fillPct         = capaciteMaxKg > 0 ? Math.min(Math.round((chargeTotaleKg / capaciteMaxKg) * 100), 100) : 0;
-  const isOverload      = fillPct >= 95;
+  const plannedPct      = capaciteMaxKg > 0 ? Math.min(Math.round((chargeTotaleKg / capaciteMaxKg) * 100), 100) : 0;
+  const collectedPct    = capaciteMaxKg > 0 ? Math.min(Math.round((chargeActuelleKg / capaciteMaxKg) * 100), 100) : 0;
+  const isOverload      = plannedPct >= 95;
+  const hasCollected    = chargeActuelleKg > 0;
 
-  const barColor = fillPct > 90 ? colors.coral : fillPct > 70 ? colors.accent : vehicleColor;
+  const barColor = plannedPct > 90 ? colors.coral : plannedPct > 70 ? colors.accent : vehicleColor;
 
   const progressColor = done === arrets.length && arrets.length > 0
     ? colors.status.terminee.fg
@@ -120,12 +127,20 @@ export default function VehicleCard({
         {/* Infos chauffeur */}
         <View style={s.headerInfo}>
           <Text style={s.chauffeurNom} numberOfLines={1}>{chauffeurNom}</Text>
-          {heureDepart && heureDepart !== '–' && (
-            <View style={s.departRow}>
-              <Ionicons name="time-outline" size={11} color={colors.textMuted} />
-              <Text style={s.departText}>Départ {heureDepart}</Text>
-            </View>
-          )}
+          <View style={s.vehicleInfoRow}>
+            {immatriculation ? (
+              <>
+                <Ionicons name="car-outline" size={11} color={colors.textMuted} />
+                <Text style={s.departText}>{immatriculation}</Text>
+                <Text style={s.departSep}>·</Text>
+              </>
+            ) : null}
+            <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+            <Text style={s.departText}>
+              {heureDepart && heureDepart !== '–' ? heureDepart : '–'}
+              {heureFin && heureFin !== '–' ? ` → ${heureFin}` : ''}
+            </Text>
+          </View>
         </View>
 
         {/* Droite : progression + export + chevron */}
@@ -149,10 +164,10 @@ export default function VehicleCard({
         </View>
         <View style={[s.metaItem, s.metaBorder]}>
           <Text style={s.metaValue}>≈ {chargeTotaleKg} kg</Text>
-          <Text style={s.metaLabel}>Chargement</Text>
+          <Text style={s.metaLabel}>Charge prévue</Text>
         </View>
         <View style={s.metaItem}>
-          <Text style={[s.metaValue, { color: barColor }]}>{fillPct}%</Text>
+          <Text style={[s.metaValue, { color: barColor }]}>{plannedPct}%</Text>
           <Text style={s.metaLabel}>Capacité</Text>
         </View>
       </View>
@@ -160,13 +175,21 @@ export default function VehicleCard({
       {/* ── Barre de charge ────────────────────────────────────── */}
       <View style={s.weightWrap}>
         <View style={s.weightLabelRow}>
-          <Text style={s.weightLabel}>Remplissage estimé</Text>
-          <Text style={[s.weightValue, { color: barColor }]}>
-            {chargeTotaleKg} / {capaciteMaxKg} kg{isOverload ? ' ⚠' : ''}
+          <Text style={s.weightLabel}>
+            {hasCollected ? 'Collecté / Prévu' : 'Capacité camion'}
+          </Text>
+          <Text style={[s.weightValue, { color: hasCollected ? colors.status.terminee.fg : barColor }]}>
+            {hasCollected
+              ? `${chargeActuelleKg} / ${chargeTotaleKg} kg`
+              : `${chargeTotaleKg} / ${capaciteMaxKg} kg${isOverload ? ' ⚠' : ''}`
+            }
           </Text>
         </View>
         <View style={s.weightBarBg}>
-          <View style={[s.weightBarFill, { width: `${fillPct}%` as any, backgroundColor: barColor }]} />
+          <View style={[s.weightBarPlanned, { width: `${plannedPct}%` as any, backgroundColor: barColor + '40' }]} />
+          {collectedPct > 0 && (
+            <View style={[s.weightBarCollected, { width: `${collectedPct}%` as any, backgroundColor: colors.status.terminee.fg }]} />
+          )}
         </View>
       </View>
 
@@ -297,10 +320,21 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
+  vehicleInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
   departText: {
     fontSize: 12,
     color: colors.textMuted,
     fontWeight: '500',
+  },
+  departSep: {
+    fontSize: 12,
+    color: colors.textMuted,
+    opacity: 0.4,
   },
   headerRight: {
     flexDirection: 'row',
@@ -393,9 +427,16 @@ const s = StyleSheet.create({
     backgroundColor: '#EAF2EE',
     borderRadius: 99,
     overflow: 'hidden',
+    position: 'relative',
   },
-  weightBarFill: {
-    height: '100%',
+  weightBarPlanned: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    borderRadius: 99,
+  },
+  weightBarCollected: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
     borderRadius: 99,
   },
 

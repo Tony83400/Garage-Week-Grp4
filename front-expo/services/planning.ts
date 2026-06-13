@@ -7,6 +7,7 @@ export interface TourneeAdmin {
   immatriculation: string;
   capacite_max_kg: number;
   heure_depart: string;
+  heure_fin?: string;
   arrets: {
     tache_id: number;
     statut: 'en_attente' | 'planifiee' | 'en_cours' | 'terminee' | 'erreur';
