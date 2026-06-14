@@ -276,7 +276,8 @@ class TourneeRepository:
                     ch.prenom,
                     c.nom_entreprise,
                     COUNT(CASE WHEN t.type_tache = 'collecte' THEN 1 END) AS total_collectes,
-                    COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'terminee' THEN 1 END) AS done_collectes
+                    COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'terminee' THEN 1 END) AS done_collectes,
+                    COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'erreur' THEN 1 END) AS erreurs_collectes
                 FROM tournees_jour tj
                 JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
                 JOIN taches_collecte t ON tj.id = t.tournee_id
@@ -292,8 +293,8 @@ class TourneeRepository:
 
             flotte_statut = []
             for f in flotte_lignes:
-                prenom, dernier_client, total, done = f[0], f[1], f[2] or 0, f[3] or 0
-                if total > 0 and done >= total:
+                prenom, dernier_client, total, done, erreurs = f[0], f[1], f[2] or 0, f[3] or 0, f[4] or 0
+                if total > 0 and (done + erreurs) >= total:
                     dernier_point = 'Retour dépôt · La Farlède'
                     termine = True
                 else:
@@ -302,7 +303,8 @@ class TourneeRepository:
                 flotte_statut.append({
                     "chauffeur": prenom,
                     "dernier_point": dernier_point,
-                    "termine": termine
+                    "termine": termine,
+                    "erreurs": erreurs
                 })
 
             return {

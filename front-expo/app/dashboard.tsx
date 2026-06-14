@@ -12,23 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
-import ActivityItem from '../components/ActivityItem';
 import MobileDrawer from '../components/MobileDrawer';
 import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activite } from '../services/dashboard';
 import { useRouter } from 'expo-router';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
-
-// ── Activité helper ───────────────────────────────────────────────────────────
-
-function buildActivities(list: Activite[]) {
-  return list.map((a) => ({
-    type: a.statut === 'terminee' ? ('success' as const) : ('error' as const),
-    name: a.client,
-    detail: a.statut === 'terminee' ? 'Collecte terminée' : 'Collecte en erreur',
-    time: '',
-  }));
-}
 
 // ── Journée card — état + chiffres fusionnés ──────────────────────────────────
 
@@ -79,7 +67,7 @@ function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
   }
 
   const s = stats!;
-  const enCours = s.collectes_total - s.collectes_validees;
+  const enCoursVrai = Math.max(0, s.collectes_total - s.collectes_validees - s.alertes);
   const hasAlert = s.alertes > 0 && !isDone;
 
   // Feu de circulation : vert (terminée) / rouge (alerte) / ambre (en cours)
@@ -92,8 +80,18 @@ function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
   const statusIcon  = isDone ? 'checkmark-circle' : hasAlert ? 'alert-circle' : 'car-outline';
   const statusText  = isDone
     ? `Journée terminée · ${s.km_total} km parcourus`
-    : `Tournées en cours · ${s.km_total} km planifiés`;
+    : hasAlert
+      ? `Imprévus détectés · ${s.km_total} km planifiés`
+      : `Tournées en cours · ${s.km_total} km planifiés`;
   const progressColor = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.accent;
+
+  const bottomSuffix = (() => {
+    if (s.alertes === 0 && enCoursVrai === 0) return ' · tout validé';
+    const parts: string[] = [];
+    if (enCoursVrai > 0) parts.push(`${enCoursVrai} en cours`);
+    if (s.alertes > 0)   parts.push(`${s.alertes} imprévu${s.alertes > 1 ? 's' : ''}`);
+    return ' · ' + parts.join(' · ');
+  })();
 
   return (
     <View style={[jc.card, { backgroundColor: statusBg, borderColor: statusBorder }]}>
@@ -142,8 +140,7 @@ function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
         <Ionicons name="checkmark-circle-outline" size={14} color={colors.secondary} />
         <Text style={jc.bottomText}>
           <Text style={jc.bottomBold}>{s.collectes_validees}/{s.collectes_total}</Text>
-          {' '}collectes validées
-          {enCours > 0 ? ` · ${enCours} en cours` : ' · tout validé'}
+          {' '}collectes validées{bottomSuffix}
         </Text>
       </View>
 
@@ -361,67 +358,133 @@ export default function DashboardScreen() {
 
             {/* Flotte en temps réel */}
             {stats && stats.flotte.length > 0 && (() => {
-              const allDone = stats.flotte.every(f => f.termine);
+              const allDone    = stats.flotte.every(f => f.termine);
+              const anyError   = stats.flotte.some(f => f.erreurs > 0);
+              const globalBadgeBg = !allDone
+                ? colors.status.en_cours.bg
+                : anyError ? colors.coralLight : colors.status.terminee.bg;
+              const globalBadgeFg = !allDone
+                ? colors.status.en_cours.fg
+                : anyError ? colors.coral : colors.status.terminee.fg;
+              const globalBadgeLabel = !allDone ? 'En tournée' : anyError ? 'Terminé avec erreurs' : 'Terminé';
               return (
-                <View style={[styles.sectionCard, { marginBottom: 14 }]}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Positions de la flotte</Text>
-                    <View style={[
-                      styles.badge,
-                      allDone && { backgroundColor: colors.status.terminee.bg },
-                    ]}>
-                      <Text style={[
-                        styles.badgeText,
-                        allDone && { color: colors.status.terminee.fg },
-                      ]}>
-                        {allDone ? 'Terminé' : 'En cours'}
+                <>
+                  <View style={styles.sectionLabel}>
+                    <Text style={styles.sectionLabelText}>
+                      FLOTTE · {stats.flotte.length} CHAUFFEUR{stats.flotte.length > 1 ? 'S' : ''}
+                    </Text>
+                    <View style={[styles.sectionLabelBadge, { backgroundColor: globalBadgeBg }]}>
+                      <Text style={[styles.sectionLabelBadgeText, { color: globalBadgeFg }]}>
+                        {globalBadgeLabel}
                       </Text>
                     </View>
                   </View>
-                  {stats.flotte.map((f, i) => (
-                    <React.Fragment key={i}>
-                      {i > 0 && <View style={styles.divider} />}
-                      <View style={styles.fleetRow}>
-                        <View style={[
-                          styles.fleetDot,
-                          { backgroundColor: f.termine ? colors.status.terminee.fg : colors.accent },
-                        ]} />
-                        <Text style={styles.fleetName}>{f.chauffeur}</Text>
-                        <Text style={[
-                          styles.fleetPoint,
-                          f.termine && { color: colors.status.terminee.fg },
-                        ]}>
-                          {f.dernier_point}
-                        </Text>
-                      </View>
-                    </React.Fragment>
-                  ))}
-                </View>
+                  <View style={[styles.sectionCard, { marginBottom: 14 }]}>
+                    {stats.flotte.map((f, i) => {
+                      const initials = f.chauffeur
+                        .split(' ')
+                        .map((w: string) => w[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase();
+                      const avatarBg = !f.termine
+                        ? colors.status.en_cours.fg
+                        : f.erreurs > 0 ? colors.coral : colors.status.terminee.fg;
+                      return (
+                        <React.Fragment key={i}>
+                          {i > 0 && <View style={styles.divider} />}
+                          <View style={styles.fleetRow}>
+                            <View style={[styles.fleetAvatar, { backgroundColor: avatarBg }]}>
+                              <Text style={styles.fleetAvatarText}>{initials}</Text>
+                            </View>
+                            <View style={styles.fleetInfo}>
+                              <Text style={styles.fleetName}>{f.chauffeur}</Text>
+                              <Text style={styles.fleetPoint}>
+                                {f.termine ? f.dernier_point : `Dernier arrêt · ${f.dernier_point}`}
+                              </Text>
+                            </View>
+                            {(() => {
+                              const hasErr = f.erreurs > 0;
+                              const badgeBg = !f.termine
+                                ? colors.status.en_cours.bg
+                                : hasErr ? colors.coralLight : colors.status.terminee.bg;
+                              const badgeFg = !f.termine
+                                ? colors.status.en_cours.fg
+                                : hasErr ? colors.coral : colors.status.terminee.fg;
+                              const badgeLabel = !f.termine
+                                ? 'En tournée'
+                                : hasErr
+                                  ? `Terminé · ${f.erreurs} erreur${f.erreurs > 1 ? 's' : ''}`
+                                  : 'Terminé ✓';
+                              return (
+                                <View style={[styles.fleetBadge, { backgroundColor: badgeBg }]}>
+                                  <Text style={[styles.fleetBadgeText, { color: badgeFg }]}>
+                                    {badgeLabel}
+                                  </Text>
+                                </View>
+                              );
+                            })()}
+                          </View>
+                        </React.Fragment>
+                      );
+                    })}
+                  </View>
+                </>
               );
             })()}
 
-            {/* Activité récente */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Activité récente</Text>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {activites.length} événement{activites.length !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-              </View>
+            {/* Rapport de collectes */}
+            {(() => {
+              const successes = activites.filter(a => a.statut === 'terminee');
+              const errors    = activites.filter(a => a.statut === 'erreur');
+              const sepLabel  = errors.length > 0
+                ? `Rapport · ${successes.length} réussie${successes.length !== 1 ? 's' : ''} · ${errors.length} erreur${errors.length > 1 ? 's' : ''}`
+                : 'Rapport de collectes';
 
-              {activites.length === 0 ? (
-                <Text style={styles.emptyText}>Aucune activité pour cette journée.</Text>
-              ) : (
-                buildActivities(activites).map((item, i) => (
-                  <React.Fragment key={i}>
-                    {i > 0 && <View style={styles.divider} />}
-                    <ActivityItem {...item} />
-                  </React.Fragment>
-                ))
-              )}
-            </View>
+              return (
+                <>
+                  {/* Séparateur éditorial */}
+                  <View style={styles.daySep}>
+                    <View style={styles.daySepLine} />
+                    <Text style={styles.daySepText}>{sepLabel}</Text>
+                    <View style={styles.daySepLine} />
+                  </View>
+
+                  {/* Cas : aucune activité ou tout réussi → ligne verte sobre */}
+                  {errors.length === 0 && (
+                    <View style={styles.actAllGood}>
+                      <Ionicons name="checkmark-circle" size={15} color={colors.status.terminee.fg} />
+                      <Text style={styles.actAllGoodText}>
+                        {activites.length === 0
+                          ? 'Aucune collecte enregistrée pour cette journée'
+                          : 'Toutes les collectes se sont bien passées'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Cas : erreurs → items flottants avec bande accent */}
+                  {errors.length > 0 && (
+                    <View style={styles.actErrorList}>
+                      {errors.map((e, i) => (
+                        <React.Fragment key={i}>
+                          {i > 0 && <View style={styles.actErrorDivider} />}
+                          <View style={styles.actErrorRow}>
+                            <View style={styles.actErrorAccent} />
+                            <View style={styles.actErrorInfo}>
+                              <Text style={styles.actErrorName}>{e.client}</Text>
+                              <Text style={styles.actErrorDetail}>Collecte en erreur</Text>
+                            </View>
+                            <View style={styles.actErrorBadge}>
+                              <Text style={styles.actErrorBadgeText}>Erreur</Text>
+                            </View>
+                          </View>
+                        </React.Fragment>
+                      ))}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
           </>
         )}
       </ScrollView>
@@ -556,27 +619,29 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  sectionHeader: {
+  sectionLabel: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
-  sectionTitle: {
-    fontSize: 15,
+  sectionLabelText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: colors.text,
-  },
-  badge: {
-    backgroundColor: colors.background,
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
     color: colors.textMuted,
+    letterSpacing: 1.2,
+  },
+  sectionLabelBadge: {
+    borderRadius: 20,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  sectionLabelBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   divider: {
     height: 1,
@@ -588,17 +653,117 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
+  daySep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 18,
+    paddingHorizontal: 2,
+  },
+  daySepLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#D8E8E0',
+  },
+  daySepText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    letterSpacing: 0.4,
+  },
+  actAllGood: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 2,
+  },
+  actAllGoodText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.status.terminee.fg,
+    flex: 1,
+  },
+  actErrorList: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#EAF2EE',
+    overflow: 'hidden',
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+    paddingHorizontal: 16,
+  },
+  actErrorDivider: {
+    height: 1,
+    backgroundColor: colors.background,
+    marginLeft: 15,
+  },
+  actErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 11,
+  },
+  actErrorAccent: {
+    width: 3,
+    height: 36,
+    borderRadius: 2,
+    backgroundColor: colors.coral,
+    flexShrink: 0,
+  },
+  actErrorInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  actErrorName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  actErrorDetail: {
+    fontSize: 12,
+    color: colors.coral,
+    fontWeight: '500',
+  },
+  actErrorBadge: {
+    backgroundColor: colors.coralLight,
+    borderRadius: 20,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    flexShrink: 0,
+  },
+  actErrorBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.coral,
+  },
   fleetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 11,
-    gap: 10,
+    paddingVertical: 12,
+    gap: 12,
   },
-  fleetDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  fleetAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
+  },
+  fleetAvatarText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  fleetInfo: {
+    flex: 1,
+    gap: 2,
   },
   fleetName: {
     fontSize: 14,
@@ -606,9 +771,18 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   fleetPoint: {
-    fontSize: 14,
-    color: colors.primaryLight,
+    fontSize: 12,
+    color: colors.textMuted,
     fontWeight: '500',
-    flex: 1,
+  },
+  fleetBadge: {
+    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    flexShrink: 0,
+  },
+  fleetBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
