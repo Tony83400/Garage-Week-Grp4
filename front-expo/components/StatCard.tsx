@@ -19,7 +19,7 @@ interface Props {
 const badgeColors: Record<BadgeStyle, { bg: string; text: string }> = {
   ok:   { bg: '#E8F5EE', text: colors.primaryLight },
   warn: { bg: colors.coralLight, text: colors.coral },
-  info: { bg: '#E6F4FA', text: colors.secondary },
+  info: { bg: colors.status.planifiee.bg, text: colors.secondary },
 };
 
 export default function StatCard({

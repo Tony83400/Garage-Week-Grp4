@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,165 +6,294 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
-import StatCard from '../components/StatCard';
 import ActivityItem from '../components/ActivityItem';
 import MobileDrawer from '../components/MobileDrawer';
 import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activite } from '../services/dashboard';
+import { useRouter } from 'expo-router';
 
-// Date des données de test — à remplacer par date.today() quand la BDD sera remplie au jour J
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildStats(s: DashboardStats) {
-  const enCours = s.collectes_total - s.collectes_validees;
-  return [
-    {
-      iconBg: '#E8F5EE',
-      icon: <Ionicons name="leaf-outline" size={20} color={colors.primaryLight} />,
-      value: `${s.poids_collecte_kg.toLocaleString('fr-FR')} kg`,
-      numericValue: s.poids_collecte_kg,
-      valueSuffix: ' kg',
-      label: 'Biodéchets collectés',
-      badgeText: `sur ${s.poids_prevu_kg.toLocaleString('fr-FR')} kg prévus`,
-      badgeStyle: 'ok' as const,
-      animDelay: 0,
-    },
-    {
-      iconBg: '#E6F4FA',
-      icon: <Ionicons name="checkmark-circle-outline" size={20} color={colors.secondary} />,
-      value: `${s.collectes_validees} / ${s.collectes_total}`,
-      numericValue: s.collectes_validees,
-      valueSuffix: ` / ${s.collectes_total}`,
-      label: 'Collectes validées',
-      badgeText: `${enCours} en cours`,
-      badgeStyle: 'info' as const,
-      animDelay: 80,
-    },
-    {
-      iconBg: colors.coralLight,
-      icon: <Ionicons name="warning-outline" size={20} color={colors.coral} />,
-      value: String(s.alertes),
-      numericValue: s.alertes,
-      valueSuffix: '',
-      label: 'Alertes actives',
-      badgeText: s.alertes > 0 ? '⚠ Action requise' : '✓ Aucune alerte',
-      badgeStyle: s.alertes > 0 ? ('warn' as const) : ('ok' as const),
-      animDelay: 160,
-    },
-    {
-      iconBg: '#E6F7F9',
-      icon: <Ionicons name="navigate-outline" size={20} color={colors.secondaryLight} />,
-      value: `${s.km_total} km`,
-      numericValue: s.km_total,
-      valueSuffix: ' km',
-      label: 'Distance totale',
-      badgeText: 'Optimisé par IA',
-      badgeStyle: 'info' as const,
-      animDelay: 240,
-    },
-  ];
-}
+// ── Activité helper ───────────────────────────────────────────────────────────
 
 function buildActivities(list: Activite[]) {
   return list.map((a) => ({
     type: a.statut === 'terminee' ? ('success' as const) : ('error' as const),
     name: a.client,
-    detail: a.statut === 'terminee' ? '✓ Collecte terminée' : '✗ Collecte en erreur',
+    detail: a.statut === 'terminee' ? 'Collecte terminée' : 'Collecte en erreur',
     time: '',
   }));
 }
 
-// ── Briefing card ─────────────────────────────────────────────────────────────
+// ── Journée card — état + chiffres fusionnés ──────────────────────────────────
 
-function BriefingCard({ stats }: { stats: DashboardStats | null }) {
-  if (!stats) return null;
-  const isGenerated = stats.collectes_total > 0;
-  const isDone = isGenerated && stats.collectes_validees === stats.collectes_total;
+function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
+  stats: DashboardStats | null;
+  onGoPlanning: () => void;
+  onGoImprevus: () => void;
+}) {
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
+  const isGenerated = !!stats && stats.collectes_total > 0;
+  const isDone = isGenerated && stats!.collectes_validees === stats!.collectes_total;
+  const pct = (stats && stats.poids_prevu_kg > 0)
+    ? Math.min(stats.poids_collecte_kg / stats.poids_prevu_kg, 1)
+    : 0;
+
+  useEffect(() => {
+    if (!isGenerated) return;
+    progressAnim.setValue(0);
+    Animated.timing(progressAnim, {
+      toValue: pct,
+      duration: 900,
+      delay: 150,
+      useNativeDriver: false,
+    }).start();
+  }, [pct, isGenerated]);
+
+  // État vide — pas de tournées générées
   if (!isGenerated) {
     return (
-      <View style={[bs.card, { backgroundColor: '#F5F7F6', borderColor: '#D4E0DC' }]}>
-        <View style={[bs.iconBox, { backgroundColor: '#E8EDEB' }]}>
-          <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+      <TouchableOpacity
+        activeOpacity={0.75}
+        onPress={onGoPlanning}
+        style={[jc.card, { backgroundColor: '#F5F7F6', borderColor: '#D4E0DC' }]}
+      >
+        <View style={jc.emptyRow}>
+          <View style={[jc.iconBox, { backgroundColor: '#E8EDEB' }]}>
+            <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[jc.statusLabel, { color: colors.textMuted }]}>Tournées non générées</Text>
+            <Text style={jc.statusSub}>Générer les tournées depuis Planning</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         </View>
-        <View style={bs.text}>
-          <Text style={[bs.title, { color: colors.textMuted }]}>Tournées non générées</Text>
-          <Text style={bs.sub}>Allez dans Planning pour lancer l'IA</Text>
-        </View>
-      </View>
+      </TouchableOpacity>
     );
   }
 
-  if (isDone) {
-    return (
-      <View style={[bs.card, { backgroundColor: colors.status.terminee.bg, borderColor: colors.status.terminee.border }]}>
-        <View style={[bs.iconBox, { backgroundColor: '#C8E8D4' }]}>
-          <Ionicons name="checkmark-circle" size={20} color={colors.status.terminee.fg} />
-        </View>
-        <View style={bs.text}>
-          <Text style={[bs.title, { color: colors.status.terminee.fg }]}>Journée terminée</Text>
-          <Text style={bs.sub}>
-            {stats.poids_collecte_kg.toLocaleString('fr-FR')} kg collectés · {stats.km_total} km parcourus
-          </Text>
-        </View>
-      </View>
-    );
-  }
+  const s = stats!;
+  const enCours = s.collectes_total - s.collectes_validees;
+  const hasAlert = s.alertes > 0 && !isDone;
+
+  // Feu de circulation : vert (terminée) / rouge (alerte) / ambre (en cours)
+  const RED = { bg: '#FEE2E2', border: '#F87171', fg: '#CC1F1F', iconBg: '#FECACA' };
+
+  const statusColor = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.status.en_cours.fg;
+  const statusBg    = isDone ? colors.status.terminee.bg : hasAlert ? RED.bg : colors.status.en_cours.bg;
+  const statusBorder= isDone ? colors.status.terminee.border : hasAlert ? RED.border : colors.status.en_cours.border;
+  const statusIconBg= isDone ? '#C8E8D4' : hasAlert ? RED.iconBg : '#F5D9A0';
+  const statusIcon  = isDone ? 'checkmark-circle' : hasAlert ? 'alert-circle' : 'car-outline';
+  const statusText  = isDone
+    ? `Journée terminée · ${s.km_total} km parcourus`
+    : `Tournées en cours · ${s.km_total} km planifiés`;
+  const progressColor = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.accent;
 
   return (
-    <View style={[bs.card, { backgroundColor: colors.status.en_cours.bg, borderColor: colors.status.en_cours.border }]}>
-      <View style={[bs.iconBox, { backgroundColor: '#F5D9A0' }]}>
-        <Ionicons name="car-outline" size={20} color={colors.status.en_cours.fg} />
+    <View style={[jc.card, { backgroundColor: statusBg, borderColor: statusBorder }]}>
+      {/* Header statut */}
+      <View style={jc.statusRow}>
+        <View style={[jc.iconBox, { backgroundColor: statusIconBg }]}>
+          <Ionicons name={statusIcon as any} size={18} color={statusColor} />
+        </View>
+        <Text style={[jc.statusLabel, { color: statusColor }]} numberOfLines={1}>{statusText}</Text>
       </View>
-      <View style={bs.text}>
-        <Text style={[bs.title, { color: colors.status.en_cours.fg }]}>
-          {stats.collectes_validees} / {stats.collectes_total} collectes terminées
-        </Text>
-        <Text style={bs.sub}>
-          {stats.alertes > 0 ? `${stats.alertes} alerte${stats.alertes > 1 ? 's' : ''} · ` : ''}
-          {stats.km_total} km planifiés
+
+      <View style={[jc.sep, hasAlert && { backgroundColor: 'rgba(204,31,31,0.12)' }]} />
+
+      {/* Biodéchets + progress */}
+      <View style={jc.metricRow}>
+        <Ionicons name="leaf-outline" size={14} color={colors.primaryLight} style={{ marginTop: 1 }} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <View style={jc.metricTop}>
+            <Text style={jc.metricValue}>
+              {s.poids_collecte_kg.toLocaleString('fr-FR')}
+              <Text style={jc.metricUnit}> kg</Text>
+            </Text>
+            <Text style={jc.metricRight}>
+              sur {s.poids_prevu_kg.toLocaleString('fr-FR')} kg prévus
+            </Text>
+          </View>
+          <View style={jc.progressTrack}>
+            <Animated.View
+              style={[
+                jc.progressFill,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%'],
+                  }),
+                  backgroundColor: progressColor,
+                },
+              ]}
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* Collectes */}
+      <View style={jc.bottomRow}>
+        <Ionicons name="checkmark-circle-outline" size={14} color={colors.secondary} />
+        <Text style={jc.bottomText}>
+          <Text style={jc.bottomBold}>{s.collectes_validees}/{s.collectes_total}</Text>
+          {' '}collectes validées
+          {enCours > 0 ? ` · ${enCours} en cours` : ' · tout validé'}
         </Text>
       </View>
+
+      {/* Footer alerte — visible seulement si imprévus */}
+      {hasAlert && (
+        <TouchableOpacity onPress={onGoImprevus} activeOpacity={0.75} style={jc.alertFooter}>
+          <Ionicons name="alert-circle-outline" size={14} color={RED.fg} />
+          <Text style={[jc.alertFooterText, { color: RED.fg }]}>
+            {s.alertes} impr{s.alertes > 1 ? 'évus' : 'évu'} à traiter
+          </Text>
+          <Ionicons name="chevron-forward" size={13} color={RED.fg} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
-const bs = StyleSheet.create({
+const jc = StyleSheet.create({
   card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 20,
   },
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: { flex: 1 },
-  title: { fontSize: 14, fontWeight: '700', color: colors.text },
-  sub: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontWeight: '500' },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statusSub: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  sep: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    marginBottom: 14,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 12,
+  },
+  metricTop: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  metricValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.3,
+  },
+  metricUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  metricRight: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontWeight: '500',
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  bottomText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    fontWeight: '500',
+    flex: 1,
+  },
+  bottomBold: {
+    fontWeight: '700',
+    color: colors.text,
+  },
+  alertFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(231,111,81,0.2)',
+  },
+  alertFooterText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.coral,
+  },
 });
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activites, setActivites] = useState<Activite[]>([]);
   const [loading, setLoading] = useState(true);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
+  function showOkToast() {
+    Animated.sequence([
+      Animated.timing(toastAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.delay(1800),
+      Animated.timing(toastAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start();
+  }
+
+  const hasAlerts = (stats?.alertes ?? 0) > 0;
 
   useEffect(() => {
     async function fetchData() {
@@ -194,22 +323,24 @@ export default function DashboardScreen() {
           <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
         </TouchableOpacity>
         <Text style={styles.greeting}>
-          Bonjour, <Text style={styles.greetingName}>Nicolas</Text> 👋
+          Bonjour, <Text style={styles.greetingName}>Nicolas</Text>
         </Text>
-        <View style={styles.topbarRight}>
-          <TouchableOpacity style={styles.notifBtn}>
-            {stats && stats.alertes > 0 && <View style={styles.notifDot} />}
-            <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
-          </TouchableOpacity>
-          <LinearGradient
-            colors={[colors.primaryLight, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatar}
-          >
-            <Text style={styles.avatarText}>N</Text>
-          </LinearGradient>
-        </View>
+        <TouchableOpacity
+          style={[styles.notifBtn, hasAlerts && styles.notifBtnAlert]}
+          onPress={() => hasAlerts ? router.push('/imprevus') : showOkToast()}
+          activeOpacity={0.75}
+        >
+          <Ionicons
+            name="notifications-outline"
+            size={20}
+            color={hasAlerts ? '#CC1F1F' : colors.primaryLight}
+          />
+          {hasAlerts && (
+            <View style={styles.notifCount}>
+              <Text style={styles.notifCountText}>{stats!.alertes}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -218,47 +349,29 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>Tableau de Bord</Text>
-          <Text style={styles.pageSubtitle}>Vue d'ensemble en temps réel — Var (83)</Text>
-        </View>
-
         {loading ? (
           <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
         ) : (
           <>
-            <BriefingCard stats={stats} />
-
-            {/* Stats — 2 × 2 grid */}
-            {stats && (() => {
-              const STATS = buildStats(stats);
-              return (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statsRow}>
-                    <StatCard {...STATS[0]} />
-                    <StatCard {...STATS[1]} />
-                  </View>
-                  <View style={styles.statsRow}>
-                    <StatCard {...STATS[2]} />
-                    <StatCard {...STATS[3]} />
-                  </View>
-                </View>
-              );
-            })()}
+            <JourneeCard
+              stats={stats}
+              onGoPlanning={() => router.push('/planning')}
+              onGoImprevus={() => router.push('/imprevus')}
+            />
 
             {/* Flotte en temps réel */}
             {stats && stats.flotte.length > 0 && (() => {
               const allDone = stats.flotte.every(f => f.termine);
               return (
-                <View style={[styles.activityCard, { marginBottom: 24 }]}>
-                  <View style={styles.activityHeader}>
-                    <Text style={styles.activityTitle}>Positions de la flotte</Text>
+                <View style={[styles.sectionCard, { marginBottom: 14 }]}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Positions de la flotte</Text>
                     <View style={[
-                      styles.activityCount,
+                      styles.badge,
                       allDone && { backgroundColor: colors.status.terminee.bg },
                     ]}>
                       <Text style={[
-                        styles.activityCountText,
+                        styles.badgeText,
                         allDone && { color: colors.status.terminee.fg },
                       ]}>
                         {allDone ? 'Terminé' : 'En cours'}
@@ -266,30 +379,33 @@ export default function DashboardScreen() {
                     </View>
                   </View>
                   {stats.flotte.map((f, i) => (
-                    <View key={i} style={styles.fleetRow}>
-                      <View style={[
-                        styles.fleetDot,
-                        { backgroundColor: f.termine ? colors.status.terminee.fg : colors.accent },
-                      ]} />
-                      <Text style={styles.fleetName}>{f.chauffeur} :</Text>
-                      <Text style={[
-                        styles.fleetPoint,
-                        f.termine && { color: colors.status.terminee.fg },
-                      ]}>
-                        {f.dernier_point}
-                      </Text>
-                    </View>
+                    <React.Fragment key={i}>
+                      {i > 0 && <View style={styles.divider} />}
+                      <View style={styles.fleetRow}>
+                        <View style={[
+                          styles.fleetDot,
+                          { backgroundColor: f.termine ? colors.status.terminee.fg : colors.accent },
+                        ]} />
+                        <Text style={styles.fleetName}>{f.chauffeur}</Text>
+                        <Text style={[
+                          styles.fleetPoint,
+                          f.termine && { color: colors.status.terminee.fg },
+                        ]}>
+                          {f.dernier_point}
+                        </Text>
+                      </View>
+                    </React.Fragment>
                   ))}
                 </View>
               );
             })()}
 
-            {/* Activity */}
-            <View style={styles.activityCard}>
-              <View style={styles.activityHeader}>
-                <Text style={styles.activityTitle}>Activité récente</Text>
-                <View style={styles.activityCount}>
-                  <Text style={styles.activityCountText}>
+            {/* Activité récente */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Activité récente</Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
                     {activites.length} événement{activites.length !== 1 ? 's' : ''}
                   </Text>
                 </View>
@@ -315,6 +431,21 @@ export default function DashboardScreen() {
         onClose={() => setDrawerOpen(false)}
         activeRoute="dashboard"
       />
+
+      {/* Toast "tout va bien" */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.toast,
+          {
+            opacity: toastAnim,
+            transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
+          },
+        ]}
+      >
+        <Ionicons name="checkmark-circle" size={16} color={colors.status.terminee.fg} />
+        <Text style={styles.toastText}>Aucun imprévu · tout roule</Text>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -334,7 +465,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -354,109 +484,96 @@ const styles = StyleSheet.create({
   greetingName: {
     color: colors.primaryLight,
   },
-  topbarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
   notifBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notifDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    backgroundColor: colors.coral,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.card,
-    zIndex: 1,
+  notifBtnAlert: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#F87171',
+    paddingHorizontal: 10,
+    width: 'auto',
+    flexDirection: 'row',
+    gap: 5,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  notifCount: {
+    backgroundColor: '#CC1F1F',
+    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primaryLight,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
+    paddingHorizontal: 4,
   },
-  avatarText: {
+  notifCountText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: '700',
   },
-  content: {
-    flex: 1,
+  toast: {
+    position: 'absolute',
+    bottom: 32,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.status.terminee.bg,
+    borderWidth: 1,
+    borderColor: colors.status.terminee.border,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    shadowColor: colors.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 6,
   },
+  toastText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.status.terminee.fg,
+  },
+  content: { flex: 1 },
   contentContainer: {
-    padding: 24,
+    padding: 20,
     paddingBottom: 40,
   },
-  pageHeader: {
-    marginBottom: 24,
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text,
-    letterSpacing: -0.4,
-  },
-  pageSubtitle: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  statsGrid: {
-    gap: 14,
-    marginBottom: 24,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 14,
-  },
-  activityCard: {
+  sectionCard: {
     backgroundColor: colors.card,
     borderRadius: 18,
     padding: 20,
+    borderWidth: 1,
+    borderColor: '#EAF2EE',
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 8,
     elevation: 3,
-    borderWidth: 1,
-    borderColor: '#EAF2EE',
   },
-  activityHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingHorizontal: 14,
+    marginBottom: 12,
   },
-  activityTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 15,
     fontWeight: '700',
     color: colors.text,
   },
-  activityCount: {
+  badge: {
     backgroundColor: colors.background,
     borderRadius: 20,
     paddingVertical: 4,
     paddingHorizontal: 10,
   },
-  activityCountText: {
+  badgeText: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.textMuted,
@@ -464,7 +581,6 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: colors.background,
-    marginHorizontal: 14,
   },
   emptyText: {
     fontSize: 13,
@@ -475,25 +591,24 @@ const styles = StyleSheet.create({
   fleetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 10,
   },
   fleetDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.accent,
-    marginRight: 10,
+    flexShrink: 0,
   },
   fleetName: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.text,
-    marginRight: 6,
   },
   fleetPoint: {
     fontSize: 14,
     color: colors.primaryLight,
-    fontWeight: '600',
+    fontWeight: '500',
+    flex: 1,
   },
 });
