@@ -184,6 +184,7 @@ export default function PlanningScreen() {
   const totalCollectes = stats?.collectes_total ?? 0;
   const isToday = selectedDate === todayISO();
   const inSupervision = !loading && vehicles.length > 0;
+  const hasAlerts = (stats?.alertes ?? 0) > 0;
 
   return (
     <SafeAreaView style={s.container}>
@@ -194,21 +195,26 @@ export default function PlanningScreen() {
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={s.menuBtn}>
           <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
         </TouchableOpacity>
-        <Text style={s.topbarTitle}>Planning</Text>
-        <View style={s.topbarRight}>
-          <TouchableOpacity style={s.notifBtn}>
-            {stats && stats.alertes > 0 && <View style={s.notifDot} />}
-            <Ionicons name="notifications-outline" size={20} color={colors.primaryLight} />
-          </TouchableOpacity>
-          <LinearGradient
-            colors={[colors.primaryLight, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.avatar}
-          >
-            <Text style={s.avatarText}>N</Text>
-          </LinearGradient>
+        <View style={{ flex: 1 }}>
+          <Text style={s.topbarTitle}>Planning</Text>
+          <Text style={s.topbarSub}>Var 83 · tournées</Text>
         </View>
+        <TouchableOpacity
+          style={[s.notifBtn, hasAlerts && s.notifBtnAlert]}
+          onPress={() => { if (hasAlerts) router.push('/imprevus'); }}
+          activeOpacity={0.75}
+        >
+          <Ionicons
+            name="notifications-outline"
+            size={20}
+            color={hasAlerts ? '#CC1F1F' : colors.primaryLight}
+          />
+          {hasAlerts && (
+            <View style={s.notifCount}>
+              <Text style={s.notifCountText}>{stats!.alertes}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Navigateur de date — pleine largeur, toujours visible */}
@@ -484,27 +490,28 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   menuBtn: { marginRight: 12, padding: 4 },
-  topbarTitle: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 },
-  topbarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  topbarTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  topbarSub: { fontSize: 11, color: colors.textMuted, fontWeight: '500', marginTop: 1 },
   notifBtn: {
-    width: 40, height: 40, borderRadius: 12,
+    width: 44, height: 36, borderRadius: 10,
     backgroundColor: colors.background,
     alignItems: 'center', justifyContent: 'center',
   },
-  notifDot: {
-    position: 'absolute', top: 8, right: 8,
-    width: 8, height: 8,
-    backgroundColor: colors.coral, borderRadius: 4,
-    borderWidth: 2, borderColor: colors.card, zIndex: 1,
+  notifBtnAlert: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1, borderColor: '#F87171',
+    paddingHorizontal: 10,
+    width: 'auto' as any,
+    flexDirection: 'row' as const,
+    gap: 5,
   },
-  avatar: {
-    width: 40, height: 40, borderRadius: 12,
+  notifCount: {
+    backgroundColor: '#CC1F1F',
+    borderRadius: 8, minWidth: 18, height: 18,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primaryLight,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
+    paddingHorizontal: 4,
   },
-  avatarText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  notifCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   // Navigateur de date
   dateStrip: {

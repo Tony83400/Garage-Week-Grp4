@@ -200,9 +200,12 @@ export default function ImprevusScreen() {
             {loading ? '...' : total === 0 ? "Aucun problème aujourd'hui" : `${traites} / ${total} traité${traites > 1 ? 's' : ''}`}
           </Text>
         </View>
-        {imprevus.length > 0 && (
-          <View style={s.countBadge}>
-            <Text style={s.countBadgeText}>{imprevus.length}</Text>
+        {total > 0 && (
+          <View style={[s.countBadge, imprevus.length === 0 && s.countBadgeDone]}>
+            {imprevus.length > 0
+              ? <Text style={s.countBadgeText}>{imprevus.length}</Text>
+              : <Ionicons name="checkmark" size={16} color="#fff" />
+            }
           </View>
         )}
       </View>
@@ -295,6 +298,9 @@ const s = StyleSheet.create({
     backgroundColor: colors.coral,
     borderRadius: 20, minWidth: 28, height: 28, paddingHorizontal: 8,
     alignItems: 'center', justifyContent: 'center',
+  },
+  countBadgeDone: {
+    backgroundColor: colors.status.terminee.fg,
   },
   countBadgeText: { fontSize: 13, fontWeight: '800', color: '#fff' },
 

@@ -59,31 +59,20 @@ export default function SitesScreen() {
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={s.menuBtn}>
           <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
         </TouchableOpacity>
-        <Text style={s.greeting}>
-          Sites <Text style={s.greetingName}>de collecte</Text>
-        </Text>
-        <LinearGradient
-          colors={[colors.primaryLight, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.avatar}
-        >
-          <Text style={s.avatarText}>N</Text>
-        </LinearGradient>
+        <View style={{ flex: 1 }}>
+          <Text style={s.topbarTitle}>Sites de collecte</Text>
+          {!loading && (
+            <Text style={s.topbarSub}>
+              {clients.length} point{clients.length !== 1 ? 's' : ''} enregistré{clients.length !== 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity style={s.addBtn} onPress={() => setSiteModalOpen(true)} activeOpacity={0.75}>
+          <Ionicons name="add-outline" size={24} color={colors.primaryLight} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false}>
-        <View style={s.pageHeader}>
-          <View>
-            <Text style={s.pageTitle}>Sites de collecte</Text>
-            <Text style={s.pageSubtitle}>{clients.length} point{clients.length !== 1 ? 's' : ''} enregistré{clients.length !== 1 ? 's' : ''}</Text>
-          </View>
-          <TouchableOpacity style={s.btnAdd} onPress={() => setSiteModalOpen(true)} activeOpacity={0.85}>
-            <Ionicons name="add-circle-outline" size={16} color={colors.primaryLight} />
-            <Text style={s.btnAddText}>Ajouter un site</Text>
-          </TouchableOpacity>
-        </View>
-
         {loading ? (
           <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
         ) : clients.length === 0 ? (
@@ -152,43 +141,17 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   menuBtn: { marginRight: 12, padding: 4 },
-  greeting: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 },
-  greetingName: { color: colors.primaryLight },
-  avatar: {
-    width: 40, height: 40, borderRadius: 12,
+  topbarTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  topbarSub: { fontSize: 11, color: colors.textMuted, fontWeight: '500', marginTop: 1 },
+  addBtn: {
+    width: 40, height: 36, borderRadius: 10,
+    backgroundColor: colors.background,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primaryLight,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
   },
-  avatarText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   content: { flex: 1 },
   contentContainer: { padding: 24, paddingBottom: 40 },
 
-  pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
-  pageSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 3, fontWeight: '500' },
-
-  btnAdd: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#C8E8D4',
-    backgroundColor: '#E8F5EE',
-  },
-  btnAddText: { fontSize: 13, fontWeight: '700', color: colors.primaryLight },
 
   emptyCard: {
     backgroundColor: colors.card,
