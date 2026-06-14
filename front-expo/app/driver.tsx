@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Animated,
   ActivityIndicator,
+  Modal,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -13,8 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../constants/colors';
-import StopCard from '../components/StopCard';
-import { StyleSheet } from 'react-native';
 import { getTournee, updateStatutTache, type TourneeDetails, type Arret } from '../services/chauffeur';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
@@ -23,12 +23,19 @@ export default function DriverScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const chauffeurId = Number(id) || 1;
+
   const [tournee, setTournee] = useState<TourneeDetails | null>(null);
   const [stops, setStops] = useState<Arret[]>([]);
   const [collectedKg, setCollectedKg] = useState(0);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'validate' | 'skip'; arret: Arret } | null>(null);
+  const [logoutTap, setLogoutTap] = useState(false);
+  const [finishedAt, setFinishedAt] = useState<string | null>(null);
+
   const toastOpacity = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const logoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     async function fetchTournee() {
@@ -36,17 +43,14 @@ export default function DriverScreen() {
         const data = await getTournee(chauffeurId, DATE_DEMO);
         if (data && data.arrets) {
           setTournee(data);
-          // On garde tous les arrêts dans l'objet tournée, mais on filtre ceux à afficher
           setStops(data.arrets.filter(a => a.statut !== 'terminee' && a.statut !== 'erreur'));
-          
-          // INITIALISATION DU COMPTEUR : Somme des poids déjà collectés
           const alreadyCollected = data.arrets
             .filter(a => a.statut === 'terminee')
             .reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0);
           setCollectedKg(alreadyCollected);
         }
       } catch (e) {
-        console.error("Erreur chargement tournée :", e);
+        console.error('Erreur chargement tournée :', e);
       } finally {
         setLoading(false);
       }
@@ -54,11 +58,26 @@ export default function DriverScreen() {
     fetchTournee();
   }, []);
 
-  const totalArrets = tournee ? tournee.arrets.length : 0;
-  const doneArrets = tournee ? tournee.arrets.filter(a => a.statut === 'terminee' || a.statut === 'erreur').length : 0;
-  const totalKgPrevu = tournee ? tournee.arrets.reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0) : 0;
-  const kgProgressPct = totalKgPrevu === 0 ? 0 : Math.min(Math.round((collectedKg / totalKgPrevu) * 100), 100);
-  const kgRestants = Math.max(totalKgPrevu - collectedKg, 0);
+  const totalArrets    = tournee ? tournee.arrets.length : 0;
+  const doneArrets     = tournee ? tournee.arrets.filter(a => a.statut === 'terminee' || a.statut === 'erreur').length : 0;
+  const errorArrets    = tournee ? tournee.arrets.filter(a => a.statut === 'erreur').length : 0;
+  const totalKgPrevu   = tournee ? tournee.arrets.reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0) : 0;
+  const kgProgressPct  = totalKgPrevu === 0 ? 0 : Math.min(collectedKg / totalKgPrevu, 1);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: kgProgressPct,
+      duration: 700,
+      useNativeDriver: false,
+    }).start();
+  }, [kgProgressPct]);
+
+  useEffect(() => {
+    if (!loading && stops.length === 0 && totalArrets > 0 && !finishedAt) {
+      const now = new Date();
+      setFinishedAt(now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+    }
+  }, [stops.length, loading]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -69,42 +88,54 @@ export default function DriverScreen() {
     ]).start(() => setToast(null));
   }
 
+  function handleLogoutPress() {
+    if (logoutTap) {
+      if (logoutTimer.current) clearTimeout(logoutTimer.current);
+      router.replace('/');
+    } else {
+      setLogoutTap(true);
+      logoutTimer.current = setTimeout(() => setLogoutTap(false), 2000);
+    }
+  }
+
   async function handleValidate(arret: Arret) {
     try {
-      const bacsEstimes = Math.ceil((arret.poids_prevu_kg || 40) / 40); 
+      const bacsEstimes = Math.ceil((arret.poids_prevu_kg || 40) / 40);
       await updateStatutTache(arret.tache_id, { statut: 'terminee', bacs_reels: bacsEstimes });
-      
       setStops(prev => prev.filter(s => s.tache_id !== arret.tache_id));
       setCollectedKg(prev => prev + (arret.poids_prevu_kg || 0));
-      // On met à jour l'objet local tournee pour que le calcul global reste juste si besoin
       if (tournee) {
-        const updatedArrets = tournee.arrets.map(a => 
-          a.tache_id === arret.tache_id ? { ...a, statut: 'terminee' as const } : a
-        );
-        setTournee({ ...tournee, arrets: updatedArrets });
+        setTournee({
+          ...tournee,
+          arrets: tournee.arrets.map(a =>
+            a.tache_id === arret.tache_id ? { ...a, statut: 'terminee' as const } : a
+          ),
+        });
       }
-      showToast(`✓ ${arret.client_nom} validé`);
-    } catch (e) {
-      showToast("Erreur lors de la validation");
+      showToast(`Collecte validée · ${arret.client_nom}`);
+    } catch {
+      showToast('Erreur lors de la validation');
     }
   }
 
   async function handleSkip(arret: Arret) {
     try {
-      await updateStatutTache(arret.tache_id, { 
-        statut: 'erreur', 
-        commentaire: "Signalé comme imprévu par le chauffeur" 
+      await updateStatutTache(arret.tache_id, {
+        statut: 'erreur',
+        commentaire: 'Signalé comme imprévu par le chauffeur',
       });
       setStops(prev => prev.filter(s => s.tache_id !== arret.tache_id));
       if (tournee) {
-        const updatedArrets = tournee.arrets.map(a => 
-          a.tache_id === arret.tache_id ? { ...a, statut: 'erreur' as const } : a
-        );
-        setTournee({ ...tournee, arrets: updatedArrets });
+        setTournee({
+          ...tournee,
+          arrets: tournee.arrets.map(a =>
+            a.tache_id === arret.tache_id ? { ...a, statut: 'erreur' as const } : a
+          ),
+        });
       }
-      showToast(`↷ ${arret.client_nom} reporté aux imprévus`);
-    } catch (e) {
-      showToast("Erreur lors du signalement");
+      showToast(`Signalé aux imprévus · ${arret.client_nom}`);
+    } catch {
+      showToast('Erreur lors du signalement');
     }
   }
 
@@ -115,6 +146,8 @@ export default function DriverScreen() {
       </SafeAreaView>
     );
   }
+
+  const progressWidth = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
     <SafeAreaView style={s.container}>
@@ -129,33 +162,41 @@ export default function DriverScreen() {
             end={{ x: 1, y: 1 }}
             style={s.avatar}
           >
-            <Text style={s.avatarText}>{tournee?.chauffeur ? tournee.chauffeur[0] : 'C'}</Text>
+            <Text style={s.avatarText}>
+              {tournee?.chauffeur ? tournee.chauffeur[0].toUpperCase() : 'C'}
+            </Text>
           </LinearGradient>
           <View>
-            <Text style={s.driverName}>{tournee?.chauffeur || 'Aucun chauffeur'}</Text>
-            <Text style={s.driverSub}>
-              {stops.length > 0
-                ? `${stops.length} arrêt${stops.length > 1 ? 's' : ''} restant${stops.length > 1 ? 's' : ''} · ${kgRestants} kg`
-                : tournee?.immatriculation || '–'}
-            </Text>
+            <Text style={s.driverName}>{tournee?.chauffeur || 'Chauffeur'}</Text>
+            <Text style={s.driverSub}>{tournee?.immatriculation || '–'}</Text>
           </View>
         </View>
-        <TouchableOpacity style={s.logoutBtn} onPress={() => router.replace('/')}>
-          <Ionicons name="log-out-outline" size={20} color={colors.coral} />
+        <TouchableOpacity
+          style={[s.logoutBtn, logoutTap && s.logoutBtnActive]}
+          onPress={handleLogoutPress}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="log-out-outline" size={18} color={logoutTap ? colors.coral : colors.textMuted} />
+          {logoutTap && <Text style={s.logoutConfirmText}>Confirmer</Text>}
         </TouchableOpacity>
       </View>
 
-      {/* Progress */}
+      {/* Progress strip */}
       <View style={s.progressWrap}>
         <View style={s.progressLabelRow}>
           <View>
-            <Text style={s.progressKgBig}>{collectedKg} <Text style={s.progressKgUnit}>kg collectés</Text></Text>
-            <Text style={s.progressSub}>sur {totalKgPrevu} kg prévus · {doneArrets}/{totalArrets} arrêts</Text>
+            <Text style={s.progressKgBig}>
+              {collectedKg.toLocaleString('fr-FR')}
+              <Text style={s.progressKgUnit}> kg collectés</Text>
+            </Text>
+            <Text style={s.progressSub}>
+              sur {totalKgPrevu.toLocaleString('fr-FR')} kg · {doneArrets}/{totalArrets} arrêts
+            </Text>
           </View>
-          <Text style={s.progressPct}>{kgProgressPct}%</Text>
+          <Text style={s.progressPct}>{Math.round(kgProgressPct * 100)}%</Text>
         </View>
         <View style={s.progressBarBg}>
-          <View style={[s.progressBarFill, { width: `${kgProgressPct}%` as any }]} />
+          <Animated.View style={[s.progressBarFill, { width: progressWidth }]} />
         </View>
       </View>
 
@@ -163,12 +204,38 @@ export default function DriverScreen() {
       {stops.length === 0 ? (
         <View style={s.emptyState}>
           <View style={s.emptyIcon}>
-            <Ionicons name="checkmark-circle" size={56} color={colors.accent} />
+            <Ionicons name="checkmark-circle" size={52} color={colors.status.terminee.fg} />
           </View>
           <Text style={s.emptyTitle}>Tournée terminée !</Text>
-          <Text style={s.emptySubtitle}>
-            {doneArrets} collecte{doneArrets !== 1 ? 's' : ''} · {collectedKg} kg collectés
-          </Text>
+
+          {(tournee?.heure_depart || finishedAt) && (
+            <Text style={s.emptyTime}>
+              {tournee?.heure_depart ? tournee.heure_depart.slice(0, 5) : '–'}
+              {' → '}
+              {finishedAt ?? '–'}
+            </Text>
+          )}
+
+          <View style={s.emptyStats}>
+            <View style={s.emptyStat}>
+              <Text style={s.emptyStatVal}>{totalArrets - errorArrets}</Text>
+              <Text style={s.emptyStatLabel}>collectes</Text>
+            </View>
+            {errorArrets > 0 && (
+              <View style={[s.emptyStat, s.emptyStatError]}>
+                <Text style={[s.emptyStatVal, { color: colors.coral }]}>{errorArrets}</Text>
+                <Text style={s.emptyStatLabel}>imprévu{errorArrets > 1 ? 's' : ''}</Text>
+              </View>
+            )}
+            <View style={s.emptyStat}>
+              <Text style={s.emptyStatVal}>{collectedKg.toLocaleString('fr-FR')}</Text>
+              <Text style={s.emptyStatLabel}>kg</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity onPress={() => router.replace('/')} activeOpacity={0.6}>
+            <Text style={s.emptyLogout}>Se déconnecter</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
@@ -182,42 +249,40 @@ export default function DriverScreen() {
                   <Text style={s.heroLabelText}>Prochain arrêt</Text>
                 </View>
                 <View style={s.heroNumBadge}>
-                  <Text style={s.heroNumText}>#{stops[0].ordre || 1}</Text>
+                  <Text style={s.heroNumText}>#{stops[0].ordre || 1} sur {totalArrets}</Text>
                 </View>
               </View>
 
               <Text style={s.heroClientName} numberOfLines={2}>{stops[0].client_nom}</Text>
-              <Text style={s.heroPoids}>~{stops[0].poids_prevu_kg} kg à collecter</Text>
+              <Text style={s.heroPoids}>{stops[0].poids_prevu_kg} kg à collecter</Text>
 
-              <View style={s.heroActions}>
-                <TouchableOpacity
-                  style={s.heroValidate}
-                  onPress={() => handleValidate(stops[0])}
-                  activeOpacity={0.82}
+              <TouchableOpacity
+                style={s.heroValidate}
+                onPress={() => setConfirmAction({ type: 'validate', arret: stops[0] })}
+                activeOpacity={0.82}
+              >
+                <LinearGradient
+                  colors={[colors.primaryLight, colors.accent]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={s.heroActionGradient}
                 >
-                  <LinearGradient
-                    colors={[colors.primaryLight, colors.accent]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={s.heroActionGradient}
-                  >
-                    <Ionicons name="checkmark" size={20} color="#fff" />
-                    <Text style={s.heroValidateText}>Valider la collecte</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                  <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
+                  <Text style={s.heroValidateText}>Valider la collecte</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={s.heroSkip}
-                  onPress={() => handleSkip(stops[0])}
-                  activeOpacity={0.82}
-                >
-                  <Ionicons name="alert-circle-outline" size={18} color={colors.coral} />
-                  <Text style={s.heroSkipText}>Signaler un imprévu</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={s.heroSkip}
+                onPress={() => setConfirmAction({ type: 'skip', arret: stops[0] })}
+                activeOpacity={0.7}
+              >
+                <Text style={s.heroSkipText}>Signaler un imprévu</Text>
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* Liste des arrêts suivants */}
+          {/* Arrêts suivants — lecture seule, pas de boutons */}
           {stops.length > 1 && (
             <>
               <View style={s.listHeader}>
@@ -226,28 +291,76 @@ export default function DriverScreen() {
                   <Text style={s.listCountText}>{stops.length - 1}</Text>
                 </View>
               </View>
-
-              {stops.slice(1).map((stop, i) => {
-                const mappedStop = {
-                  id: stop.tache_id,
-                  ordre: stop.ordre || i + 2,
-                  nom: stop.client_nom,
-                  ville: 'Var',
-                  poidsPrevu: stop.poids_prevu_kg,
-                };
-                return (
-                  <StopCard
-                    key={stop.tache_id}
-                    stop={mappedStop}
-                    isFirst={false}
-                    onValidate={() => handleValidate(stop)}
-                    onSkip={() => handleSkip(stop)}
-                  />
-                );
-              })}
+              <View style={s.listCard}>
+                {stops.slice(1).map((stop, i) => (
+                  <React.Fragment key={stop.tache_id}>
+                    {i > 0 && <View style={s.listDivider} />}
+                    <View style={s.listItem}>
+                      <View style={s.listNum}>
+                        <Text style={s.listNumText}>{stop.ordre || i + 2}</Text>
+                      </View>
+                      <View style={s.listInfo}>
+                        <Text style={s.listName} numberOfLines={1}>{stop.client_nom}</Text>
+                        <Text style={s.listPoids}>{stop.poids_prevu_kg} kg</Text>
+                      </View>
+                    </View>
+                  </React.Fragment>
+                ))}
+              </View>
             </>
           )}
         </ScrollView>
+      )}
+
+      {/* Modal confirmation — valider ou signaler */}
+      {confirmAction && (
+        <Modal transparent animationType="fade" visible onRequestClose={() => setConfirmAction(null)}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalSheet}>
+              <View style={[
+                s.modalIconBox,
+                { backgroundColor: confirmAction.type === 'validate' ? colors.status.terminee.bg : colors.coralLight },
+              ]}>
+                <Ionicons
+                  name={confirmAction.type === 'validate' ? 'checkmark-circle' : 'alert-circle'}
+                  size={30}
+                  color={confirmAction.type === 'validate' ? colors.status.terminee.fg : colors.coral}
+                />
+              </View>
+              <Text style={s.modalTitle}>
+                {confirmAction.type === 'validate' ? 'Confirmer la collecte' : 'Signaler un imprévu'}
+              </Text>
+              <Text style={s.modalClient}>{confirmAction.arret.client_nom}</Text>
+              <Text style={s.modalDetail}>
+                {confirmAction.type === 'validate'
+                  ? `${confirmAction.arret.poids_prevu_kg} kg collectés`
+                  : 'Reporté aux imprévus de demain'}
+              </Text>
+              <View style={s.modalActions}>
+                <TouchableOpacity style={s.modalCancel} onPress={() => setConfirmAction(null)} activeOpacity={0.7}>
+                  <Text style={s.modalCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    s.modalConfirm,
+                    { backgroundColor: confirmAction.type === 'validate' ? colors.status.terminee.fg : colors.coral },
+                  ]}
+                  onPress={() => {
+                    const action = confirmAction;
+                    setConfirmAction(null);
+                    if (action.type === 'validate') handleValidate(action.arret);
+                    else handleSkip(action.arret);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={s.modalConfirmText}>
+                    {confirmAction.type === 'validate' ? 'Confirmer' : 'Signaler'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       )}
 
       {/* Toast */}
@@ -259,8 +372,6 @@ export default function DriverScreen() {
     </SafeAreaView>
   );
 }
-
-
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -297,11 +408,6 @@ const s = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primaryLight,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
   },
   avatarText: {
     color: '#fff',
@@ -320,17 +426,26 @@ const s = StyleSheet.create({
     marginTop: 1,
   },
   logoutBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.coralLight,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+    paddingHorizontal: 10,
+  },
+  logoutBtnActive: {
+    backgroundColor: colors.coralLight,
     borderWidth: 1,
-    borderColor: 'rgba(231,111,81,0.2)',
+    borderColor: 'rgba(231,111,81,0.3)',
+  },
+  logoutConfirmText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.coral,
   },
 
-  // Progress
+  // Progress strip
   progressWrap: {
     paddingHorizontal: 20,
     paddingTop: 14,
@@ -379,7 +494,7 @@ const s = StyleSheet.create({
     borderRadius: 99,
   },
 
-  // Hero stop
+  // Hero card
   heroCard: {
     backgroundColor: colors.card,
     borderRadius: 20,
@@ -389,7 +504,7 @@ const s = StyleSheet.create({
     marginBottom: 24,
     shadowColor: colors.primaryLight,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
   },
@@ -431,12 +546,12 @@ const s = StyleSheet.create({
     color: colors.primaryLight,
   },
   heroClientName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: colors.text,
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
     marginBottom: 6,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   heroPoids: {
     fontSize: 14,
@@ -444,19 +559,17 @@ const s = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 22,
   },
-  heroActions: {
-    gap: 10,
-  },
   heroValidate: {
     borderRadius: 14,
     overflow: 'hidden',
+    marginBottom: 10,
   },
   heroActionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    paddingVertical: 15,
+    paddingVertical: 16,
   },
   heroValidateText: {
     color: '#fff',
@@ -464,23 +577,17 @@ const s = StyleSheet.create({
     fontWeight: '700',
   },
   heroSkip: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(231,111,81,0.3)',
-    backgroundColor: colors.coralLight,
+    paddingVertical: 10,
   },
   heroSkipText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.coral,
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
   },
 
-  // List
+  // List — read-only
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   listHeader: {
@@ -507,6 +614,56 @@ const s = StyleSheet.create({
     fontWeight: '600',
     color: colors.textMuted,
   },
+  listCard: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#EAF2EE',
+    overflow: 'hidden',
+  },
+  listDivider: {
+    height: 1,
+    backgroundColor: colors.background,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+  },
+  listNum: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E8F0EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  listNumText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  listInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  listName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    flex: 1,
+  },
+  listPoids: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primaryLight,
+    marginLeft: 8,
+  },
 
   // Empty state
   emptyState: {
@@ -519,34 +676,149 @@ const s = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 28,
-    backgroundColor: '#E8F5EE',
+    backgroundColor: colors.status.terminee.bg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
   },
   emptyTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 20,
     letterSpacing: -0.3,
   },
-  emptySubtitle: {
-    fontSize: 14,
+  emptyStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 32,
+  },
+  emptyStat: {
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#EAF2EE',
+    minWidth: 72,
+  },
+  emptyStatError: {
+    borderColor: 'rgba(231,111,81,0.25)',
+    backgroundColor: colors.coralLight,
+  },
+  emptyStatVal: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.3,
+  },
+  emptyStatLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  emptyTime: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textMuted,
+    marginBottom: 20,
+    letterSpacing: 0.5,
+  },
+  emptyLogout: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
+    marginTop: 8,
+  },
+
+  // Confirmation modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 32,
+    paddingHorizontal: 20,
+  },
+  modalSheet: {
+    backgroundColor: colors.card,
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 6,
+    letterSpacing: -0.2,
+  },
+  modalClient: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primaryLight,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  modalDetail: {
+    fontSize: 13,
     color: colors.textMuted,
     fontWeight: '500',
+    marginBottom: 24,
     textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E8E4',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  modalConfirm: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
 
   // Toast
   toast: {
     position: 'absolute',
-    top: 80,
+    bottom: 40,
     right: 20,
     left: 20,
     backgroundColor: colors.primaryDark,
