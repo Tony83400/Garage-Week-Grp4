@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../constants/colors';
 import { getTournee, updateStatutTache, type TourneeDetails, type Arret } from '../services/chauffeur';
+import BlueBoBModal from '../components/BlueBoBModal';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
@@ -30,6 +31,7 @@ export default function DriverScreen() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: 'validate' | 'skip'; arret: Arret } | null>(null);
+  const [showBlueBoB, setShowBlueBoB] = useState(false);
   const [logoutTap, setLogoutTap] = useState(false);
   const [finishedAt, setFinishedAt] = useState<string | null>(null);
 
@@ -257,6 +259,18 @@ export default function DriverScreen() {
               <Text style={s.heroPoids}>{stops[0].poids_prevu_kg} kg à collecter</Text>
 
               <TouchableOpacity
+                style={s.blueBoBBtn}
+                onPress={() => setShowBlueBoB(true)}
+                activeOpacity={0.8}
+              >
+                <View style={s.blueBoBLogoBox}>
+                  <Text style={s.blueBoBLogoLetter}>B</Text>
+                </View>
+                <Text style={s.blueBoBBtnText}>Voir dans BlueBoB</Text>
+                <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={s.heroValidate}
                 onPress={() => setConfirmAction({ type: 'validate', arret: stops[0] })}
                 activeOpacity={0.82}
@@ -362,6 +376,15 @@ export default function DriverScreen() {
           </View>
         </Modal>
       )}
+
+      {/* BlueBoB modal */}
+      <BlueBoBModal
+        visible={showBlueBoB}
+        onClose={() => setShowBlueBoB(false)}
+        stop={stops[0] ?? null}
+        stopIndex={stops[0]?.ordre || 1}
+        totalStops={totalArrets}
+      />
 
       {/* Toast */}
       {toast && (
@@ -557,7 +580,36 @@ const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.textMuted,
-    marginBottom: 22,
+    marginBottom: 14,
+  },
+  blueBoBBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1A3FA8',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 14,
+  },
+  blueBoBLogoBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  blueBoBLogoLetter: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#1A3FA8',
+  },
+  blueBoBBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
   heroValidate: {
     borderRadius: 14,
