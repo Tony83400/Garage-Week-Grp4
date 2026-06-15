@@ -1,6 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { TouchableOpacity, View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface LoginButtonProps {
@@ -16,18 +15,13 @@ export default function LoginButton({ onPress, loading = false }: LoginButtonPro
       activeOpacity={0.8}
       style={styles.button}
     >
-      <LinearGradient
-        colors={['#2D6A4F', '#52B788']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
+      <View style={styles.inner}>
         <Text style={styles.text}>Se connecter</Text>
         {loading
           ? <ActivityIndicator color="#ffffff" size="small" style={styles.icon} />
           : <Ionicons name="arrow-forward" size={18} color="white" style={styles.icon} />
         }
-      </LinearGradient>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -36,15 +30,16 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     marginTop: 8,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#2D6A4F',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowColor: '#1B4332',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  gradient: {
+  inner: {
+    backgroundColor: '#2A7A3B',
     paddingHorizontal: 20,
     paddingVertical: 17,
     flexDirection: 'row',

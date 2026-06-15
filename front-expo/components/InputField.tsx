@@ -12,7 +12,7 @@ export default function InputField({ label, ...props }: InputFieldProps) {
       <TextInput
         {...props}
         style={styles.input}
-        placeholderTextColor="rgba(255,255,255,0.35)"
+        placeholderTextColor="#A09070"
       />
     </View>
   );
@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
+    color: '#8A7A60',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 8,
@@ -34,13 +34,13 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#EDE5D4',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 14,
+    borderColor: '#C8B898',
+    borderRadius: 10,
     fontSize: 15,
     fontWeight: '500',
-    color: '#ffffff',
+    color: '#1B2D27',
     fontFamily: 'System',
   },
 });

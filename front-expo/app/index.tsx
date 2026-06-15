@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, useWindowDimensions, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { login } from '../services/auth';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withTiming,
-  withSequence,
 } from 'react-native-reanimated';
-import AnimatedBlob from '../components/AnimatedBlob';
+import Svg, { Path } from 'react-native-svg';
 import InputField from '../components/InputField';
 import LoginButton from '../components/LoginButton';
 import ErrorMessage from '../components/ErrorMessage';
 import TruckAnimation, { type TruckPhase } from '../components/TruckAnimation';
-import { colors } from '../constants/colors';
+
+function AlchiLogo() {
+  return (
+    <Svg width={38} height={46} viewBox="0 0 36 44">
+      <Path d="M18 2 L4 42 L13 42 L18 24 L23 42 L32 42 Z" fill="#FFFFFF" />
+      <Path d="M11 30 L25 30 L23 34 L13 34 Z" fill="#1B3A28" />
+    </Svg>
+  );
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -29,7 +35,6 @@ export default function LoginScreen() {
   const [showError, setShowError] = useState(false);
   const [phase, setPhase] = useState<TruckPhase>('arriving');
 
-  // Le formulaire tombe du camion quand la benne s'ouvre
   const cardY = useSharedValue(-260);
   const cardRot = useSharedValue(3);
   const cardOpacity = useSharedValue(0);
@@ -96,18 +101,13 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <LinearGradient
-          colors={[colors.primaryDark, colors.primaryMid, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
+        <ImageBackground
+          source={require('../assets/ref/logistique.jpg')}
+          style={styles.bg}
+          resizeMode="cover"
         >
-          {/* Blobs de fond */}
-          <AnimatedBlob size={520} color={colors.primaryLight} top={-120} left={-100} delay={0} />
-          <AnimatedBlob size={400} color={colors.secondary} bottom={-80} right={-80} delay={4000} />
-          <AnimatedBlob size={280} color={colors.accent} top="40%" left="55%" delay={7000} />
+          <View style={styles.overlay} />
 
-          {/* Camion — reste visible en haut pendant toute l'interaction */}
           <View style={styles.truckRow}>
             <TruckAnimation
               phase={phase}
@@ -118,56 +118,55 @@ export default function LoginScreen() {
             />
           </View>
 
-          {/* Formulaire — tombe depuis le camion */}
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             <Animated.View style={[styles.card, cardStyle]}>
-              {/* Logo */}
-              <View style={styles.logoWrapper}>
-                <LinearGradient
-                  colors={[colors.primaryLight, colors.accent]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.logoBox}
-                >
-                  <Text style={styles.logoEmoji}>🌿</Text>
-                </LinearGradient>
+
+              {/* Header vert — identité */}
+              <View style={styles.cardHeader}>
+                <AlchiLogo />
+                <Text style={styles.title}>AlchiRoute</Text>
+                <Text style={styles.tagline}>· LES ALCHIMISTES · VAR 83 ·</Text>
               </View>
 
-              <Text style={styles.title}>ArchAppli</Text>
-              <Text style={styles.tagline}>Collecte intelligente. Impact réel.</Text>
+              {/* Séparateur */}
+              <View style={styles.sep} />
 
-              <InputField
-                label="Email"
-                placeholder="votre@email.fr"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                editable={!loading}
-              />
+              {/* Zone formulaire — beige */}
+              <View style={styles.cardForm}>
+                <InputField
+                  label="Email"
+                  placeholder="votre@email.fr"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  editable={!loading}
+                />
 
-              <InputField
-                label="Mot de passe"
-                placeholder="••••••••"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoComplete="password"
-                editable={!loading}
-                onSubmitEditing={handleLogin}
-              />
+                <InputField
+                  label="Mot de passe"
+                  placeholder="••••••••"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoComplete="password"
+                  editable={!loading}
+                  onSubmitEditing={handleLogin}
+                />
 
-              <LoginButton onPress={handleLogin} loading={loading} />
+                <LoginButton onPress={handleLogin} loading={loading} />
 
-              <ErrorMessage message={error} visible={showError} />
+                <ErrorMessage message={error} visible={showError} />
+              </View>
+
             </Animated.View>
           </ScrollView>
-        </LinearGradient>
+        </ImageBackground>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -177,8 +176,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  gradient: {
+  bg: {
     flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 28, 15, 0.70)',
   },
   truckRow: {
     alignItems: 'center',
@@ -196,49 +199,46 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 480,
-    backgroundColor: 'rgba(180,210,195,0.22)',
-    borderRadius: 28,
-    padding: 40,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.25,
-    shadowRadius: 60,
-    elevation: 10,
-  },
-  logoWrapper: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  logoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#2D6A4F',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.45,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowRadius: 32,
+    elevation: 14,
   },
-  logoEmoji: {
-    fontSize: 34,
+  cardHeader: {
+    backgroundColor: '#1B3A28',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 28,
+    paddingBottom: 24,
+  },
+  sep: {
+    height: 3,
+    backgroundColor: '#2A7A3B',
+  },
+  cardForm: {
+    backgroundColor: '#EDE3CF',
+    paddingHorizontal: 28,
+    paddingTop: 24,
+    paddingBottom: 28,
   },
   title: {
-    color: '#ffffff',
-    fontSize: 34,
-    fontWeight: '800',
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '900',
     textAlign: 'center',
+    marginTop: 14,
     marginBottom: 6,
     letterSpacing: -0.5,
   },
   tagline: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 10,
     textAlign: 'center',
-    marginBottom: 36,
-    letterSpacing: 0.2,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    fontWeight: '600',
   },
 });
