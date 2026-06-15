@@ -4,6 +4,11 @@ from client import Client
 from datetime import date
 from flask_cors import CORS
 import threading
+import os
+from dotenv import load_dotenv
+
+# Chargement des variables d'environnement depuis le fichier .env (situé dans le dossier serveur)
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 from solveur_ortools import resoudre_et_exporter
 app = Flask(__name__)

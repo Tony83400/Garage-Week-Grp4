@@ -8,26 +8,45 @@ def heure_vers_minutes(heure_str):
     h, m, s = map(int, heure_str.split(':'))
     return h * 60 + m
 
+import os
+
 def calculer_distance_matrice(coordonnees):
     """
-    Appelle l'API OSRM pour obtenir la matrice de distances et de durées réelles.
-    OSRM attend des coordonnées au format : lon,lat
+    Appelle l'API OpenRouteService pour obtenir la matrice de distances pour CAMIONS.
     """
-    n = len(coordonnees)
+    # 1. Formatage des coordonnées pour ORS (liste de listes [lon, lat])
+    locations = [[lon, lat] for lat, lon in coordonnees]
     
-    # 1. Formatage des coordonnées pour OSRM (lon,lat;lon,lat;...)
-    coords_str = ";".join([f"{lon},{lat}" for lat, lon in coordonnees])
+    # Récupération de la clé API depuis les variables d'environnement
+    API_KEY = os.getenv("OPENROUTESERVICE_KEY")
     
-    # 2. Appel de l'API OSRM (Service /table)
-    url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
+    if not API_KEY or API_KEY == "votre_cle_ici":
+        print("Alerte : Clé OPENROUTESERVICE_KEY non configurée dans le .env. Fallback euclidien.")
+        return calculer_distance_euclidienne_fallback(coordonnees)
+
+    # 2. Appel de l'API Matrix de ORS avec le profil "driving-hgv" (poids lourd)
+    url = "https://api.openrouteservice.org/v2/matrix/driving-hgv"
+    
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    body = {
+        "locations": locations,
+        "metrics": ["distance", "duration"]
+    }
     
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.post(url, json=body, headers=headers, timeout=10)
+        
         if response.status_code == 200:
             data = response.json()
-            # Distances en mètres (int)
+            # Distances renvoyées en mètres (on convertit en int)
             distances = [[int(dist) for dist in row] for row in data['distances']]
-            # Durées en secondes converties en minutes (int)
+            
+            # Durées renvoyées en secondes (on convertit en minutes)
             durations = [[int(dur // 60) for dur in row] for row in data['durations']]
             
             return {
@@ -35,11 +54,11 @@ def calculer_distance_matrice(coordonnees):
                 "durations": durations
             }
         else:
-            print("Erreur OSRM, fallback vers distance euclidienne.")
+            print(f"Erreur API ORS ({response.status_code}): {response.text}")
             return calculer_distance_euclidienne_fallback(coordonnees)
             
     except Exception as e:
-        print(f"OSRM indisponible ({e}), fallback vers euclidienne.")
+        print(f"API OpenRouteService indisponible ({e}), fallback vers euclidienne.")
         return calculer_distance_euclidienne_fallback(coordonnees)
 
 def calculer_distance_euclidienne_fallback(coordonnees):
