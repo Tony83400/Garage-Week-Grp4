@@ -76,12 +76,125 @@ class TourneeRepository:
             return cursor.fetchall()
 
     def recuperer_depot_principal(self):
+        """Récupère les coordonnées du premier dépôt (La Farlède)."""
         with self.db_core.get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM depots LIMIT 1')
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    def preparer_donnees_reoptimisation(self, date_jour, heure_actuelle_min):
+        """
+        Prépare les données pour une ré-optimisation en cours de journée.
+        - Prend les points en 'erreur' et 'planifiee'.
+        - Pour les tournées 'demarree', le point de départ est la position du dernier client livré.
+        - Déduit la charge déjà à bord du camion.
+        """
+        data = {}
+        depot = self.recuperer_depot_principal()
+        DEPOT_LAT, DEPOT_LON = (depot['latitude'], depot['longitude']) if depot else (43.167, 6.043)
+        
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 1. Récupérer les shifts actifs ou futurs
+            cursor.execute('''
+                SELECT tj.id, tj.statut, c.charge_max_kg, c.bacs_max, tj.heure_debut_service, tj.heure_fin_service, ch.nom
+                FROM tournees_jour tj
+                JOIN camions c ON tj.camion_id = c.id
+                JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
+                WHERE tj.date_tournee = ? AND tj.statut IN ('demarree', 'affectee', 'brouillon')
+            ''', (date_jour,))
+            shifts = cursor.fetchall()
+            
+            # 2. Récupérer les tâches à (re)planifier
+            cursor.execute('''
+                SELECT t.id, t.bacs_prevus, t.poids_prevu_kg, c.latitude, c.longitude, c.nom_entreprise,
+                       dc.heure_debut, dc.heure_fin
+                FROM taches_collecte t
+                JOIN clients c ON t.client_id = c.id
+                LEFT JOIN disponibilites_clients dc ON dc.client_id = c.id 
+                     AND dc.jour_semaine = (STRFTIME('%w', ?) + 6) % 7 + 1
+                WHERE t.date_planifiee = ? 
+                AND t.statut IN ('en_attente', 'planifiee', 'erreur')
+            ''', (date_jour, date_jour))
+            taches_restantes = cursor.fetchall()
+
+            # --- Construction de la matrice ---
+            # Index 0 : Dépôt (point d'arrivée final de tout le monde)
+            coordonnees = [(DEPOT_LAT, DEPOT_LON)]
+            data['tache_ids'] = [None]
+            data['demands'] = [0]
+            data['weight_demands'] = [0]
+            data['time_windows'] = [(0, 1440)]
+            data['infos_geo'] = {0: {"nom": "Dépôt", "lat": DEPOT_LAT, "lon": DEPOT_LON}}
+
+            # Indices 1 à N : Les clients à visiter
+            for t in taches_restantes:
+                tid, bacs, poids, lat, lon, nom, hs, he = t
+                data['tache_ids'].append(tid)
+                data['demands'].append(bacs)
+                data['weight_demands'].append(poids)
+                data['time_windows'].append((heure_vers_minutes(hs), heure_vers_minutes(he)) if hs and he else (0, 1440))
+                coordonnees.append((lat, lon))
+                data['infos_geo'][len(coordonnees)-1] = {"nom": nom, "lat": lat, "lon": lon}
+
+            num_tasks = len(taches_restantes)
+            
+            # Indices N+1 à N+V : Les points de départ actuels de chaque camion
+            data['starts'] = []
+            data['ends'] = []
+            data['vehicle_capacities'] = []
+            data['vehicle_weights'] = []
+            data['vehicle_time_windows'] = []
+            data['shift_ids'] = []
+            
+            for s_id, statut, c_kg, c_bacs, h_start, h_end, ch_nom in shifts:
+                data['shift_ids'].append(s_id)
+                data['ends'].append(0) # Tout le monde finit au dépôt
+                
+                if statut == 'demarree':
+                    # Trouver le dernier point terminé
+                    cursor.execute('''
+                        SELECT c.latitude, c.longitude, SUM(t.poids_prevu_kg), SUM(t.bacs_prevus)
+                        FROM taches_collecte t
+                        JOIN clients c ON t.client_id = c.id
+                        WHERE t.tournee_id = ? AND t.statut = 'terminee'
+                        ORDER BY t.ordre_passage DESC LIMIT 1
+                    ''', (s_id,))
+                    last_pos = cursor.fetchone()
+                    
+                    if last_pos and last_pos[0]:
+                        lat, lon, poids_done, bacs_done = last_pos
+                        coordonnees.append((lat, lon))
+                        data['starts'].append(len(coordonnees) - 1)
+                        # Capacité restante
+                        data['vehicle_weights'].append(max(0, c_kg - (poids_done or 0)))
+                        data['vehicle_capacities'].append(max(0, c_bacs - (bacs_done or 0)))
+                        # Il part MAINTENANT
+                        data['vehicle_time_windows'].append((heure_actuelle_min, heure_vers_minutes(h_end)))
+                    else:
+                        # Pas encore de point terminé, il part du dépôt maintenant
+                        data['starts'].append(0)
+                        data['vehicle_weights'].append(c_kg)
+                        data['vehicle_capacities'].append(c_bacs)
+                        data['vehicle_time_windows'].append((heure_actuelle_min, heure_vers_minutes(h_end)))
+                else:
+                    # Tournée non commencée, part du dépôt à son heure prévue (ou maintenant si en retard)
+                    data['starts'].append(0)
+                    data['vehicle_weights'].append(c_kg)
+                    data['vehicle_capacities'].append(c_bacs)
+                    h_dep_min = max(heure_actuelle_min, heure_vers_minutes(h_start))
+                    data['vehicle_time_windows'].append((h_dep_min, heure_vers_minutes(h_end)))
+
+            data['num_vehicles'] = len(data['starts'])
+            matrices = calculer_distance_matrice(coordonnees)
+            data['distance_matrix'] = matrices['distances']
+            data['time_matrix'] = matrices['durations']
+            data['depot'] = 0
+            
+            return data
 
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
         data = {}
@@ -162,6 +275,13 @@ class TourneeRepository:
 
             return data
 
+    def mettre_a_jour_statut_tournee(self, tournee_id, statut):
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE tournees_jour SET statut = ? WHERE id = ?', (statut, tournee_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
     def valider_collecte(self, tache_id, bacs_reels):
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
@@ -179,13 +299,60 @@ class TourneeRepository:
     def recuperer_tournee_chauffeur(self, chauffeur_id, date_jour):
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''SELECT ch.prenom || ' ' || ch.nom, c.immatriculation, c.charge_max_kg, tj.heure_debut_service FROM tournees_jour tj JOIN chauffeurs ch ON tj.chauffeur_id = ch.id JOIN camions c ON tj.camion_id = c.id WHERE tj.chauffeur_id = ? AND tj.date_tournee = ?''', (chauffeur_id, date_jour))
-            info = cursor.fetchone()
-            if not info: return None
-            chauffeur_nom, immat, cap, h_depart = info
-            cursor.execute('''SELECT t.id, t.statut, t.bacs_prevus, t.poids_prevu_kg, t.ordre_passage, c.nom_entreprise, c.latitude, c.longitude FROM taches_collecte t JOIN clients c ON t.client_id = c.id JOIN tournees_jour tj ON t.tournee_id = tj.id WHERE tj.chauffeur_id = ? AND tj.date_tournee = ? ORDER BY t.ordre_passage ASC''', (chauffeur_id, date_jour))
-            arrets = [{"tache_id": l[0], "statut": l[1], "bacs_prevus": l[2], "poids_prevu_kg": l[3], "ordre": l[4], "client_nom": l[5], "latitude": l[6], "longitude": l[7]} for l in cursor.fetchall()]
-            return {"chauffeur": chauffeur_nom, "vehicule": f"VL{chauffeur_id}", "immatriculation": immat, "capacite_max_kg": cap, "heure_depart": h_depart, "arrets": arrets}
+            
+            # 1. Sélectionner la PROCHAINE tournée à faire pour ce chauffeur
+            # On cherche soit celle 'demarree', soit la première 'affectee' (Trip 1, puis Trip 2, etc.)
+            cursor.execute('''
+                SELECT tj.id, ch.prenom || ' ' || ch.nom, c.immatriculation, c.charge_max_kg, tj.heure_debut_service, tj.statut
+                FROM tournees_jour tj
+                JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
+                JOIN camions c ON tj.camion_id = c.id
+                WHERE tj.chauffeur_id = ? AND tj.date_tournee = ? 
+                AND tj.statut IN ('demarree', 'affectee')
+                ORDER BY CASE WHEN tj.statut = 'demarree' THEN 0 ELSE 1 END ASC, tj.id ASC
+                LIMIT 1
+            ''', (chauffeur_id, date_jour))
+            
+            tournee_info = cursor.fetchone()
+            if not tournee_info:
+                return None
+                
+            tournee_bdd_id, chauffeur_nom, immatriculation, capacite, heure_depart, statut = tournee_info
+
+            # 2. Liste des arrêts pour CETTE tournée spécifique
+            cursor.execute('''
+                SELECT t.id, t.statut, t.bacs_prevus, t.poids_prevu_kg, t.ordre_passage,
+                       c.nom_entreprise, c.latitude, c.longitude
+                FROM taches_collecte t
+                JOIN clients c ON t.client_id = c.id
+                WHERE t.tournee_id = ?
+                ORDER BY t.ordre_passage ASC
+            ''', (tournee_bdd_id,))
+            
+            lignes = cursor.fetchall()
+            arrets = []
+            for l in lignes:
+                arrets.append({
+                    "tache_id": l[0],
+                    "statut": l[1],
+                    "bacs_prevus": l[2],
+                    "poids_prevu_kg": l[3],
+                    "ordre": l[4],
+                    "client_nom": l[5],
+                    "latitude": l[6],
+                    "longitude": l[7]
+                })
+                
+            return {
+                "tournee_id": tournee_bdd_id,
+                "chauffeur": chauffeur_nom,
+                "vehicule": f"VL{chauffeur_id}", 
+                "immatriculation": immatriculation,
+                "capacite_max_kg": capacite,
+                "heure_depart": heure_depart,
+                "statut": statut,
+                "arrets": arrets
+            }
 
     def get_dashboard_stats(self, date_jour):
         with self.db_core.get_connection() as conn:

@@ -124,6 +124,18 @@ def api_get_tournee_chauffeur(chauffeur_id):
         return jsonify({"message": "Aucune tournée planifiée pour ce chauffeur aujourd'hui."}), 200
     return jsonify(tournee), 200
 
+@app.route('/api/chauffeur/tournee/<int:tournee_id>/statut', methods=['POST'])
+def api_update_statut_tournee(tournee_id):
+    """Permet au chauffeur de démarrer ou terminer sa tournée."""
+    data = request.get_json() or {}
+    nouveau_statut = data.get('statut')
+    
+    if nouveau_statut not in ['demarree', 'terminee']:
+        return jsonify({"erreur": "Statut invalide."}), 400
+        
+    db.mettre_a_jour_statut_tournee(tournee_id, nouveau_statut)
+    return jsonify({"message": f"Tournée {nouveau_statut} avec succès."}), 200
+
 @app.route('/api/chauffeur/tache/<int:tache_id>/statut', methods=['POST'])
 def api_update_statut_tache(tache_id):
     """
@@ -273,6 +285,46 @@ def api_optimiser_tournees():
         return jsonify({"erreur": f"Erreur lors de l'optimisation : {str(e)}"}), 500 
 
 
+
+@app.route('/api/planning/reoptimiser', methods=['POST'])
+def api_reoptimiser_tournees():
+    """
+    Ré-optimisation en cours de journée (Real-Time VRP).
+    Prend en compte la position actuelle des camions et les imprévus.
+    """
+    data_req = request.get_json() or {}
+    date_cible = data_req.get('date', date.today().isoformat())
+    
+    # Heure actuelle en minutes (ex: 14:30 -> 14*60 + 30 = 870)
+    now = datetime.datetime.now()
+    heure_actuelle_min = now.hour * 60 + now.minute
+
+    try:
+        # 1. Préparation des données spécifiques au re-routage
+        data_ortools = db.preparer_donnees_reoptimisation(date_cible, heure_actuelle_min)
+        
+        if not data_ortools or data_ortools['num_vehicles'] == 0:
+            return jsonify({"erreur": "Aucun shift actif ou futur pour cette date."}), 400
+            
+        if len(data_ortools.get('tache_ids', [])) <= 1:
+            return jsonify({"erreur": "Aucune tâche à ré-optimiser."}), 400
+
+        # 2. Exécution du solveur
+        resultats_ia = resoudre_et_exporter(data_ortools)
+        
+        if not resultats_ia:
+            return jsonify({"erreur": "Échec de la ré-optimisation (aucune solution)."}), 500
+        
+        # 3. Sauvegarde
+        db.sauvegarder_resultat_optimisation(date_cible, resultats_ia, data_ortools)
+        
+        return jsonify({
+            "message": "Ré-optimisation réussie !",
+            "points_non_affectes": resultats_ia.get('dropped_nodes', [])
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"erreur": f"Erreur ré-optimisation : {str(e)}"}), 500
 
 @app.route('/api/ressources/camions', methods=['GET'])
 def get_camions():

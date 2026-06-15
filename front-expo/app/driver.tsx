@@ -15,7 +15,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../constants/colors';
-import { getTournee, updateStatutTache, type TourneeDetails, type Arret } from '../services/chauffeur';
+import { getTournee, updateStatutTache, updateStatutTournee, type TourneeDetails, type Arret } from '../services/chauffeur';
+
+// ... (dans le composant)
+
+  async function handleStartTournee() {
+    if (!(tournee as any)?.tournee_id) return;
+    try {
+      await updateStatutTournee((tournee as any).tournee_id, 'demarree');
+      showToast('Tournée démarrée !');
+      await fetchTournee();
+    } catch {
+      showToast('Erreur lors du démarrage');
+    }
+  }
+
+  async function handleFinishTournee() {
+    if (!(tournee as any)?.tournee_id) return;
+    try {
+      await updateStatutTournee((tournee as any).tournee_id, 'terminee');
+      showToast('Trajet terminé !');
+      await fetchTournee();
+    } catch {
+      showToast('Erreur lors de la validation finale');
+    }
+  }
 import BlueBoBModal from '../components/BlueBoBModal';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
@@ -49,24 +73,37 @@ export default function DriverScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const logoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    async function fetchTournee() {
-      try {
-        const data = await getTournee(chauffeurId, DATE_DEMO);
-        if (data && data.arrets) {
-          setTournee(data);
-          setStops(data.arrets.filter(a => a.statut !== 'terminee' && a.statut !== 'erreur'));
-          const alreadyCollected = data.arrets
-            .filter(a => a.statut === 'terminee')
-            .reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0);
-          setCollectedKg(alreadyCollected);
+  async function fetchTournee() {
+    try {
+      const data = await getTournee(chauffeurId, DATE_DEMO);
+      if (data && data.arrets) {
+        setTournee(data);
+        const remaining = data.arrets.filter(a => a.statut !== 'terminee' && a.statut !== 'erreur');
+        setStops(remaining);
+        
+        const alreadyCollected = data.arrets
+          .filter(a => a.statut === 'terminee')
+          .reduce((acc, a) => acc + (a.poids_prevu_kg || 0), 0);
+        setCollectedKg(alreadyCollected);
+        
+        if (remaining.length === 0) {
+          const now = new Date();
+          setFinishedAt(now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+        } else {
+          setFinishedAt(null);
         }
-      } catch (e) {
-        console.error('Erreur chargement tournée :', e);
-      } finally {
-        setLoading(false);
+      } else {
+        setTournee(null);
+        setStops([]);
       }
+    } catch (e) {
+      console.error('Erreur chargement tournée :', e);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     fetchTournee();
   }, []);
 
@@ -84,13 +121,6 @@ export default function DriverScreen() {
     }).start();
   }, [kgProgressPct]);
 
-  useEffect(() => {
-    if (!loading && stops.length === 0 && totalArrets > 0 && !finishedAt) {
-      const now = new Date();
-      setFinishedAt(now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
-    }
-  }, [stops.length, loading]);
-
   function showToast(msg: string) {
     setToast(msg);
     Animated.sequence([
@@ -98,6 +128,28 @@ export default function DriverScreen() {
       Animated.delay(2000),
       Animated.timing(toastOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start(() => setToast(null));
+  }
+
+  async function handleStartTournee() {
+    if (!(tournee as any)?.tournee_id) return;
+    try {
+      await updateStatutTournee((tournee as any).tournee_id, 'demarree');
+      showToast('Tournée démarrée !');
+      await fetchTournee();
+    } catch {
+      showToast('Erreur lors du démarrage');
+    }
+  }
+
+  async function handleFinishTournee() {
+    if (!(tournee as any)?.tournee_id) return;
+    try {
+      await updateStatutTournee((tournee as any).tournee_id, 'terminee');
+      showToast('Trajet terminé !');
+      await fetchTournee();
+    } catch {
+      showToast('Erreur lors de la validation finale');
+    }
   }
 
   function handleLogoutPress() {
@@ -219,7 +271,18 @@ export default function DriverScreen() {
           <View style={s.emptyIcon}>
             <Ionicons name="checkmark-circle" size={52} color={colors.status.terminee.fg} />
           </View>
-          <Text style={s.emptyTitle}>Tournée terminée !</Text>
+          <Text style={s.emptyTitle}>{tournee ? 'Trip terminé !' : 'Journée terminée !'}</Text>
+
+          {tournee && (
+            <TouchableOpacity 
+              style={s.btnNextTrip} 
+              onPress={handleFinishTournee}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="flag-outline" size={24} color="#fff" />
+              <Text style={s.btnNextTripText}>Valider et clore ce trajet</Text>
+            </TouchableOpacity>
+          )}
 
           {(tournee?.heure_depart || finishedAt) && (
             <Text style={s.emptyTime}>
@@ -256,15 +319,30 @@ export default function DriverScreen() {
           {/* Hero — prochain arrêt */}
           {stops[0] && (
             <View style={s.heroCard}>
-              <View style={s.heroTopRow}>
-                <View style={s.heroLabel}>
-                  <View style={s.heroDot} />
-                  <Text style={s.heroLabelText}>Prochain arrêt</Text>
+              {(tournee as any)?.statut === 'affectee' ? (
+                <View style={s.startTripContainer}>
+                  <Text style={s.startTripTitle}>Nouvelle tournée prête</Text>
+                  <Text style={s.startTripSub}>Cliquez pour commencer l'itinéraire</Text>
+                  <TouchableOpacity
+                    style={s.btnStartTournee}
+                    onPress={handleStartTournee}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="play" size={24} color="#fff" />
+                    <Text style={s.btnStartTourneeText}>Démarrer la tournée</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={s.heroNumBadge}>
-                  <Text style={s.heroNumText}>#{stops[0].ordre || 1} sur {totalArrets}</Text>
-                </View>
-              </View>
+              ) : (
+                <>
+                  <View style={s.heroTopRow}>
+                    <View style={s.heroLabel}>
+                      <View style={s.heroDot} />
+                      <Text style={s.heroLabelText}>Prochain arrêt</Text>
+                    </View>
+                    <View style={s.heroNumBadge}>
+                      <Text style={s.heroNumText}>#{stops[0].ordre || 1} sur {totalArrets}</Text>
+                    </View>
+                  </View>
 
               <Text style={s.heroClientName} numberOfLines={2}>{stops[0].client_nom}</Text>
               <Text style={s.heroPoids}>{stops[0].poids_prevu_kg} kg à collecter</Text>
@@ -813,6 +891,57 @@ const s = StyleSheet.create({
     color: colors.textMuted,
     textDecorationLine: 'underline',
     marginTop: 8,
+  },
+  btnNextTrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 24,
+  },
+  btnNextTripText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  // Start trip container
+  startTripContainer: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  startTripTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  startTripSub: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: 20,
+  },
+  btnStartTournee: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  btnStartTourneeText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 
   // Confirmation modal

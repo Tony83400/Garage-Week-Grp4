@@ -46,6 +46,11 @@ export async function optimiserTournees(date: string): Promise<any> {
   return await api.post('/api/planning/optimiser', { date });
 }
 
+// 3bis. Déclencher la ré-optimisation en cours de journée (Real-Time VRP)
+export async function reoptimiserTournees(date: string): Promise<any> {
+  return await api.post('/api/planning/reoptimiser', { date });
+}
+
 // 4. Contexte du jour pour la PrepCard
 export async function getPlanningPreview(date: string): Promise<{ clients_dispo: number; chauffeurs_dispo: number }> {
   try {

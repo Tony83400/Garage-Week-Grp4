@@ -13,7 +13,19 @@ def resoudre_et_exporter(data):
     """Configuration et exécution du solveur OR-Tools"""
     
     print("Initialisation du Routing Model...")
-    manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), data['num_vehicles'], data['depot'])
+    
+    # NOUVEAUTÉ : Gestion des départs/arrivées multiples (Re-routage Real-Time)
+    if 'starts' in data and 'ends' in data:
+        manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), 
+                                               data['num_vehicles'], 
+                                               data['starts'], 
+                                               data['ends'])
+    else:
+        # Mode classique (tout le monde part du dépôt)
+        manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), 
+                                               data['num_vehicles'], 
+                                               data['depot'])
+    
     routing = pywrapcp.RoutingModel(manager)
 
     # 1. CONTRAINTE DE DISTANCE

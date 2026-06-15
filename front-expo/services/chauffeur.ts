@@ -12,6 +12,8 @@ export interface Arret {
 }
 
 export interface TourneeDetails {
+  tournee_id: number;
+  statut: 'affectee' | 'demarree' | 'terminee';
   chauffeur: string;
   vehicule: string;
   immatriculation: string;
@@ -35,6 +37,14 @@ export interface UpdateStatutPayload {
 export function updateStatutTache(tache_id: number, payload: UpdateStatutPayload) {
   return api.post<{ message: string; statut_enregistre: string; bacs_reels: number }>(
     `/api/chauffeur/tache/${tache_id}/statut`,
-    payload,
+    payload
   );
 }
+
+export function updateStatutTournee(tournee_id: number, statut: 'demarree' | 'terminee') {
+  return api.post<{ message: string }>(
+    `/api/chauffeur/tournee/${tournee_id}/statut`,
+    { statut }
+  );
+}
+
