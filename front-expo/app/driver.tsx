@@ -16,30 +16,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../constants/colors';
 import { getTournee, updateStatutTache, updateStatutTournee, type TourneeDetails, type Arret } from '../services/chauffeur';
-
-// ... (dans le composant)
-
-  async function handleStartTournee() {
-    if (!(tournee as any)?.tournee_id) return;
-    try {
-      await updateStatutTournee((tournee as any).tournee_id, 'demarree');
-      showToast('Tournée démarrée !');
-      await fetchTournee();
-    } catch {
-      showToast('Erreur lors du démarrage');
-    }
-  }
-
-  async function handleFinishTournee() {
-    if (!(tournee as any)?.tournee_id) return;
-    try {
-      await updateStatutTournee((tournee as any).tournee_id, 'terminee');
-      showToast('Trajet terminé !');
-      await fetchTournee();
-    } catch {
-      showToast('Erreur lors de la validation finale');
-    }
-  }
 import BlueBoBModal from '../components/BlueBoBModal';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
@@ -382,8 +358,10 @@ export default function DriverScreen() {
               >
                 <Text style={s.heroSkipText}>Signaler un imprévu</Text>
               </TouchableOpacity>
-            </View>
+            </>
           )}
+        </View>
+      )}
 
           {/* Arrêts suivants — lecture seule, pas de boutons */}
           {stops.length > 1 && (
