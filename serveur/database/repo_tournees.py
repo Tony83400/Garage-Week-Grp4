@@ -10,7 +10,7 @@ def heure_vers_minutes(heure_str):
 
 def calculer_distance_matrice(coordonnees):
     """
-    Appelle l'API OSRM pour obtenir la matrice de distances réelles.
+    Appelle l'API OSRM pour obtenir la matrice de distances et de durées réelles.
     OSRM attend des coordonnées au format : lon,lat
     """
     n = len(coordonnees)
@@ -19,15 +19,21 @@ def calculer_distance_matrice(coordonnees):
     coords_str = ";".join([f"{lon},{lat}" for lat, lon in coordonnees])
     
     # 2. Appel de l'API OSRM (Service /table)
-    url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=distance"
+    url = f"http://router.project-osrm.org/table/v1/driving/{coords_str}?annotations=duration,distance"
     
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            # La matrice est renvoyée en mètres. 
-            # OR-Tools préfère des entiers (1m = 1 unité)
-            return [[int(dist) for dist in row] for row in data['distances']]
+            # Distances en mètres (int)
+            distances = [[int(dist) for dist in row] for row in data['distances']]
+            # Durées en secondes converties en minutes (int)
+            durations = [[int(dur // 60) for dur in row] for row in data['durations']]
+            
+            return {
+                "distances": distances,
+                "durations": durations
+            }
         else:
             print("Erreur OSRM, fallback vers distance euclidienne.")
             return calculer_distance_euclidienne_fallback(coordonnees)
@@ -37,16 +43,27 @@ def calculer_distance_matrice(coordonnees):
         return calculer_distance_euclidienne_fallback(coordonnees)
 
 def calculer_distance_euclidienne_fallback(coordonnees):
-    """Ton ancienne fonction de secours si OSRM échoue"""
+    """Ancienne fonction de secours si OSRM échoue"""
     n = len(coordonnees)
-    matrice = [[0] * n for _ in range(n)]
+    matrice_dist = [[0] * n for _ in range(n)]
+    matrice_time = [[0] * n for _ in range(n)]
+    
     for i in range(n):
         for j in range(n):
             if i != j:
+                # Distance euclidienne simplifiée
                 dist = math.sqrt((coordonnees[i][0] - coordonnees[j][0])**2 + 
                                  (coordonnees[i][1] - coordonnees[j][1])**2)
-                matrice[i][j] = int(dist * 100000) # Un peu plus grand pour la précision
-    return matrice
+                # On multiplie par un facteur pour simuler des mètres
+                dist_metres = int(dist * 100000)
+                matrice_dist[i][j] = dist_metres
+                # Temps estimé : distance / 500
+                matrice_time[i][j] = dist_metres // 500
+                
+    return {
+        "distances": matrice_dist,
+        "durations": matrice_time
+    }
 
 class TourneeRepository:
     def __init__(self, db_core):
@@ -151,10 +168,9 @@ class TourneeRepository:
                 data['infos_geo'][index] = {"nom": nom, "lat": lat, "lon": lon}
                 data['time_windows'].append((MIN_GLOBAL, MAX_GLOBAL))
 
-            data['distance_matrix'] = calculer_distance_matrice(coordonnees)
-            
-            # MODE SAFE : On divise les valeurs de l'API OSRM si elles sont en secondes
-            data['time_matrix'] = [[int(val/60) if val > 500 else val for val in row] for row in data['distance_matrix']]
+            matrices = calculer_distance_matrice(coordonnees)
+            data['distance_matrix'] = matrices['distances']
+            data['time_matrix'] = matrices['durations']
 
             return data
 
@@ -496,13 +512,14 @@ class TourneeRepository:
                 pos_lon = pos[1] if pos else DEPOT_LON
 
                 try:
-                    mat = calculer_distance_matrice([
+                    matrices = calculer_distance_matrice([
                         (pos_lat, pos_lon),
                         (lat_o, lon_o),
                         (DEPOT_LAT, DEPOT_LON),
                     ])
-                    t_vers_client = mat[0][1] // 500  # mètres → minutes (≈30 km/h)
-                    t_vers_depot  = mat[1][2] // 500
+                    # Utilisation de la matrice de durées directement
+                    t_vers_client = matrices['durations'][0][1]
+                    t_vers_depot  = matrices['durations'][1][2]
                 except Exception:
                     continue
 

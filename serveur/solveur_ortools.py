@@ -133,7 +133,7 @@ def resoudre_et_exporter(data):
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
         temps_service = 15 if from_node != data['depot'] else 0
-        temps_trajet = data['distance_matrix'][from_node][to_node] // 500
+        temps_trajet = data['time_matrix'][from_node][to_node]
         return temps_service + temps_trajet
 
     time_callback_index = routing.RegisterTransitCallback(time_callback)
