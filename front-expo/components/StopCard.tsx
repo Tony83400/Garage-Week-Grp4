@@ -10,6 +10,7 @@ export type Stop = {
   nom: string;
   ville: string;
   poidsPrevu: number;
+  type_imprevu?: string | null;
 };
 
 interface Props {
@@ -23,6 +24,9 @@ export default function StopCard({ stop, isFirst, onValidate, onSkip }: Props) {
   const opacity = useRef(new Animated.Value(1)).current;
   const translateX = useRef(new Animated.Value(0)).current;
 
+  // On détecte si l'arrêt provient d'une réassignation IA
+  const isReassigned = stop.type_imprevu === 'integre_dynamiquement' || stop.type_imprevu === 'replanifie';
+
   function animate(direction: 1 | -1, callback: () => void) {
     Animated.parallel([
       Animated.timing(opacity, { toValue: 0, duration: 270, useNativeDriver: true }),
@@ -31,7 +35,7 @@ export default function StopCard({ stop, isFirst, onValidate, onSkip }: Props) {
   }
 
   return (
-    <Animated.View style={[s.card, { opacity, transform: [{ translateX }] }]}>
+    <Animated.View style={[s.card, isReassigned && s.cardReassigned, { opacity, transform: [{ translateX }] }]}>
       <View style={s.row}>
         {isFirst ? (
           <LinearGradient
@@ -49,7 +53,10 @@ export default function StopCard({ stop, isFirst, onValidate, onSkip }: Props) {
         )}
 
         <View style={s.info}>
-          <Text style={s.name} numberOfLines={1}>{stop.nom}</Text>
+          {/* Couleur verte si réassigné */}
+          <Text style={[s.name, isReassigned && { color: '#27AE60' }]} numberOfLines={1}>
+            {stop.nom} {isReassigned ? '✨ (Réassigné)' : ''}
+          </Text>
           <Text style={s.ville}>{stop.ville}</Text>
           <Text style={s.poids}>~{stop.poidsPrevu} kg prévus</Text>
         </View>
@@ -87,6 +94,12 @@ const s = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
     elevation: 3,
+  },
+  cardReassigned: {
+    backgroundColor: '#E8F5EE',
+    borderColor: '#2ECC71',
+    borderLeftWidth: 4,
+    borderLeftColor: '#27AE60',
   },
   row: {
     flexDirection: 'row',

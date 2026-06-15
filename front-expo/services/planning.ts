@@ -1,6 +1,7 @@
 import { api } from './api';
 
 export interface TourneeAdmin {
+  tournee_id: number;
   chauffeur_id: number;
   chauffeur: string;
   vehicule: string;
@@ -17,6 +18,7 @@ export interface TourneeAdmin {
     latitude?: number;
     longitude?: number;
     heure_estimee?: string;
+    type_imprevu?: string | null;
   }[];
 }
 

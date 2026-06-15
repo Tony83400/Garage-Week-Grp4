@@ -18,3 +18,11 @@ export function getImprevus(date?: string) {
 export function replanifierImprevu(tache_id: number) {
   return api.post<{ message: string }>(`/api/imprevus/${tache_id}/replanifier`, {});
 }
+
+// AJOUT DE LA NOUVELLE FONCTION
+export function reassignerImprevuDynamique(tache_id: number, tournee_id: number) {
+  return api.post<{ message: string }>('/api/tournees/recalcul-dynamique', {
+    tache_id,
+    tournee_id
+  });
+}

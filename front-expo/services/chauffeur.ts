@@ -9,6 +9,7 @@ export interface Arret {
   client_nom: string;
   latitude: number;
   longitude: number;
+  type_imprevu?: string | null;
 }
 
 export interface TourneeDetails {

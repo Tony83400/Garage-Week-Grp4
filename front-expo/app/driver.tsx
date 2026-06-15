@@ -294,7 +294,10 @@ export default function DriverScreen() {
 
           {/* Hero — prochain arrêt */}
           {stops[0] && (
-            <View style={s.heroCard}>
+            <View style={[
+              s.heroCard, 
+              (stops[0].type_imprevu === 'integre_dynamiquement' || stops[0].type_imprevu === 'replanifie') && { backgroundColor: '#E8F5EE', borderColor: '#2ECC71', borderLeftWidth: 5 }
+            ]}>
               {(tournee as any)?.statut === 'affectee' ? (
                 <View style={s.startTripContainer}>
                   <Text style={s.startTripTitle}>Nouvelle tournée prête</Text>
@@ -312,15 +315,19 @@ export default function DriverScreen() {
                 <>
                   <View style={s.heroTopRow}>
                     <View style={s.heroLabel}>
-                      <View style={s.heroDot} />
-                      <Text style={s.heroLabelText}>Prochain arrêt</Text>
+                      <View style={[s.heroDot, (stops[0].type_imprevu === 'integre_dynamiquement' || stops[0].type_imprevu === 'replanifie') && { backgroundColor: '#27AE60' }]} />
+                      <Text style={[s.heroLabelText, (stops[0].type_imprevu === 'integre_dynamiquement' || stops[0].type_imprevu === 'replanifie') && { color: '#27AE60' }]}>
+                        {stops[0].type_imprevu === 'integre_dynamiquement' || stops[0].type_imprevu === 'replanifie' ? '✨ Arrêt Réassigné' : 'Prochain arrêt'}
+                      </Text>
                     </View>
                     <View style={s.heroNumBadge}>
                       <Text style={s.heroNumText}>#{stops[0].ordre || 1} sur {totalArrets}</Text>
                     </View>
                   </View>
 
-              <Text style={s.heroClientName} numberOfLines={2}>{stops[0].client_nom}</Text>
+              <Text style={[s.heroClientName, (stops[0].type_imprevu === 'integre_dynamiquement' || stops[0].type_imprevu === 'replanifie') && { color: '#1B5E20' }]} numberOfLines={2}>
+                {stops[0].client_nom}
+              </Text>
               <Text style={s.heroPoids}>{stops[0].poids_prevu_kg} kg à collecter</Text>
 
               <TouchableOpacity
@@ -376,12 +383,14 @@ export default function DriverScreen() {
                 {stops.slice(1).map((stop, i) => (
                   <React.Fragment key={stop.tache_id}>
                     {i > 0 && <View style={s.listDivider} />}
-                    <View style={s.listItem}>
-                      <View style={s.listNum}>
-                        <Text style={s.listNumText}>{stop.ordre || i + 2}</Text>
+                    <View style={[s.listItem, (stop.type_imprevu === 'integre_dynamiquement' || stop.type_imprevu === 'replanifie') && { backgroundColor: '#E8F5EE' }]}>
+                      <View style={[s.listNum, (stop.type_imprevu === 'integre_dynamiquement' || stop.type_imprevu === 'replanifie') && { backgroundColor: '#C8E8D4' }]}>
+                        <Text style={[s.listNumText, (stop.type_imprevu === 'integre_dynamiquement' || stop.type_imprevu === 'replanifie') && { color: '#27AE60' }]}>{stop.ordre || i + 2}</Text>
                       </View>
                       <View style={s.listInfo}>
-                        <Text style={s.listName} numberOfLines={1}>{stop.client_nom}</Text>
+                        <Text style={[s.listName, (stop.type_imprevu === 'integre_dynamiquement' || stop.type_imprevu === 'replanifie') && { color: '#27AE60' }]} numberOfLines={1}>
+                          {stop.client_nom} { (stop.type_imprevu === 'integre_dynamiquement' || stop.type_imprevu === 'replanifie') ? '✨' : ''}
+                        </Text>
                         <Text style={s.listPoids}>{stop.poids_prevu_kg} kg</Text>
                       </View>
                     </View>

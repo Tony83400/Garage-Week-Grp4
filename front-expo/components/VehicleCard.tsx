@@ -226,7 +226,9 @@ export default function VehicleCard({
 
                   {/* Contenu */}
                   <View style={s.stopContent}>
-                    <Text style={s.stopName} numberOfLines={1}>{a.client_nom}</Text>
+                    <Text style={[s.stopName, (a.type_imprevu === 'integre_dynamiquement' || a.type_imprevu === 'replanifie') && { color: '#27AE60' }]} numberOfLines={1}>
+                      {a.client_nom} { (a.type_imprevu === 'integre_dynamiquement' || a.type_imprevu === 'replanifie') ? '✨' : ''}
+                    </Text>
                     {a.heure_estimee && <Text style={s.stopTime}>{a.heure_estimee}</Text>}
                   </View>
 

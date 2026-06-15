@@ -98,7 +98,8 @@ export default function PlanningScreen() {
             latitude: (a as any).latitude || 0,
             longitude: (a as any).longitude || 0,
             ordre: a.ordre,
-            heure_estimee: a.heure_estimee
+            heure_estimee: a.heure_estimee,
+            type_imprevu: a.type_imprevu
           }))
         }));
         console.log("=== LOG 3 : ROWS PRÊTES POUR L'AFFICHAGE ===");

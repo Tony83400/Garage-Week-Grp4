@@ -65,6 +65,9 @@ class DatabaseManager:
 
     def recuperer_taches_du_jour(self, date_jour):
         return self.repo_tournees.recuperer_taches_du_jour(date_jour)
+    
+    def remettre_imprevu_en_attente(self,tache_id):
+        return self.repo_tournees.remettre_imprevu_en_attente(tache_id)
 
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
         return self.repo_tournees.preparer_donnees_ortools(date_jour, depot_lat, depot_lon)

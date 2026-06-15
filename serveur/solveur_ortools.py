@@ -100,10 +100,24 @@ def resoudre_et_exporter(data):
     if 'groupes_vehicules' in data:
         groupes = data['groupes_vehicules']
         DUREE_VIDAGE = 30 # minutes entre deux trips
-        for v in range(data['num_vehicles'] - 1):
-            if groupes[v] == groupes[v+1]:
-                # Trip v+1 commence APRÈS la fin du Trip v + vidage
-                routing.solver().Add(time_dimension.CumulVar(routing.Start(v+1)) >= time_dimension.CumulVar(routing.End(v)) + DUREE_VIDAGE)
+        
+        # On regroupe les index de véhicules par groupe (chauffeur)
+        vehicules_par_groupe = {}
+        for v in range(data['num_vehicles']):
+            g = groupes[v]
+            if g not in vehicules_par_groupe:
+                vehicules_par_groupe[g] = []
+            vehicules_par_groupe[g].append(v)
+            
+        # Pour chaque chauffeur, on impose que le trip N+1 commence après le trip N
+        for g, v_indices in vehicules_par_groupe.items():
+            for i in range(len(v_indices) - 1):
+                v_courant = v_indices[i]
+                v_suivant = v_indices[i+1]
+                routing.solver().Add(
+                    time_dimension.CumulVar(routing.Start(v_suivant)) >= 
+                    time_dimension.CumulVar(routing.End(v_courant)) + DUREE_VIDAGE
+                )
 
     # 5. PÉNALITÉS ET COUTS FIXES
     # Coût fixe réduit à 50 000 pour équilibrer avec les distances 

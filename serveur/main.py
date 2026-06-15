@@ -190,10 +190,10 @@ def get_imprevus():
 
 @app.route('/api/imprevus/<int:tache_id>/replanifier', methods=['POST'])
 def replanifier_imprevu(tache_id):
-    # Remet la tâche en attente, annule les bacs réels et réinitialise le commentaire
-    succes = db.mettre_a_jour_statut_etape(tache_id, 'en_attente', 0, "Replanifié par l'administration")
+    # On détache l'arrêt du camion en cours et on le protège
+    succes = db.remettre_imprevu_en_attente(tache_id)
     if succes:
-        return jsonify({"message": "Tâche replanifiée avec succès."}), 200
+        return jsonify({"message": "Tâche détachée et prête pour la prochaine optimisation."}), 200
     return jsonify({"erreur": "Tâche introuvable."}), 404
 
 @app.route('/api/planning/preview', methods=['GET'])
@@ -321,5 +321,41 @@ def update_dispo_chauffeur(chauffeur_id):
     db.remplacer_disponibilites_chauffeur(chauffeur_id, data)
     return jsonify({"message": "Disponibilités mises à jour."}), 200
 
+@app.route('/api/tournees/recalcul-dynamique', methods=['POST'])
+def api_recalcul_dynamique():
+    """
+    Intègre un imprévu dans une tournée en cours, recalcule le futur, et fusionne.
+    """
+    data_req = request.get_json() or {}
+    tache_imprevue_id = data_req.get('tache_id')
+    tournee_cible_id = data_req.get('tournee_id')
+    
+    if not tache_imprevue_id or not tournee_cible_id:
+        return jsonify({"erreur": "tache_id et tournee_id sont requis."}), 400
+        
+    try:
+        # 1. On prépare le mini-problème pour OR-Tools
+        data_ortools = db.preparer_donnees_recalcul_dynamique(tournee_cible_id, tache_imprevue_id)
+        
+        if not data_ortools or len(data_ortools['tache_ids']) <= 1:
+            return jsonify({"erreur": "Impossible de préparer les données pour le recalcul."}), 400
+            
+        # 2. On lance l'IA de Google OR-Tools sur ce mini-problème
+        resultats_ia = resoudre_et_exporter(data_ortools)
+        
+        if not resultats_ia or not resultats_ia['routes']:
+            return jsonify({"erreur": "L'IA n'a pas trouvé de chemin viable pour insérer l'imprévu."}), 500
+            
+        # 3. On récupère la route calculée pour notre "véhicule virtuel 0"
+        sequence_noeuds = resultats_ia['routes'][0] 
+        
+        # 4. On réalise la fusion (Data Stitching) en base de données
+        db.sauvegarder_fusion_dynamique(tournee_cible_id, sequence_noeuds, data_ortools['tache_ids'])
+        
+        return jsonify({"message": "L'imprévu a été inséré et le reste de la tournée a été optimisé avec succès !"}), 200
+        
+    except Exception as e:
+        return jsonify({"erreur": f"Erreur lors du recalcul dynamique : {str(e)}"}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)
