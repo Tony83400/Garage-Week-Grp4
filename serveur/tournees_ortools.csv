@@ -1,6 +1,0 @@
-Chauffeur,Ordre,Nom_Etape,Latitude,Longitude,Heure_Arrivee,Distance_Cumulee_Unite,Bacs_a_Collecter,Poids_a_Collecter_Kg
-Tournée de Martin,1,Dépôt,43.167,6.043,07:00,0,0,0
-Tournée de Martin,2,Hôtel de la Baie,43.1167,5.8,07:49,34517,3,120.0
-Tournée de Martin,3,Restaurant Plage,43.1,5.88,08:22,43938,4,140.0
-Tournée de Martin,4,Musée d'Art,43.15,6.35,10:09,90266,2,70.0
-Tournée de Martin,5,Retour Dépôt,43.167,6.043,11:30,123506,0,0

@@ -34,7 +34,7 @@ class UtilisateurRepository:
                 cursor = conn.cursor()
                 cursor.execute('INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES (?, ?, ?)', (email, mdp, role))
                 conn.commit()
-                return True
+                return cursor.lastrowid
         except sqlite3.IntegrityError:
             print(f"Erreur : L'email '{email}' existe déjà.")
-            return False
+            return None

@@ -570,8 +570,10 @@ class TourneeRepository:
             clients_dispo = cursor.fetchone()[0] or 0
 
             cursor.execute('''
-                SELECT COUNT(*) FROM tournees_jour WHERE date_tournee = ?
-            ''', (date_jour,))
+                SELECT COUNT(chauffeur_id) 
+                FROM disponibilites_chauffeurs 
+                WHERE jour_semaine = ?
+            ''', (jour_semaine,))
             chauffeurs_dispo = cursor.fetchone()[0] or 0
 
             return {"clients_dispo": clients_dispo, "chauffeurs_dispo": chauffeurs_dispo}
@@ -579,8 +581,9 @@ class TourneeRepository:
     def generer_brouillons_jour(self, date_jour):
         """
         Génère automatiquement les tâches de collecte pour un jour donné,
-        en se basant sur les disponibilités des clients et en ignorant ceux 
+        en se basant sur les disponibilités des clients et en ignorant ceux
         qui sont en exception (ex: fermés ce jour-là).
+        Génère également les tournées (shifts) pour les chauffeurs disponibles.
         """
         # 1. Calcul du jour de la semaine (1 = Lundi, ..., 7 = Dimanche)
         date_obj = datetime.datetime.strptime(date_jour, '%Y-%m-%d')
@@ -588,23 +591,40 @@ class TourneeRepository:
 
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
-            
-            # 2. Sécurité : Vérifier qu'on n'a pas déjà généré les tâches pour ce jour
+
+            # --- A. GÉNÉRATION DES TOURNÉES POUR LES CHAUFFEURS ---
+            cursor.execute('''DELETE FROM tournees_jour WHERE date_tournee = ?''', (date_jour,))
+
+            # Récupérer les chauffeurs disponibles ce jour-là
             cursor.execute('''
-                SELECT COUNT(*) FROM taches_collecte 
+                SELECT chauffeur_id, heure_debut, heure_fin 
+                FROM disponibilites_chauffeurs 
+                WHERE jour_semaine = ?
+            ''', (jour_semaine,))
+            chauffeurs_dispo = cursor.fetchall()
+
+            if chauffeurs_dispo:
+                # Récupérer les camions disponibles
+                cursor.execute('SELECT id FROM camions ORDER BY id ASC')
+                camions = [row[0] for row in cursor.fetchall()]
+
+                if camions:
+                    # Assigner un camion à chaque chauffeur (cyclique si pas assez de camions)
+                    for i, (chauffeur_id, heure_debut, heure_fin) in enumerate(chauffeurs_dispo):
+                        camion_id = camions[i % len(camions)]
+                        cursor.execute('''
+                            INSERT INTO tournees_jour 
+                            (date_tournee, chauffeur_id, camion_id, depot_id, heure_debut_service, heure_fin_service, statut) 
+                            VALUES (?, ?, ?, 1, ?, ?, 'brouillon')
+                        ''', (date_jour, chauffeur_id, camion_id, heure_debut, heure_fin))
+
+            # --- B. GÉNÉRATION DES TÂCHES DE COLLECTE ---
+            cursor.execute('''
+                DELETE FROM taches_collecte 
                 WHERE date_planifiee = ? AND type_tache = 'collecte'
             ''', (date_jour,))
-            
-            # En phase de test, on supprime les anciennes tâches pour tout regénérer proprement
-            if cursor.fetchone()[0] > 0:
-                print(f"Suppression des tâches existantes pour le {date_jour} pour regénération.")
-                cursor.execute('''
-                    DELETE FROM taches_collecte 
-                    WHERE date_planifiee = ? AND type_tache = 'collecte'
-                ''', (date_jour,))
-                conn.commit()
 
-            # 3. La Super-Requête : Trouver les clients prévus ce jour, SAUF s'ils sont fermés
+            # 3. Trouver les clients prévus ce jour
             cursor.execute('''
                 SELECT d.client_id, d.poids_prevu_kg
                 FROM disponibilites_clients d
@@ -615,25 +635,22 @@ class TourneeRepository:
                     WHERE date_exception = ? AND est_ferme = 1
                 )
             ''', (jour_semaine, date_jour))
-            
+
             clients_a_collecter = cursor.fetchall()
-            
+
             # 4. Création des tâches
             taches_inserees = 0
             for client in clients_a_collecter:
                 client_id, poids_estime = client
-                
-                # On utilise le poids défini spécifiquement pour ce point (créneau de disponibilité)
-                # On estime environ 40kg par bac pour le nombre de bacs prévus
                 bacs_estimes = math.ceil(poids_estime / 40)
-                
+
                 cursor.execute('''
                     INSERT INTO taches_collecte 
                     (client_id, date_planifiee, type_tache, bacs_prevus, poids_prevu_kg, statut) 
                     VALUES (?, ?, 'collecte', ?, ?, 'en_attente')
                 ''', (client_id, date_jour, bacs_estimes, poids_estime))
                 taches_inserees += 1
-            
+
             conn.commit()
             return {"status": "succes", "taches_creees": taches_inserees}
     def sauvegarder_resultat_optimisation(self, date_jour, resultats_ia, data_ortools):

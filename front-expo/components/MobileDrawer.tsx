@@ -5,7 +5,7 @@ import Sidebar from './Sidebar';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  activeRoute: 'dashboard' | 'planning' | 'sites';
+  activeRoute: 'dashboard' | 'planning' | 'sites' | 'ressources';
 }
 
 export default function MobileDrawer({ isOpen, onClose, activeRoute }: Props) {

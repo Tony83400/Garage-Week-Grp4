@@ -23,7 +23,7 @@ function LogoIcon() {
 }
 
 interface Props {
-  activeRoute: 'dashboard' | 'planning' | 'sites';
+  activeRoute: 'dashboard' | 'planning' | 'sites' | 'ressources';
   style?: object;
 }
 
@@ -93,6 +93,20 @@ export default function Sidebar({ activeRoute, style }: Props) {
           />
           <Text style={[styles.navText, activeRoute === 'sites' && styles.navTextActive]}>
             Sites de collecte
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.navItem, activeRoute === 'ressources' && styles.navItemActive]}
+          onPress={() => router.push('/ressources')}
+        >
+          <Ionicons
+            name="people-outline"
+            size={18}
+            color={activeRoute === 'ressources' ? colors.accentLight : 'rgba(255,255,255,0.55)'}
+          />
+          <Text style={[styles.navText, activeRoute === 'ressources' && styles.navTextActive]}>
+            Ressources
           </Text>
         </TouchableOpacity>
       </View>

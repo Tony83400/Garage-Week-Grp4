@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS taches_collecte;
 DROP TABLE IF EXISTS tournees_jour;
 DROP TABLE IF EXISTS exceptions_calendrier_clients;
 DROP TABLE IF EXISTS disponibilites_clients;
+DROP TABLE IF EXISTS disponibilites_chauffeurs;
 DROP TABLE IF EXISTS clients;
 DROP TABLE IF EXISTS camions;
 DROP TABLE IF EXISTS chauffeurs;
@@ -32,6 +33,15 @@ CREATE TABLE chauffeurs (
     nom TEXT NOT NULL,
     prenom TEXT NOT NULL,
     telephone TEXT
+);
+
+CREATE TABLE disponibilites_chauffeurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chauffeur_id INTEGER NOT NULL REFERENCES chauffeurs(id) ON DELETE CASCADE,
+    jour_semaine INTEGER NOT NULL CHECK (jour_semaine BETWEEN 1 AND 7),
+    heure_debut TEXT NOT NULL,
+    heure_fin TEXT NOT NULL,
+    CHECK (heure_debut < heure_fin)
 );
 
 CREATE TABLE camions (
@@ -122,6 +132,21 @@ INSERT INTO utilisateurs (email, mot_de_passe, role) VALUES
 INSERT INTO chauffeurs (utilisateur_id, nom, prenom, telephone) VALUES 
 (2, 'Dupont', 'Jean', '0601000000'),
 (3, 'Martin', 'Alice', '0602000000');
+
+INSERT INTO disponibilites_chauffeurs (chauffeur_id, jour_semaine, heure_debut, heure_fin) VALUES
+(1, 1, '06:30:00', '16:00:00'),
+(1, 2, '06:30:00', '16:00:00'),
+(1, 3, '06:30:00', '16:00:00'),
+(1, 4, '06:30:00', '16:00:00'),
+(1, 5, '06:30:00', '16:00:00'),
+(1, 6, '06:30:00', '14:00:00'),
+
+(2, 1, '06:30:00', '16:00:00'),
+(2, 2, '06:30:00', '16:00:00'),
+(2, 3, '06:30:00', '16:00:00'),
+(2, 4, '06:30:00', '16:00:00'),
+(2, 5, '06:30:00', '16:00:00'),
+(2, 7, '07:00:00', '14:00:00');
 
 
 INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES 

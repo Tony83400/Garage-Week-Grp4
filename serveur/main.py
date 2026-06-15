@@ -261,5 +261,57 @@ def api_optimiser_tournees():
 
 
 
+@app.route('/api/ressources/camions', methods=['GET'])
+def get_camions():
+    camions = db.recuperer_tous_les_camions()
+    return jsonify(camions), 200
+
+@app.route('/api/ressources/camions', methods=['POST'])
+def add_camion():
+    data = request.get_json()
+    if not data or 'immatriculation' not in data or 'charge_max_kg' not in data or 'bacs_max' not in data:
+        return jsonify({"erreur": "Données incomplètes pour le camion."}), 400
+    
+    try:
+        camion_id = db.ajouter_camion(data['immatriculation'], data['charge_max_kg'], data['bacs_max'])
+        return jsonify({"message": "Camion ajouté.", "id": camion_id}), 201
+    except Exception as e:
+        return jsonify({"erreur": f"Erreur lors de l'ajout: {str(e)}"}), 500
+
+@app.route('/api/ressources/chauffeurs', methods=['GET'])
+def get_chauffeurs():
+    chauffeurs = db.recuperer_tous_les_chauffeurs()
+    return jsonify(chauffeurs), 200
+
+@app.route('/api/ressources/chauffeurs', methods=['POST'])
+def add_chauffeur():
+    data = request.get_json()
+    if not data or 'nom' not in data or 'prenom' not in data or 'email' not in data or 'mot_de_passe' not in data:
+        return jsonify({"erreur": "Nom, prénom, email et mot_de_passe requis."}), 400
+    
+    # Création du compte utilisateur
+    user_id = db.ajouter_utilisateur(data['email'], data['mot_de_passe'], role='chauffeur')
+    if not user_id:
+        return jsonify({"erreur": "Cet email existe déjà ou erreur lors de la création de l'utilisateur."}), 409
+    
+    # Création du profil chauffeur
+    telephone = data.get('telephone', '')
+    chauffeur_id = db.ajouter_chauffeur(user_id, data['nom'], data['prenom'], telephone)
+    return jsonify({"message": "Chauffeur ajouté.", "id": chauffeur_id}), 201
+
+@app.route('/api/ressources/chauffeurs/<int:chauffeur_id>/disponibilites', methods=['GET'])
+def get_dispo_chauffeur(chauffeur_id):
+    dispos = db.recuperer_disponibilites_chauffeur(chauffeur_id)
+    return jsonify(dispos), 200
+
+@app.route('/api/ressources/chauffeurs/<int:chauffeur_id>/disponibilites', methods=['POST'])
+def update_dispo_chauffeur(chauffeur_id):
+    data = request.get_json()
+    if not isinstance(data, list):
+        return jsonify({"erreur": "Un tableau de disponibilités est attendu."}), 400
+    
+    db.remplacer_disponibilites_chauffeur(chauffeur_id, data)
+    return jsonify({"message": "Disponibilités mises à jour."}), 200
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)

@@ -38,8 +38,20 @@ class DatabaseManager:
     def ajouter_camion(self, immatriculation, charge_max_kg, bacs_max):
         return self.repo_ressources.ajouter_camion(immatriculation, charge_max_kg, bacs_max)
 
+    def recuperer_tous_les_camions(self):
+        return self.repo_ressources.recuperer_tous_les_camions()
+
     def ajouter_chauffeur(self, utilisateur_id, nom, prenom, telephone):
         return self.repo_ressources.ajouter_chauffeur(utilisateur_id, nom, prenom, telephone)
+
+    def recuperer_tous_les_chauffeurs(self):
+        return self.repo_ressources.recuperer_tous_les_chauffeurs()
+
+    def recuperer_disponibilites_chauffeur(self, chauffeur_id):
+        return self.repo_ressources.recuperer_disponibilites_chauffeur(chauffeur_id)
+
+    def remplacer_disponibilites_chauffeur(self, chauffeur_id, disponibilites):
+        return self.repo_ressources.remplacer_disponibilites_chauffeur(chauffeur_id, disponibilites)
 
     # 3. CONTRAINTES ET PLANIFICATION
     def ajouter_disponibilite_client(self, client_id, jour_semaine, heure_debut, heure_fin):
