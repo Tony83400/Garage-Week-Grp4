@@ -8,7 +8,25 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
-import { getImprevus, replanifierImprevu, type Imprevu } from '../services/imprevus';
+import { getImprevus, replanifierImprevu, reassignerImprevu, type Imprevu } from '../services/imprevus';
+
+const TYPE_LABELS: Record<string, string> = {
+  poids_atteint:          'Benne pleine',
+  client_absent:          'Client absent',
+  bac_absent:             'Bac absent',
+  acces_impossible:       'Accès impossible',
+  chauffeur_indisponible: 'Chauffeur indispo',
+  autre:                  'Autre',
+};
+
+const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  poids_atteint:          'trash-outline',
+  client_absent:          'person-remove-outline',
+  bac_absent:             'cube-outline',
+  acces_impossible:       'ban-outline',
+  chauffeur_indisponible: 'car-outline',
+  autre:                  'ellipsis-horizontal-outline',
+};
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
@@ -23,10 +41,12 @@ function tomorrowFR() {
 function ImprevuCard({
   item,
   onReport,
+  onReassign,
   animIndex = 0,
 }: {
   item: Imprevu;
   onReport: () => void;
+  onReassign?: () => void;
   animIndex?: number;
 }) {
   const opacity    = useRef(new Animated.Value(0)).current;
@@ -45,6 +65,11 @@ function ImprevuCard({
       Animated.timing(translateY, { toValue: -8, duration: 220, useNativeDriver: true }),
     ]).start(() => callback());
   }
+
+  const typeKey  = item.type_imprevu || 'autre';
+  const typeLabel = TYPE_LABELS[typeKey] ?? typeKey;
+  const typeIcon  = TYPE_ICONS[typeKey] ?? 'ellipsis-horizontal-outline';
+  const canReassign = typeKey !== 'bac_absent';
 
   return (
     <Animated.View style={[s.card, { opacity, transform: [{ translateY }] }]}>
@@ -68,6 +93,10 @@ function ImprevuCard({
             </View>
           )}
         </View>
+        <View style={s.typeBadge}>
+          <Ionicons name={typeIcon} size={11} color={colors.coral} />
+          <Text style={s.typeBadgeText}>{typeLabel}</Text>
+        </View>
       </View>
 
       <View style={s.raisonRow}>
@@ -75,14 +104,26 @@ function ImprevuCard({
         <Text style={s.raisonText} numberOfLines={2}>{item.raison}</Text>
       </View>
 
-      <TouchableOpacity
-        style={s.btnReport}
-        onPress={() => animateOut(onReport)}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="calendar-outline" size={15} color="#fff" />
-        <Text style={s.btnReportText}>Reporter demain</Text>
-      </TouchableOpacity>
+      <View style={s.cardActions}>
+        {canReassign && onReassign && (
+          <TouchableOpacity
+            style={s.btnReassign}
+            onPress={() => animateOut(onReassign)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="swap-horizontal-outline" size={15} color={colors.primaryLight} />
+            <Text style={s.btnReassignText}>Réassigner</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={s.btnReport}
+          onPress={() => animateOut(onReport)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="calendar-outline" size={15} color="#fff" />
+          <Text style={s.btnReportText}>Reporter demain</Text>
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
@@ -183,6 +224,21 @@ export default function ImprevusScreen() {
     }
   }
 
+  async function handleReassign(item: Imprevu) {
+    try {
+      const result = await reassignerImprevu(item.tache_id);
+      setImprevus(prev => prev.filter(i => i.tache_id !== item.tache_id));
+      setTraites(t => t + 1);
+      if (result.chauffeur) {
+        showToast(`Réassigné à ${result.chauffeur} · ${result.heure_arrivee ?? ''}`);
+      } else {
+        showToast(`Reporté demain · ${item.client_nom}`);
+      }
+    } catch {
+      showToast('Erreur lors de la réassignation');
+    }
+  }
+
   const total = imprevus.length + traites;
 
   return (
@@ -252,6 +308,7 @@ export default function ImprevusScreen() {
               item={item}
               animIndex={i}
               onReport={() => setConfirmItem(item)}
+              onReassign={() => handleReassign(item)}
             />
           ))}
         </ScrollView>
@@ -352,7 +409,39 @@ const s = StyleSheet.create({
   },
   raisonText: { fontSize: 12, color: colors.coral, fontWeight: '600', flex: 1, lineHeight: 17 },
 
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.coralLight,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(231,111,81,0.2)',
+    flexShrink: 0,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.coral,
+  },
+
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  btnReassign: {
+    flex: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    paddingVertical: 12, borderRadius: 11,
+    backgroundColor: '#E8F5EE',
+    borderWidth: 1, borderColor: '#C8E8D4',
+  },
+  btnReassignText: { fontSize: 13, fontWeight: '700', color: colors.primaryLight },
+
   btnReport: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
     paddingVertical: 12, borderRadius: 11,
     backgroundColor: colors.primaryLight,

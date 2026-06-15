@@ -99,8 +99,9 @@ CREATE TABLE taches_collecte (
     poids_prevu_kg REAL DEFAULT 0,
     duree_estimee_min INTEGER DEFAULT 15,
     bacs_reels INTEGER DEFAULT NULL,
-    statut TEXT DEFAULT 'en_attente', 
-    commentaire TEXT DEFAULT NULL
+    statut TEXT DEFAULT 'en_attente',
+    commentaire TEXT DEFAULT NULL,
+    type_imprevu TEXT DEFAULT NULL
 );
 
 -- =============================================================================

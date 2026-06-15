@@ -29,6 +29,7 @@ export interface UpdateStatutPayload {
   statut: 'terminee' | 'erreur';
   bacs_reels?: number;
   commentaire?: string;
+  type_imprevu?: string;
 }
 
 export function updateStatutTache(tache_id: number, payload: UpdateStatutPayload) {

@@ -127,9 +127,10 @@ def api_update_statut_tache(tache_id):
     data = request.get_json() or {}
     
     # Récupération des données envoyées par le Front
-    statut = data.get('statut') # Doit être 'terminee' ou 'erreur'
+    statut = data.get('statut')  # Doit être 'terminee' ou 'erreur'
     bacs_reels = data.get('bacs_reels')
     commentaire = data.get('commentaire')
+    type_imprevu = data.get('type_imprevu')
     
     # 1. Vérification basique
     if statut not in ['terminee', 'erreur']:
@@ -146,7 +147,7 @@ def api_update_statut_tache(tache_id):
             commentaire = "Erreur non spécifiée par le chauffeur"
 
     # 4. Mise à jour en base de données
-    succes = db.mettre_a_jour_statut_etape(tache_id, statut, bacs_reels, commentaire)
+    succes = db.mettre_a_jour_statut_etape(tache_id, statut, bacs_reels, commentaire, type_imprevu)
     
     if succes:
         return jsonify({
@@ -168,6 +169,22 @@ def get_imprevus():
     date_jour = request.args.get('date', date.today().isoformat())
     imprevus = db.recuperer_imprevus(date_jour)
     return jsonify(imprevus), 200
+
+@app.route('/api/imprevus/<int:tache_id>/reassigner', methods=['POST'])
+def reassigner_imprevu(tache_id):
+    """Tente de réassigner une tâche orpheline au premier chauffeur disponible."""
+    date_jour = date.today().isoformat()
+    candidat = db.trouver_candidat_reassignation(tache_id, date_jour)
+    if candidat:
+        db.executer_reassignation(tache_id, candidat['tournee_id'])
+        return jsonify({
+            "message": f"Réassigné à {candidat['chauffeur_nom']}",
+            "chauffeur": candidat['chauffeur_nom'],
+            "heure_arrivee": candidat['heure_arrivee_estimee'],
+        }), 200
+    else:
+        db.executer_reassignation(tache_id, None)
+        return jsonify({"message": "Aucun chauffeur disponible — reporté au lendemain"}), 200
 
 @app.route('/api/imprevus/<int:tache_id>/replanifier', methods=['POST'])
 def replanifier_imprevu(tache_id):

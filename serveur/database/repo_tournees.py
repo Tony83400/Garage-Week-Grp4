@@ -169,16 +169,17 @@ class TourneeRepository:
             conn.commit()
             return cursor.rowcount > 0
 
-    def mettre_a_jour_statut_etape(self, tache_id, statut, bacs_reels=None, commentaire=None):
+    def mettre_a_jour_statut_etape(self, tache_id, statut, bacs_reels=None, commentaire=None, type_imprevu=None):
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                UPDATE taches_collecte 
-                SET statut = ?, 
+                UPDATE taches_collecte
+                SET statut = ?,
                     bacs_reels = ?,
-                    commentaire = ?
+                    commentaire = ?,
+                    type_imprevu = ?
                 WHERE id = ?
-            ''', (statut, bacs_reels, commentaire, tache_id))
+            ''', (statut, bacs_reels, commentaire, type_imprevu, tache_id))
             conn.commit()
             return cursor.rowcount > 0
 
@@ -396,26 +397,159 @@ class TourneeRepository:
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT t.id, c.nom_entreprise, t.commentaire
+                SELECT t.id, c.nom_entreprise, c.adresse, t.commentaire,
+                       t.type_imprevu, t.heure_estimee,
+                       ch.prenom || ' ' || ch.nom
                 FROM taches_collecte t
                 JOIN clients c ON t.client_id = c.id
+                LEFT JOIN tournees_jour tj ON t.tournee_id = tj.id
+                LEFT JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
                 WHERE t.date_planifiee = ? AND t.statut = 'erreur'
+                ORDER BY t.id DESC
             ''', (date_jour,))
-            
             lignes = cursor.fetchall()
-            imprevus = []
-            for l in lignes:
-                imprevus.append({
-                    "tache_id": l[0],
-                    "client_nom": l[1],
-                    "adresse": "À compléter", 
-                    "ville": "À compléter",
-                    "chauffeur": "Inconnu", 
-                    "raison": l[2] or "Site inaccessible ou erreur signalée",
-                    "heure": "N/A"
-                })
-            return imprevus
+            return [{
+                "tache_id": l[0],
+                "client_nom": l[1],
+                "adresse": l[2] or "Adresse non renseignée",
+                "raison": l[3] or "Erreur signalée par le chauffeur",
+                "type_imprevu": l[4] or "autre",
+                "heure": l[5] or "N/A",
+                "chauffeur": l[6] or "Inconnu",
+            } for l in lignes]
     
+    def trouver_candidat_reassignation(self, tache_id, date_jour):
+        """Cherche le meilleur chauffeur disponible pour absorber une tâche orpheline."""
+        date_obj = datetime.datetime.strptime(date_jour, '%Y-%m-%d')
+        jour_semaine = date_obj.weekday() + 1  # 1=Lundi … 7=Dimanche
+
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # 1. Infos de la tâche orpheline + fenêtre horaire client
+            cursor.execute('''
+                SELECT t.poids_prevu_kg, t.bacs_prevus, c.latitude, c.longitude,
+                       dc.heure_debut, dc.heure_fin
+                FROM taches_collecte t
+                JOIN clients c ON t.client_id = c.id
+                LEFT JOIN disponibilites_clients dc
+                    ON dc.client_id = c.id AND dc.jour_semaine = ?
+                WHERE t.id = ?
+                LIMIT 1
+            ''', (jour_semaine, tache_id))
+            info = cursor.fetchone()
+            if not info:
+                return None
+
+            poids_orphelin, bacs_orphelin, lat_o, lon_o, hd_str, hf_str = info
+            client_debut = heure_vers_minutes(hd_str) if hd_str else 180
+            client_fin   = heure_vers_minutes(hf_str) if hf_str else 1200
+
+            now = datetime.datetime.now()
+            heure_actuelle = now.hour * 60 + now.minute
+
+            if heure_actuelle >= client_fin:
+                return None  # Fenêtre client déjà fermée
+
+            # 2. Tournées avec des arrêts encore planifiés (hors tournée de la tâche elle-même)
+            cursor.execute('''
+                SELECT DISTINCT tj.id, tj.heure_fin_service, cam.charge_max_kg,
+                       ch.prenom || ' ' || ch.nom
+                FROM tournees_jour tj
+                JOIN camions cam ON tj.camion_id = cam.id
+                JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
+                JOIN taches_collecte t ON t.tournee_id = tj.id
+                WHERE tj.date_tournee = ? AND t.statut = 'planifiee'
+                AND tj.id != COALESCE(
+                    (SELECT tournee_id FROM taches_collecte WHERE id = ?), -1
+                )
+            ''', (date_jour, tache_id))
+            tournees = cursor.fetchall()
+
+            DEPOT_LAT, DEPOT_LON = 43.1389, 6.0222
+            meilleur = None
+            meilleur_trajet = float('inf')
+
+            for tournee_id, heure_fin_str, charge_max, nom_chauffeur in tournees:
+                fin_min = heure_vers_minutes(heure_fin_str)
+
+                # Capacité restante en poids
+                cursor.execute('''
+                    SELECT COALESCE(SUM(poids_prevu_kg), 0)
+                    FROM taches_collecte
+                    WHERE tournee_id = ? AND statut = 'terminee'
+                ''', (tournee_id,))
+                poids_utilise = cursor.fetchone()[0]
+                if (charge_max - poids_utilise) < poids_orphelin:
+                    continue
+
+                # Position estimée = dernier arrêt terminé (sinon dépôt)
+                cursor.execute('''
+                    SELECT c.latitude, c.longitude
+                    FROM taches_collecte t
+                    JOIN clients c ON t.client_id = c.id
+                    WHERE t.tournee_id = ? AND t.statut = 'terminee'
+                    ORDER BY t.ordre_passage DESC LIMIT 1
+                ''', (tournee_id,))
+                pos = cursor.fetchone()
+                pos_lat = pos[0] if pos else DEPOT_LAT
+                pos_lon = pos[1] if pos else DEPOT_LON
+
+                try:
+                    mat = calculer_distance_matrice([
+                        (pos_lat, pos_lon),
+                        (lat_o, lon_o),
+                        (DEPOT_LAT, DEPOT_LON),
+                    ])
+                    t_vers_client = mat[0][1] // 500  # mètres → minutes (≈30 km/h)
+                    t_vers_depot  = mat[1][2] // 500
+                except Exception:
+                    continue
+
+                arrivee = heure_actuelle + t_vers_client
+                fin_tournee = arrivee + 15 + t_vers_depot  # 15 min service
+
+                if arrivee > client_fin:
+                    continue
+                if fin_tournee > fin_min:
+                    continue
+
+                if t_vers_client < meilleur_trajet:
+                    meilleur_trajet = t_vers_client
+                    meilleur = {
+                        'tournee_id': tournee_id,
+                        'chauffeur_nom': nom_chauffeur,
+                        'heure_arrivee_estimee': f"{int(arrivee // 60):02d}:{int(arrivee % 60):02d}",
+                    }
+
+        return meilleur
+
+    def executer_reassignation(self, tache_id, tournee_id):
+        """Attache la tâche à une tournée candidate, ou la replanifie au lendemain."""
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+            if tournee_id is None:
+                demain = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+                cursor.execute('''
+                    UPDATE taches_collecte
+                    SET date_planifiee = ?, statut = 'en_attente',
+                        tournee_id = NULL, ordre_passage = NULL
+                    WHERE id = ?
+                ''', (demain, tache_id))
+            else:
+                cursor.execute('''
+                    SELECT COALESCE(MAX(ordre_passage), 0)
+                    FROM taches_collecte WHERE tournee_id = ?
+                ''', (tournee_id,))
+                max_ordre = cursor.fetchone()[0]
+                cursor.execute('''
+                    UPDATE taches_collecte
+                    SET tournee_id = ?, ordre_passage = ?, statut = 'planifiee'
+                    WHERE id = ?
+                ''', (tournee_id, max_ordre + 1, tache_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
     def get_planning_preview(self, date_jour):
         """Retourne le nombre de clients disponibles et de chauffeurs planifiés pour un jour."""
         date_obj = datetime.datetime.strptime(date_jour, '%Y-%m-%d')

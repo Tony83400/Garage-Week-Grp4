@@ -20,6 +20,15 @@ import BlueBoBModal from '../components/BlueBoBModal';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
+const IMPREVU_TYPES = [
+  { value: 'client_absent',          label: 'Client absent' },
+  { value: 'bac_absent',             label: 'Bac absent' },
+  { value: 'acces_impossible',       label: 'Accès impossible' },
+  { value: 'poids_atteint',          label: 'Benne pleine' },
+  { value: 'chauffeur_indisponible', label: 'Indisponible' },
+  { value: 'autre',                  label: 'Autre' },
+];
+
 export default function DriverScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +41,7 @@ export default function DriverScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: 'validate' | 'skip'; arret: Arret } | null>(null);
   const [showBlueBoB, setShowBlueBoB] = useState(false);
+  const [imprevuType, setImprevuType] = useState<string>('autre');
   const [logoutTap, setLogoutTap] = useState(false);
   const [finishedAt, setFinishedAt] = useState<string | null>(null);
 
@@ -120,11 +130,12 @@ export default function DriverScreen() {
     }
   }
 
-  async function handleSkip(arret: Arret) {
+  async function handleSkip(arret: Arret, typeImprevu: string = 'autre') {
     try {
       await updateStatutTache(arret.tache_id, {
         statut: 'erreur',
         commentaire: 'Signalé comme imprévu par le chauffeur',
+        type_imprevu: typeImprevu,
       });
       setStops(prev => prev.filter(s => s.tache_id !== arret.tache_id));
       if (tournee) {
@@ -288,7 +299,7 @@ export default function DriverScreen() {
 
               <TouchableOpacity
                 style={s.heroSkip}
-                onPress={() => setConfirmAction({ type: 'skip', arret: stops[0] })}
+                onPress={() => { setImprevuType('autre'); setConfirmAction({ type: 'skip', arret: stops[0] }); }}
                 activeOpacity={0.7}
               >
                 <Text style={s.heroSkipText}>Signaler un imprévu</Text>
@@ -348,8 +359,26 @@ export default function DriverScreen() {
               <Text style={s.modalDetail}>
                 {confirmAction.type === 'validate'
                   ? `${confirmAction.arret.poids_prevu_kg} kg collectés`
-                  : 'Reporté aux imprévus de demain'}
+                  : 'Sélectionnez la raison'}
               </Text>
+
+              {confirmAction.type === 'skip' && (
+                <View style={s.imprevuTypesGrid}>
+                  {IMPREVU_TYPES.map(t => (
+                    <TouchableOpacity
+                      key={t.value}
+                      style={[s.imprevuTypeChip, imprevuType === t.value && s.imprevuTypeChipActive]}
+                      onPress={() => setImprevuType(t.value)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.imprevuTypeText, imprevuType === t.value && s.imprevuTypeTextActive]}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               <View style={s.modalActions}>
                 <TouchableOpacity style={s.modalCancel} onPress={() => setConfirmAction(null)} activeOpacity={0.7}>
                   <Text style={s.modalCancelText}>Annuler</Text>
@@ -363,7 +392,7 @@ export default function DriverScreen() {
                     const action = confirmAction;
                     setConfirmAction(null);
                     if (action.type === 'validate') handleValidate(action.arret);
-                    else handleSkip(action.arret);
+                    else handleSkip(action.arret, imprevuType);
                   }}
                   activeOpacity={0.85}
                 >
@@ -865,6 +894,36 @@ const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#fff',
+  },
+
+  // Imprevu type chips
+  imprevuTypesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    width: '100%',
+    marginBottom: 24,
+  },
+  imprevuTypeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: '#D4E0DC',
+  },
+  imprevuTypeChipActive: {
+    backgroundColor: colors.coralLight,
+    borderColor: 'rgba(231,111,81,0.45)',
+  },
+  imprevuTypeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  imprevuTypeTextActive: {
+    color: colors.coral,
+    fontWeight: '700',
   },
 
   // Toast
