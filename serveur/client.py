@@ -1,9 +1,10 @@
 class Client:
-    def __init__(self, nom_entreprise, latitude, longitude, id=None):
+    def __init__(self, nom_entreprise, latitude, longitude, id=None, adresse=None):
         self.id = id
         self.nom_entreprise = nom_entreprise
         self.latitude = latitude
         self.longitude = longitude
+        self.adresse = adresse
 
     def __str__(self):
         id_str = f"[{self.id}]" if self.id is not None else "[Nouveau]"
@@ -14,5 +15,6 @@ class Client:
             "id": self.id,
             "nom_entreprise": self.nom_entreprise,
             "latitude": self.latitude,
-            "longitude": self.longitude
+            "longitude": self.longitude,
+            "adresse": self.adresse,
         }

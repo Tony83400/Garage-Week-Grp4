@@ -25,6 +25,12 @@ class DatabaseManager:
     def recuperer_tous_les_clients(self):
         return self.repo_clients.recuperer_tous_les_clients()
 
+    def supprimer_client(self, client_id):
+        return self.repo_clients.supprimer_client(client_id)
+
+    def backfill_adresses_nominatim(self):
+        return self.repo_clients.backfill_adresses_nominatim()
+
     # 2. GESTION DES RESSOURCES
     def ajouter_camion(self, immatriculation, charge_max_kg, bacs_max):
         return self.repo_ressources.ajouter_camion(immatriculation, charge_max_kg, bacs_max)

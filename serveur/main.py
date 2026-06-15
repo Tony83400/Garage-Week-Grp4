@@ -3,6 +3,7 @@ from database.database_manager import DatabaseManager
 from client import Client
 from datetime import date
 from flask_cors import CORS
+import threading
 
 from solveur_ortools import resoudre_et_exporter
 app = Flask(__name__)
@@ -45,17 +46,45 @@ def add_client():
     if not nom:
         return jsonify({"erreur": "Le champ 'nom' est requis."}), 400
     
-    # Simulation géolocalisation pour un nouveau client si non fournie
     lat = data.get('latitude', 43.1200)
     lon = data.get('longitude', 5.9300)
-    
-    nouveau_client = Client(nom_entreprise=nom, latitude=lat, longitude=lon)
-    
+    adresse = data.get('adresse', None)
+
+    nouveau_client = Client(nom_entreprise=nom, latitude=lat, longitude=lon, adresse=adresse)
+
     if db.ajouter_client(nouveau_client):
-        # On retourne un succès même si adresse/ville/etc. ne sont pas encore gérés en BDD
-        return jsonify({"message": f"Site '{nouveau_client.nom_entreprise}' enregistré avec succès."}), 201
+        return jsonify({"message": f"Site '{nouveau_client.nom_entreprise}' enregistré avec succès.", "id": nouveau_client.id}), 201
     else:
         return jsonify({"erreur": f"Le site '{nouveau_client.nom_entreprise}' n'a pas pu être ajouté."}), 409
+
+@app.route('/disponibilites', methods=['POST'])
+def add_disponibilite():
+    """Ajoute une disponibilité (créneau + jour) pour un client — utilisé par OR-Tools."""
+    data = request.get_json()
+    client_id   = data.get('client_id')
+    jour        = data.get('jour_semaine')
+    heure_debut = data.get('heure_debut')
+    heure_fin   = data.get('heure_fin')
+
+    if not all([client_id, jour, heure_debut, heure_fin]):
+        return jsonify({"erreur": "Champs manquants : client_id, jour_semaine, heure_debut, heure_fin requis."}), 400
+
+    db.ajouter_disponibilite_client(client_id, jour, heure_debut, heure_fin)
+    return jsonify({"message": "Disponibilité ajoutée."}), 201
+
+@app.route('/clients/<int:client_id>', methods=['DELETE'])
+def delete_client(client_id):
+    """Supprime un client et ses données associées (cascade)."""
+    ok = db.supprimer_client(client_id)
+    if ok:
+        return jsonify({"message": f"Client {client_id} supprimé."}), 200
+    return jsonify({"erreur": "Client introuvable."}), 404
+
+@app.route('/clients/backfill-adresses', methods=['POST'])
+def backfill_adresses():
+    """Lance le reverse geocoding Nominatim pour les clients sans adresse (en arrière-plan)."""
+    threading.Thread(target=db.backfill_adresses_nominatim, daemon=True).start()
+    return jsonify({"message": "Backfill lancé en arrière-plan"}), 202
 
 @app.route('/api/dashboard/stats', methods=['GET'])
 def api_dashboard_stats():

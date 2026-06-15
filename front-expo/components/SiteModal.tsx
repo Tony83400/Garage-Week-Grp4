@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,26 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+}
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
-import { addClient } from '@/services/clients';
+import { addClient, addDisponibilite } from '@/services/clients';
 
 const CATEGORIES = ['Restaurant', 'Hôtel', 'École', 'Cantine', 'Fast-food', 'Supermarché', 'Autre'];
 const VILLES = ['Toulon', 'Hyères', 'La Seyne-sur-Mer', 'Six-Fours', 'Sanary-sur-Mer', 'Bandol', 'Ollioules', 'La Garde', 'Le Pradet', 'Le Lavandou'];
+const JOURS = [
+  { label: 'Lun', value: 1 },
+  { label: 'Mar', value: 2 },
+  { label: 'Mer', value: 3 },
+  { label: 'Jeu', value: 4 },
+  { label: 'Ven', value: 5 },
+];
 
 interface Props {
   visible: boolean;
@@ -31,23 +45,74 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
   const [ville, setVille] = useState('');
   const [slotStart, setSlotStart] = useState('07:00');
   const [slotEnd, setSlotEnd] = useState('12:00');
+  const [joursSelected, setJoursSelected] = useState<number[]>([]);
   const [saisonnier, setSaisonnier] = useState(false);
+
+  function toggleJour(val: number) {
+    setJoursSelected(prev =>
+      prev.includes(val) ? prev.filter(j => j !== val) : [...prev, val]
+    );
+  }
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [geoLat, setGeoLat] = useState<number | null>(null);
+  const [geoLon, setGeoLon] = useState<number | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canSubmit = nom.trim().length > 0 && adresse.trim().length > 0;
+  const canSubmit = nom.trim().length > 0 && geoLat !== null && geoLon !== null;
+
+  function handleAdresseChange(text: string) {
+    setAdresse(text);
+    setGeoLat(null);
+    setGeoLon(null);
+    setSuggestions([]);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (text.trim().length < 3) return;
+    searchTimer.current = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const q = encodeURIComponent(text + ' Var France');
+        const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=5&countrycodes=fr`;
+        const res = await fetch(url, { headers: { 'User-Agent': 'AlchiRoute/1.0 contact@les-alchimistes.fr' } });
+        const data: NominatimResult[] = await res.json();
+        setSuggestions(data);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 500);
+  }
+
+  function handleSelectSuggestion(item: NominatimResult) {
+    setAdresse(item.display_name);
+    setGeoLat(parseFloat(item.lat));
+    setGeoLon(parseFloat(item.lon));
+    setSuggestions([]);
+    setFocusedField(null);
+  }
 
   async function handleSubmit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      await addClient({
+      const result = await addClient({
         nom_entreprise: nom.trim(),
-        latitude: 43.1200,
-        longitude: 5.9300,
+        latitude: geoLat!,
+        longitude: geoLon!,
+        adresse: adresse.trim(),
       });
+      if (result.id && joursSelected.length > 0) {
+        const hd = slotStart.length === 5 ? slotStart + ':00' : slotStart;
+        const hf = slotEnd.length === 5 ? slotEnd + ':00' : slotEnd;
+        for (const jour of joursSelected) {
+          await addDisponibilite({ client_id: result.id!, jour_semaine: jour, heure_debut: hd, heure_fin: hf });
+        }
+      }
       onSuccess(`✓ ${nom.trim()} ajouté avec succès !`);
       handleClose();
     } catch {
@@ -68,6 +133,10 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
     setSaisonnier(false);
     setErrorMsg(null);
     setFocusedField(null);
+    setSuggestions([]);
+    setGeoLat(null);
+    setGeoLon(null);
+    setJoursSelected([]);
     onClose();
   }
 
@@ -145,16 +214,43 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
               </View>
 
               <View style={s.field}>
-                <Text style={s.label}>Adresse <Text style={s.required}>*</Text></Text>
-                <TextInput
-                  style={[s.input, focusedField === 'adresse' && s.inputFocused]}
-                  value={adresse}
-                  onChangeText={setAdresse}
-                  onFocus={() => setFocusedField('adresse')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="ex: 12 rue des Oliviers"
-                  placeholderTextColor={colors.textMuted}
-                />
+                <Text style={s.label}>Recherche du lieu <Text style={s.required}>*</Text></Text>
+                <View style={[s.searchWrap, focusedField === 'adresse' && s.searchWrapFocused]}>
+                  <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+                  <TextInput
+                    style={s.searchInput}
+                    value={adresse}
+                    onChangeText={handleAdresseChange}
+                    onFocus={() => setFocusedField('adresse')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Ex : McDonald's Toulon, École La Garde…"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  {searchLoading && <ActivityIndicator size="small" color={colors.primaryLight} />}
+                </View>
+
+                {suggestions.length > 0 && (
+                  <View style={s.suggestionsBox}>
+                    {suggestions.map((item, i) => (
+                      <TouchableOpacity
+                        key={item.place_id}
+                        style={[s.suggestionItem, i > 0 && s.suggestionDivider]}
+                        onPress={() => handleSelectSuggestion(item)}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons name="location-outline" size={13} color={colors.primaryLight} style={{ marginTop: 1, flexShrink: 0 }} />
+                        <Text style={s.suggestionText} numberOfLines={2}>{item.display_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {geoLat !== null && (
+                  <View style={s.geoConfirm}>
+                    <Ionicons name="checkmark-circle" size={14} color={colors.accent} />
+                    <Text style={s.geoConfirmText}>Lieu localisé — coordonnées récupérées</Text>
+                  </View>
+                )}
               </View>
 
               <View style={s.field}>
@@ -179,6 +275,24 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
               <View style={s.sectionHeader}>
                 <Ionicons name="time-outline" size={13} color={colors.primaryLight} />
                 <Text style={s.sectionLabel}>Planning</Text>
+              </View>
+
+              <View style={s.field}>
+                <Text style={s.label}>Jours de collecte</Text>
+                <View style={s.joursRow}>
+                  {JOURS.map(j => (
+                    <TouchableOpacity
+                      key={j.value}
+                      style={[s.jourChip, joursSelected.includes(j.value) && s.jourChipActive]}
+                      onPress={() => toggleJour(j.value)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.jourChipText, joursSelected.includes(j.value) && s.jourChipTextActive]}>
+                        {j.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               <View style={s.field}>
@@ -412,6 +526,93 @@ const s = StyleSheet.create({
   inputFocused: {
     borderColor: colors.primaryLight,
     backgroundColor: '#F5FAF7',
+  },
+
+  // Search autocomplete
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#D4E8DC',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  searchWrapFocused: {
+    borderColor: colors.primaryLight,
+    backgroundColor: '#F5FAF7',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  suggestionsBox: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D4E8DC',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  suggestionDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#EAF2EE',
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  geoConfirm: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  geoConfirmText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+
+  // Jours chips
+  joursRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  jourChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: '#D4E8DC',
+    alignItems: 'center',
+  },
+  jourChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primaryLight,
+  },
+  jourChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  jourChipTextActive: {
+    color: '#fff',
   },
 
   // Chips

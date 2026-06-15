@@ -6,6 +6,7 @@ export interface Client {
   nom_entreprise: string;
   latitude: number;
   longitude: number;
+  adresse?: string;
 }
 
 export function getClients() {
@@ -13,5 +14,22 @@ export function getClients() {
 }
 
 export function addClient(client: Omit<Client, 'id'>) {
-  return api.post<{ message: string }>('/clients', client);
+  return api.post<{ message: string; id?: number }>('/clients', client);
+}
+
+export function addDisponibilite(dispo: {
+  client_id: number;
+  jour_semaine: number;
+  heure_debut: string;
+  heure_fin: string;
+}) {
+  return api.post<{ message: string }>('/disponibilites', dispo);
+}
+
+export function deleteClient(id: number) {
+  return api.del<{ message: string }>(`/clients/${id}`);
+}
+
+export function backfillAdresses() {
+  return api.post<{ message: string }>('/clients/backfill-adresses', {});
 }
