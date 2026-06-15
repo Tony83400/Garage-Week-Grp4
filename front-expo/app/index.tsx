@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, useWindowDimensions, ImageBackground } from 'react-native';
+import { View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, useWindowDimensions, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { login } from '../services/auth';
@@ -9,7 +9,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
 import InputField from '../components/InputField';
 import LoginButton from '../components/LoginButton';
 import ErrorMessage from '../components/ErrorMessage';
@@ -17,10 +16,11 @@ import TruckAnimation, { type TruckPhase } from '../components/TruckAnimation';
 
 function AlchiLogo() {
   return (
-    <Svg width={38} height={46} viewBox="0 0 36 44">
-      <Path d="M18 2 L4 42 L13 42 L18 24 L23 42 L32 42 Z" fill="#FFFFFF" />
-      <Path d="M11 30 L25 30 L23 34 L13 34 Z" fill="#1B3A28" />
-    </Svg>
+    <Image
+      source={require('../assets/ref/vrai A en blanc.png')}
+      style={{ width: 56, height: 56 }}
+      resizeMode="contain"
+    />
   );
 }
 
@@ -35,8 +35,8 @@ export default function LoginScreen() {
   const [showError, setShowError] = useState(false);
   const [phase, setPhase] = useState<TruckPhase>('arriving');
 
-  const cardY = useSharedValue(-260);
-  const cardRot = useSharedValue(3);
+  const cardY = useSharedValue(-620);
+  const cardRot = useSharedValue(-7);
   const cardOpacity = useSharedValue(0);
 
   const cardStyle = useAnimatedStyle(() => ({
@@ -49,9 +49,9 @@ export default function LoginScreen() {
 
   function handleFormReady() {
     setPhase('idle');
-    cardOpacity.value = withTiming(1, { duration: 200 });
-    cardY.value = withSpring(0, { damping: 13, stiffness: 95, mass: 1.1 });
-    cardRot.value = withSpring(0, { damping: 14, stiffness: 80 });
+    cardOpacity.value = withTiming(1, { duration: 120 });
+    cardY.value = withSpring(0, { damping: 11, stiffness: 52, mass: 2.2 });
+    cardRot.value = withSpring(0, { damping: 12, stiffness: 58 });
   }
 
   const emailFilled = email.trim().includes('@') && email.trim().length > 4;
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 24,
     paddingBottom: 8,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   scrollContent: {
     flexGrow: 1,
