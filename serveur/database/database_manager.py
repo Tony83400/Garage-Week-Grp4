@@ -54,6 +54,9 @@ class DatabaseManager:
         return self.repo_ressources.remplacer_disponibilites_chauffeur(chauffeur_id, disponibilites)
 
     # 3. CONTRAINTES ET PLANIFICATION
+    def recuperer_depot_principal(self):
+        return self.repo_tournees.recuperer_depot_principal()
+
     def ajouter_disponibilite_client(self, client_id, jour_semaine, heure_debut, heure_fin):
         return self.repo_tournees.ajouter_disponibilite_client(client_id, jour_semaine, heure_debut, heure_fin)
 

@@ -107,7 +107,7 @@ CREATE TABLE taches_collecte (
     heure_estimee TEXT DEFAULT NULL,
     bacs_prevus INTEGER DEFAULT 0,
     poids_prevu_kg REAL DEFAULT 0,
-    duree_estimee_min INTEGER DEFAULT 15,
+    duree_estimee_min INTEGER DEFAULT 5,
     bacs_reels INTEGER DEFAULT NULL,
     statut TEXT DEFAULT 'en_attente',
     commentaire TEXT DEFAULT NULL,
@@ -305,5 +305,138 @@ INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, heure_debut_se
 ('2026-06-19', 2, 2, '06:30:00', '16:00:00', 'brouillon'),
 -- Sam 20 juin
 ('2026-06-20', 1, 1, '06:30:00', '14:00:00', 'brouillon');
+-- =============================================================================
+-- SUITE DES INSERTIONS : 30 NOUVEAUX CLIENTS (Total : 50)
+-- =============================================================================
 
+INSERT INTO clients (nom_entreprise, latitude, longitude, adresse, date_debut_contrat, date_fin_contrat) VALUES
+('Lycée Agricole',         43.1092, 6.1438, 'Route de l''Almanarre, 83400 Hyères',                '2025-01-01', '2026-12-31'),
+('Stade Mayol',            43.1195, 5.9348, 'Quai Joseph Lafontan, 83000 Toulon',                 '2025-01-01', '2026-12-31'),
+('Centre de Tri Postal',   43.1450, 6.0712, 'ZAC de la Moutonne, 83260 La Crau',                  '2025-01-01', '2026-12-31'),
+('Hypermarché Ouest',      43.1364, 5.8617, 'Route des Sablettes, 83500 La Seyne-sur-Mer',        '2025-01-01', '2026-12-31'),
+('Collège Jules Ferry',    43.1589, 6.0222, 'Avenue de la République, 83210 Solliès-Pont',        '2025-01-01', '2026-12-31'),
+('Maison de Retraite',     43.1310, 5.9810, 'Avenue Pablo Picasso, 83160 La Valette-du-Var',      '2025-01-01', '2026-12-31'),
+('Usine Automobile',       43.1400, 6.0000, 'ZAE des Espaluns, 83130 La Garde',                   '2025-01-01', '2026-12-31'),
+('Base Navale',            43.1215, 5.9083, 'Arsenal de Toulon, 83800 Toulon',                    '2025-01-01', '2026-12-31'),
+('Gare SNCF Toulon',       43.1281, 5.9297, 'Place de l''Europe, 83000 Toulon',                   '2025-01-01', '2026-12-31'),
+('Aéroport Toulon-Hyères', 43.0975, 6.1461, 'Boulevard de la Marine, 83400 Hyères',               '2025-01-01', '2026-12-31'),
+('Camping Sud',            43.0475, 6.1361, 'Route de Giens, 83400 Hyères',                       '2025-01-01', '2026-12-31'),
+('Parc d''Attractions',    43.3086, 6.5164, 'Route du Plan de la Tour, 83120 Sainte-Maxime',      '2025-01-01', '2026-12-31'),
+('Pépinière Var',          43.1667, 6.1500, 'Chemin des Maures, 83250 La Londe-les-Maures',       '2025-01-01', '2026-12-31'),
+('Marché Agricole',        43.3833, 5.8667, 'Place du Marché, 83170 Brignoles',                   '2025-01-01', '2026-12-31'),
+('Golf Club',              43.1450, 5.7561, 'Route de Bandol, 83270 Saint-Cyr-sur-Mer',           '2025-01-01', '2026-12-31'),
+('Domaine Viticole',       43.2000, 5.7833, 'Chemin des Vignes, 83330 Le Castellet',              '2025-01-01', '2026-12-31'),
+('Supermarché Centre',     43.1250, 5.9300, 'Boulevard de Strasbourg, 83000 Toulon',              '2025-01-01', '2026-12-31'),
+('Imprimerie Varoise',     43.1360, 6.0150, 'Avenue de l''Université, 83130 La Garde',            '2025-01-01', '2026-12-31'),
+('Clinique Est',           43.4250, 6.7667, 'Avenue André Léotard, 83600 Fréjus',                 '2025-01-01', '2026-12-31'),
+('Théâtre Municipal',      43.1235, 5.9320, 'Place Victor Hugo, 83000 Toulon',                    '2025-01-01', '2026-12-31'),
+('Abattoir Régional',      43.3850, 6.3050, 'Zone Industrielle, 83340 Le Luc',                    '2025-01-01', '2026-12-31'),
+('Centre Nautique',        43.0761, 5.8361, 'Corniche de la Coudoulière, 83140 Six-Fours',        '2025-01-01', '2026-12-31'),
+('Hôtel de Ville',         43.1167, 5.8833, 'Quai Saturnin Fabre, 83500 La Seyne-sur-Mer',        '2025-01-01', '2026-12-31'),
+('Résidence Universitaire',43.1380, 6.0200, 'Rue des Fusiliers Marins, 83130 La Garde',           '2025-01-01', '2026-12-31'),
+('Médiathèque',            43.1220, 6.1280, 'Place Clemenceau, 83400 Hyères',                     '2025-01-01', '2026-12-31'),
+('Restaurant d''Altitude', 43.3333, 5.9667, 'Massif de la Sainte-Baume, 83640 Plan-d''Aups',      '2025-01-01', '2026-12-31'),
+('Cave Coopérative',       43.2333, 6.0833, 'Avenue des Vignerons, 83390 Cuers',                  '2025-01-01', '2026-12-31'),
+('Magasin Bricolage',      43.1420, 6.0350, 'ZAC Grand Ciel, 83130 La Garde',                     '2025-01-01', '2026-12-31'),
+('Centre Pénitentiaire',   43.1333, 6.0500, 'Route de Crau, 83210 La Farlède',                    '2025-01-01', '2026-12-31'),
+('Concessionnaire Auto',   43.1550, 5.9850, 'Avenue des Frères Lumière, 83160 La Valette',        '2025-01-01', '2026-12-31');
 -- C. AUCUNE TÂCHE N'EST INSÉRÉE — créées par le bouton "Générer les tournées (IA)"
+
+-- =============================================================================
+-- DISPONIBILITÉS DES 30 NOUVEAUX CLIENTS
+-- =============================================================================
+
+INSERT INTO disponibilites_clients (client_id, jour_semaine, heure_debut, heure_fin, poids_prevu_kg) VALUES
+-- 21. Lycée Agricole : Lun, Mer, Ven
+(21, 1, '07:30:00', '12:00:00', 110.0),
+(21, 3, '07:30:00', '12:00:00', 105.0),
+(21, 5, '07:30:00', '12:00:00', 115.0),
+-- 22. Stade Mayol : Lundi (après match du week-end)
+(22, 1, '06:00:00', '14:00:00', 450.0),
+-- 23. Centre de Tri Postal : Tous les jours
+(23, 1, '06:30:00', '15:00:00', 200.0),
+(23, 2, '06:30:00', '15:00:00', 200.0),
+(23, 3, '06:30:00', '15:00:00', 200.0),
+(23, 4, '06:30:00', '15:00:00', 200.0),
+(23, 5, '06:30:00', '15:00:00', 200.0),
+-- 24. Hypermarché Ouest : Mar, Jeu, Sam
+(24, 2, '05:00:00', '11:00:00', 350.0),
+(24, 4, '05:00:00', '11:00:00', 320.0),
+(24, 6, '05:00:00', '11:00:00', 400.0),
+-- 25. Collège Jules Ferry : Mar, Jeu
+(25, 2, '08:00:00', '12:00:00', 90.0),
+(25, 4, '08:00:00', '12:00:00', 85.0),
+-- 26. Maison de Retraite : Tous les jours
+(26, 1, '07:00:00', '14:00:00', 120.0),
+(26, 3, '07:00:00', '14:00:00', 120.0),
+(26, 5, '07:00:00', '14:00:00', 120.0),
+-- 27. Usine Automobile : Lun au Ven, gros volume
+(27, 1, '06:00:00', '16:00:00', 500.0),
+(27, 3, '06:00:00', '16:00:00', 480.0),
+(27, 5, '06:00:00', '16:00:00', 510.0),
+-- 28. Base Navale : Mercredi uniquement (Sécurité)
+(28, 3, '08:00:00', '12:00:00', 250.0),
+-- 29. Gare SNCF Toulon : Lun, Mer, Ven
+(29, 1, '05:00:00', '10:00:00', 180.0),
+(29, 3, '05:00:00', '10:00:00', 170.0),
+(29, 5, '05:00:00', '10:00:00', 190.0),
+-- 30. Aéroport Toulon-Hyères : Tous les jours
+(30, 2, '06:00:00', '13:00:00', 220.0),
+(30, 4, '06:00:00', '13:00:00', 210.0),
+(30, 6, '06:00:00', '13:00:00', 250.0),
+-- 31. Camping Sud : Saisonnier, gros volumes Samedi et Lundi
+(31, 1, '07:00:00', '13:00:00', 280.0),
+(31, 6, '07:00:00', '13:00:00', 350.0),
+-- 32. Parc d'Attractions : Lundi et Jeudi
+(32, 1, '08:00:00', '12:00:00', 150.0),
+(32, 4, '08:00:00', '12:00:00', 140.0),
+-- 33. Pépinière Var : Mardi
+(33, 2, '09:00:00', '15:00:00', 60.0),
+-- 34. Marché Agricole : Jeudi et Dimanche (après marché)
+(34, 4, '13:00:00', '16:00:00', 200.0),
+(34, 7, '13:00:00', '16:00:00', 250.0),
+-- 35. Golf Club : Mercredi
+(35, 3, '08:00:00', '14:00:00', 70.0),
+-- 36. Domaine Viticole : Lundi et Vendredi
+(36, 1, '07:30:00', '15:30:00', 110.0),
+(36, 5, '07:30:00', '15:30:00', 130.0),
+-- 37. Supermarché Centre : Quotidien sauf Dimanche
+(37, 1, '06:00:00', '11:00:00', 190.0),
+(37, 2, '06:00:00', '11:00:00', 180.0),
+(37, 3, '06:00:00', '11:00:00', 185.0),
+(37, 4, '06:00:00', '11:00:00', 170.0),
+(37, 5, '06:00:00', '11:00:00', 200.0),
+(37, 6, '06:00:00', '11:00:00', 250.0),
+-- 38. Imprimerie Varoise : Jeudi
+(38, 4, '08:00:00', '16:00:00', 140.0),
+-- 39. Clinique Est : Lun, Mer, Ven
+(39, 1, '07:00:00', '14:00:00', 160.0),
+(39, 3, '07:00:00', '14:00:00', 160.0),
+(39, 5, '07:00:00', '14:00:00', 160.0),
+-- 40. Théâtre Municipal : Lundi (après spectacles du week-end)
+(40, 1, '09:00:00', '12:00:00', 80.0),
+-- 41. Abattoir Régional : Mar, Jeu
+(41, 2, '05:00:00', '10:00:00', 400.0),
+(41, 4, '05:00:00', '10:00:00', 400.0),
+-- 42. Centre Nautique : Mercredi et Samedi
+(42, 3, '08:30:00', '14:00:00', 60.0),
+(42, 6, '08:30:00', '14:00:00', 90.0),
+-- 43. Hôtel de Ville : Mardi
+(43, 2, '08:00:00', '15:00:00', 50.0),
+-- 44. Résidence Universitaire : Lundi et Jeudi
+(44, 1, '07:30:00', '13:00:00', 180.0),
+(44, 4, '07:30:00', '13:00:00', 170.0),
+-- 45. Médiathèque : Vendredi
+(45, 5, '09:00:00', '12:00:00', 40.0),
+-- 46. Restaurant d'Altitude : Lundi (difficile d'accès, gros volume)
+(46, 1, '08:00:00', '14:00:00', 150.0),
+-- 47. Cave Coopérative : Mercredi
+(47, 3, '07:00:00', '15:00:00', 130.0),
+-- 48. Magasin Bricolage : Lundi et Vendredi
+(48, 1, '06:30:00', '11:30:00', 140.0),
+(48, 5, '06:30:00', '11:30:00', 160.0),
+-- 49. Centre Pénitentiaire : Mardi et Vendredi (horaires stricts)
+(49, 2, '08:00:00', '10:00:00', 250.0),
+(49, 5, '08:00:00', '10:00:00', 250.0),
+-- 50. Concessionnaire Auto : Jeudi
+(50, 4, '08:30:00', '16:00:00', 90.0);

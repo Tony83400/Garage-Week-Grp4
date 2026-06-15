@@ -240,7 +240,14 @@ def api_optimiser_tournees():
     DEPOT_LAT, DEPOT_LON = 43.1670, 6.0430
     
     try:
-        # 1. Préparation des données pour le solveur
+        # 1. Récupération dynamique du dépôt depuis la BDD
+        depot = db.recuperer_depot_principal()
+        if not depot:
+            return jsonify({"erreur": "Dépôt non trouvé dans la base de données."}), 404
+            
+        DEPOT_LAT, DEPOT_LON = depot['latitude'], depot['longitude']
+        
+        # 2. Préparation des données pour le solveur
         data_ortools = db.preparer_donnees_ortools(date_cible, DEPOT_LAT, DEPOT_LON)
         
         # S'il n'y a que le dépôt (index 0) et pas de clients
@@ -258,7 +265,8 @@ def api_optimiser_tournees():
         
         return jsonify({
             "message": "L'optimisation des tournées a été calculée et enregistrée avec succès !",
-            "vehicules_utilises": len(resultats_ia['routes'])
+            "vehicules_utilises": len(resultats_ia['routes']),
+            "points_non_affectes": resultats_ia.get('dropped_nodes', [])
         }), 200
         
     except Exception as e:
