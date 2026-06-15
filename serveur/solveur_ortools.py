@@ -89,9 +89,12 @@ def resoudre_et_exporter(data):
         end_index = routing.End(vehicle_id)
         h_start, h_end = data['vehicle_time_windows'][vehicle_id]
         
+        # SÉCURITÉ : S'assurer que h_start <= h_end pour éviter un crash du solveur
+        h_end_safe = max(h_start, h_end)
+        
         # Le conducteur ne peut pas partir avant son heure et doit être rentré avant la fin
-        time_dimension.CumulVar(start_index).SetRange(h_start, h_end)
-        time_dimension.CumulVar(end_index).SetRange(h_start, h_end)
+        time_dimension.CumulVar(start_index).SetRange(h_start, h_end_safe)
+        time_dimension.CumulVar(end_index).SetRange(h_start, h_end_safe)
 
     # 4. GESTION DU MULTI-TRIP (Séquencement des trips virtuels)
     if 'groupes_vehicules' in data:
@@ -109,7 +112,10 @@ def resoudre_et_exporter(data):
     # Pénalité pour point non visité (doit rester très haute)
     penalty = 1000000 
     for node in range(1, len(data['distance_matrix'])):
-        routing.AddDisjunction([manager.NodeToIndex(node)], penalty)
+        # SÉCURITÉ : On n'ajoute de disjonction que sur les tâches réelles (avec un ID)
+        # On évite d'en ajouter sur les points de départ (starts) pour ne pas perturber le solveur
+        if node < len(data['tache_ids']) and data['tache_ids'][node] is not None:
+            routing.AddDisjunction([manager.NodeToIndex(node)], penalty)
 
     # 6. PARAMÈTRES DE RECHERCHE
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
@@ -119,9 +125,8 @@ def resoudre_et_exporter(data):
     
     search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     
-    # Garde les 120 secondes
-    search_parameters.time_limit.seconds = 30
-    search_parameters.log_search = True
+    search_parameters.time_limit.seconds = 5
+    search_parameters.log_search = False
 
 
     solution = routing.SolveWithParameters(search_parameters)

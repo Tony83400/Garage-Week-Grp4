@@ -22,7 +22,7 @@ import EditPlanningModal from '../components/EditPlanningModal';
 
 import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
-import { getPlanningAdmin, genererBrouillons, optimiserTournees, reoptimiserTournees, getPlanningPreview, type TourneeAdmin } from '../services/planning';
+import { getPlanningAdmin, genererBrouillons, optimiserTournees, getPlanningPreview, type TourneeAdmin } from '../services/planning';
 
 type VehicleRow = { chauffeurId: number; chauffeurNom: string; heureDepart: string; heureFin: string; arrets: any[]; capaciteMaxKg: number; distance_km: number; immatriculation: string };
 
@@ -155,7 +155,16 @@ export default function PlanningScreen() {
     showToast('Calcul du nouveau futur...');
     try {
       const res = await reoptimiserTournees(selectedDate);
-      showToast(res.message || 'Ré-optimisation réussie');
+      
+      // On utilise une Alert pour un message détaillé et bloquant (important pour la supervision)
+      const { Alert } = require('react-native');
+      Alert.alert(
+        "Ré-optimisation terminée",
+        `${res.points_reaffectes} points ont été ré-affectés aux tournées en cours.\n${res.points_reportes} points ont été automatiquement reportés au lendemain.`,
+        [{ text: "OK", onPress: () => fetchData(selectedDate) }]
+      );
+      
+      // Rafraîchissement immédiat en arrière-plan
       await fetchData(selectedDate);
     } catch (e: any) {
       console.error(e);
@@ -443,7 +452,7 @@ export default function PlanningScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={s.btnRegenerate}
-            onPress={isToday ? handleReoptimise : handleGenerate}
+            onPress={handleGenerate}
             activeOpacity={0.85}
             disabled={generating}
           >
@@ -452,7 +461,7 @@ export default function PlanningScreen() {
               : <Ionicons name="refresh-outline" size={16} color={colors.textMuted} />
             }
             <Text style={s.btnRegenerateText}>
-              {generating ? 'Recalcul...' : (isToday ? 'Ré-optimiser' : 'Régénérer')}
+              {generating ? 'Calcul IA en cours...' : 'Régénérer (IA)'}
             </Text>
           </TouchableOpacity>
         </View>

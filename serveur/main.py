@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from database.database_manager import DatabaseManager
 from client import Client
 from datetime import date
+import datetime
 from flask_cors import CORS
 import threading
 import os
@@ -187,22 +188,6 @@ def get_imprevus():
     imprevus = db.recuperer_imprevus(date_jour)
     return jsonify(imprevus), 200
 
-@app.route('/api/imprevus/<int:tache_id>/reassigner', methods=['POST'])
-def reassigner_imprevu(tache_id):
-    """Tente de réassigner une tâche orpheline au premier chauffeur disponible."""
-    date_jour = date.today().isoformat()
-    candidat = db.trouver_candidat_reassignation(tache_id, date_jour)
-    if candidat:
-        db.executer_reassignation(tache_id, candidat['tournee_id'])
-        return jsonify({
-            "message": f"Réassigné à {candidat['chauffeur_nom']}",
-            "chauffeur": candidat['chauffeur_nom'],
-            "heure_arrivee": candidat['heure_arrivee_estimee'],
-        }), 200
-    else:
-        db.executer_reassignation(tache_id, None)
-        return jsonify({"message": "Aucun chauffeur disponible — reporté au lendemain"}), 200
-
 @app.route('/api/imprevus/<int:tache_id>/replanifier', methods=['POST'])
 def replanifier_imprevu(tache_id):
     # Remet la tâche en attente, annule les bacs réels et réinitialise le commentaire
@@ -283,48 +268,6 @@ def api_optimiser_tournees():
         
     except Exception as e:
         return jsonify({"erreur": f"Erreur lors de l'optimisation : {str(e)}"}), 500 
-
-
-
-@app.route('/api/planning/reoptimiser', methods=['POST'])
-def api_reoptimiser_tournees():
-    """
-    Ré-optimisation en cours de journée (Real-Time VRP).
-    Prend en compte la position actuelle des camions et les imprévus.
-    """
-    data_req = request.get_json() or {}
-    date_cible = data_req.get('date', date.today().isoformat())
-    
-    # Heure actuelle en minutes (ex: 14:30 -> 14*60 + 30 = 870)
-    now = datetime.datetime.now()
-    heure_actuelle_min = now.hour * 60 + now.minute
-
-    try:
-        # 1. Préparation des données spécifiques au re-routage
-        data_ortools = db.preparer_donnees_reoptimisation(date_cible, heure_actuelle_min)
-        
-        if not data_ortools or data_ortools['num_vehicles'] == 0:
-            return jsonify({"erreur": "Aucun shift actif ou futur pour cette date."}), 400
-            
-        if len(data_ortools.get('tache_ids', [])) <= 1:
-            return jsonify({"erreur": "Aucune tâche à ré-optimiser."}), 400
-
-        # 2. Exécution du solveur
-        resultats_ia = resoudre_et_exporter(data_ortools)
-        
-        if not resultats_ia:
-            return jsonify({"erreur": "Échec de la ré-optimisation (aucune solution)."}), 500
-        
-        # 3. Sauvegarde
-        db.sauvegarder_resultat_optimisation(date_cible, resultats_ia, data_ortools)
-        
-        return jsonify({
-            "message": "Ré-optimisation réussie !",
-            "points_non_affectes": resultats_ia.get('dropped_nodes', [])
-        }), 200
-        
-    except Exception as e:
-        return jsonify({"erreur": f"Erreur ré-optimisation : {str(e)}"}), 500
 
 @app.route('/api/ressources/camions', methods=['GET'])
 def get_camions():

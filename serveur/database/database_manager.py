@@ -81,12 +81,6 @@ class DatabaseManager:
 
     def mettre_a_jour_statut_tournee(self, tournee_id, statut):
         return self.repo_tournees.mettre_a_jour_statut_tournee(tournee_id, statut)
-
-    def trouver_candidat_reassignation(self, tache_id, date_jour):
-        return self.repo_tournees.trouver_candidat_reassignation(tache_id, date_jour)
-
-    def executer_reassignation(self, tache_id, tournee_id):
-        return self.repo_tournees.executer_reassignation(tache_id, tournee_id)
     
     def recuperer_imprevus(self, date_jour):
         return self.repo_tournees.recuperer_imprevus(date_jour)
