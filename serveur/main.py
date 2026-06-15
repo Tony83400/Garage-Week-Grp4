@@ -49,8 +49,10 @@ def add_client():
     lat = data.get('latitude', 43.1200)
     lon = data.get('longitude', 5.9300)
     adresse = data.get('adresse', None)
+    date_debut = data.get('date_debut_contrat', None)
+    date_fin = data.get('date_fin_contrat', None)
 
-    nouveau_client = Client(nom_entreprise=nom, latitude=lat, longitude=lon, adresse=adresse)
+    nouveau_client = Client(nom_entreprise=nom, latitude=lat, longitude=lon, adresse=adresse, date_debut_contrat=date_debut, date_fin_contrat=date_fin)
 
     if db.ajouter_client(nouveau_client):
         return jsonify({"message": f"Site '{nouveau_client.nom_entreprise}' enregistré avec succès.", "id": nouveau_client.id}), 201
@@ -79,6 +81,12 @@ def delete_client(client_id):
     if ok:
         return jsonify({"message": f"Client {client_id} supprimé."}), 200
     return jsonify({"erreur": "Client introuvable."}), 404
+
+@app.route('/clients/<int:client_id>/disponibilites', methods=['GET'])
+def get_disponibilites_client(client_id):
+    """Retourne les créneaux de collecte enregistrés pour un client."""
+    dispos = db.get_disponibilites_client(client_id)
+    return jsonify(dispos), 200
 
 @app.route('/clients/backfill-adresses', methods=['POST'])
 def backfill_adresses():

@@ -1,13 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  Animated,
-  TextInput,
+  View, Text, ScrollView, TouchableOpacity,
+  ActivityIndicator, StyleSheet, Animated, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -16,7 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import MobileDrawer from '../components/MobileDrawer';
 import SiteModal from '../components/SiteModal';
-import { getClients, deleteClient, type Client } from '../services/clients';
+import SiteDetailModal from '../components/SiteDetailModal';
+import { getClients, type Client } from '../services/clients';
 
 function extractVille(adresse?: string): string {
   if (!adresse) return 'Autre';
@@ -29,9 +24,8 @@ export default function SitesScreen() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [siteModalOpen, setSiteModalOpen] = useState(false);
+  const [detailSite, setDetailSite] = useState<Client | null>(null);
   const [search, setSearch] = useState('');
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -50,18 +44,6 @@ export default function SitesScreen() {
   useEffect(() => {
     fetchClients();
   }, []);
-
-  async function handleDelete(id: number) {
-    try {
-      await deleteClient(id);
-      setClients(prev => prev.filter(c => c.id !== id));
-      setExpandedId(null);
-      setDeleteConfirmId(null);
-      showToast('Site supprimé');
-    } catch {
-      showToast('Erreur lors de la suppression');
-    }
-  }
 
   function showToast(msg: string) {
     setToast(msg);
@@ -85,17 +67,12 @@ export default function SitesScreen() {
 
   const villesSorted = Object.keys(grouped).sort();
 
-  function renderRow(c: Client, i: number, isLast: boolean) {
-    const isExpanded = expandedId === c.id;
-    const adresseText = c.adresse || `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`;
+  function renderRow(c: Client, i: number) {
     return (
       <TouchableOpacity
         key={c.id ?? i}
         style={[s.siteItem, i > 0 && s.siteDivider]}
-        onPress={() => {
-          setExpandedId(isExpanded ? null : (c.id ?? null));
-          setDeleteConfirmId(null);
-        }}
+        onPress={() => setDetailSite(c)}
         activeOpacity={0.75}
       >
         <View style={s.siteIconBox}>
@@ -103,54 +80,11 @@ export default function SitesScreen() {
         </View>
         <View style={s.siteInfo}>
           <Text style={s.siteName}>{c.nom_entreprise}</Text>
-          <Text style={s.siteAddr} numberOfLines={isExpanded ? undefined : 1}>
-            {adresseText}
+          <Text style={s.siteAddr} numberOfLines={1}>
+            {c.adresse || `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`}
           </Text>
-          {isExpanded && (
-            <View style={s.expandedBlock}>
-              <View style={s.expandedCoordRow}>
-                <Ionicons name="navigate-outline" size={11} color={colors.textMuted} />
-                <Text style={s.expandedCoords}>
-                  {c.latitude.toFixed(5)}, {c.longitude.toFixed(5)}
-                </Text>
-              </View>
-              {deleteConfirmId === c.id ? (
-                <View style={s.deleteConfirmRow}>
-                  <Text style={s.deleteConfirmLabel}>Supprimer ce site ?</Text>
-                  <TouchableOpacity
-                    style={s.deleteConfirmBtn}
-                    onPress={() => handleDelete(c.id!)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={s.deleteConfirmBtnText}>Oui, supprimer</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={s.deleteCancelBtn}
-                    onPress={() => setDeleteConfirmId(null)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={s.deleteCancelBtnText}>Annuler</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={s.deleteBtn}
-                  onPress={() => setDeleteConfirmId(c.id ?? null)}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="trash-outline" size={13} color={colors.coral} />
-                  <Text style={s.deleteBtnText}>Supprimer ce site</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
         </View>
-        <Ionicons
-          name={isExpanded ? 'chevron-up' : 'chevron-forward'}
-          size={14}
-          color={colors.textMuted}
-          style={{ flexShrink: 0 }}
-        />
+        <Ionicons name="chevron-forward" size={14} color={colors.textMuted} style={{ flexShrink: 0 }} />
       </TouchableOpacity>
     );
   }
@@ -231,7 +165,7 @@ export default function SitesScreen() {
                   </View>
                 </View>
                 <View style={s.listCard}>
-                  {grouped[ville].map((c, i) => renderRow(c, i, i === grouped[ville].length - 1))}
+                  {grouped[ville].map((c, i) => renderRow(c, i))}
                 </View>
               </View>
             ))}
@@ -263,6 +197,13 @@ export default function SitesScreen() {
         visible={siteModalOpen}
         onClose={() => setSiteModalOpen(false)}
         onSuccess={(msg) => { showToast(msg); fetchClients(); }}
+      />
+      <SiteDetailModal
+        visible={detailSite !== null}
+        client={detailSite}
+        onClose={() => setDetailSite(null)}
+        onDeleted={(id) => setClients(prev => prev.filter(c => c.id !== id))}
+        onToast={showToast}
       />
       <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} activeRoute="sites" />
     </SafeAreaView>
@@ -414,77 +355,6 @@ const s = StyleSheet.create({
   siteInfo: { flex: 1 },
   siteName: { fontSize: 14, fontWeight: '600', color: colors.text },
   siteAddr: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  expandedBlock: {
-    marginTop: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#EAF2EE',
-    gap: 8,
-  },
-  expandedCoordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  expandedCoords: {
-    fontSize: 10,
-    color: colors.textMuted,
-    fontWeight: '500',
-  },
-  deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(231,111,81,0.3)',
-    backgroundColor: colors.coralLight,
-  },
-  deleteBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.coral,
-  },
-  deleteConfirmRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  deleteConfirmLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.coral,
-    flex: 1,
-  },
-  deleteConfirmBtn: {
-    backgroundColor: colors.coral,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  deleteConfirmBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  deleteCancelBtn: {
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#D4E8DC',
-    backgroundColor: colors.background,
-  },
-  deleteCancelBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-
   // FAB
   fab: {
     position: 'absolute',

@@ -31,6 +31,9 @@ class DatabaseManager:
     def backfill_adresses_nominatim(self):
         return self.repo_clients.backfill_adresses_nominatim()
 
+    def get_disponibilites_client(self, client_id):
+        return self.repo_clients.get_disponibilites_client(client_id)
+
     # 2. GESTION DES RESSOURCES
     def ajouter_camion(self, immatriculation, charge_max_kg, bacs_max):
         return self.repo_ressources.ajouter_camion(immatriculation, charge_max_kg, bacs_max)

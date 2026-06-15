@@ -24,6 +24,27 @@ import { addClient, addDisponibilite } from '@/services/clients';
 
 const CATEGORIES = ['Restaurant', 'Hôtel', 'École', 'Cantine', 'Fast-food', 'Supermarché', 'Autre'];
 const VILLES = ['Toulon', 'Hyères', 'La Seyne-sur-Mer', 'Six-Fours', 'Sanary-sur-Mer', 'Bandol', 'Ollioules', 'La Garde', 'Le Pradet', 'Le Lavandou'];
+const DUREES_CONTRAT = [
+  { label: '6 mois', months: 6 },
+  { label: '1 an', months: 12 },
+  { label: '2 ans', months: 24 },
+];
+
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+function formatDateFR(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
 const JOURS = [
   { label: 'Lun', value: 1 },
   { label: 'Mar', value: 2 },
@@ -53,6 +74,7 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
       prev.includes(val) ? prev.filter(j => j !== val) : [...prev, val]
     );
   }
+  const [contractMonths, setContractMonths] = useState<number | null>(12);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -100,11 +122,17 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
     setSubmitting(true);
     setErrorMsg(null);
     try {
+      const today = new Date();
+      const dateDebut = toISODate(today);
+      const dateFin = contractMonths ? toISODate(addMonths(today, contractMonths)) : undefined;
+
       const result = await addClient({
         nom_entreprise: nom.trim(),
         latitude: geoLat!,
         longitude: geoLon!,
         adresse: adresse.trim(),
+        date_debut_contrat: dateDebut,
+        date_fin_contrat: dateFin,
       });
       if (result.id && joursSelected.length > 0) {
         const hd = slotStart.length === 5 ? slotStart + ':00' : slotStart;
@@ -131,6 +159,7 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
     setSlotStart('07:00');
     setSlotEnd('12:00');
     setSaisonnier(false);
+    setContractMonths(12);
     setErrorMsg(null);
     setFocusedField(null);
     setSuggestions([]);
@@ -350,6 +379,45 @@ export default function SiteModal({ visible, onClose, onSuccess }: Props) {
                   <View style={[s.toggleThumb, saisonnier && s.toggleThumbOn]} />
                 </View>
               </TouchableOpacity>
+
+              <View style={s.divider} />
+
+              {/* Section — Contrat */}
+              <View style={s.sectionHeader}>
+                <Ionicons name="document-text-outline" size={13} color={colors.primaryLight} />
+                <Text style={s.sectionLabel}>Contrat</Text>
+              </View>
+
+              <View style={s.field}>
+                <Text style={s.label}>Durée du contrat</Text>
+                <View style={s.dureeRow}>
+                  {DUREES_CONTRAT.map(d => (
+                    <TouchableOpacity
+                      key={d.months}
+                      style={[s.dureeChip, contractMonths === d.months && s.dureeChipActive]}
+                      onPress={() => setContractMonths(m => m === d.months ? null : d.months)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[s.dureeChipText, contractMonths === d.months && s.dureeChipTextActive]}>
+                        {d.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {contractMonths !== null && (() => {
+                  const today = new Date();
+                  const debut = toISODate(today);
+                  const fin = toISODate(addMonths(today, contractMonths));
+                  return (
+                    <View style={s.contractPreview}>
+                      <Ionicons name="calendar-outline" size={12} color={colors.primaryLight} />
+                      <Text style={s.contractPreviewText}>
+                        Du {formatDateFR(debut)} au {formatDateFR(fin)}
+                      </Text>
+                    </View>
+                  );
+                })()}
+              </View>
 
               {/* Inline error */}
               {errorMsg && (
@@ -737,6 +805,44 @@ const s = StyleSheet.create({
   },
   toggleThumbOn: {
     marginLeft: 20,
+  },
+
+  // Contract duration chips
+  dureeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dureeChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: '#D4E8DC',
+    alignItems: 'center',
+  },
+  dureeChipActive: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primaryLight,
+  },
+  dureeChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  dureeChipTextActive: {
+    color: '#fff',
+  },
+  contractPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  contractPreviewText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primaryLight,
   },
 
   // Error

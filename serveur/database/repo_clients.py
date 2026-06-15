@@ -17,8 +17,8 @@ class ClientRepository:
             with self.db_core.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    'INSERT INTO clients (nom_entreprise, latitude, longitude, adresse) VALUES (?, ?, ?, ?)',
-                    (client.nom_entreprise, client.latitude, client.longitude, client.adresse)
+                    'INSERT INTO clients (nom_entreprise, latitude, longitude, adresse, date_debut_contrat, date_fin_contrat) VALUES (?, ?, ?, ?, ?, ?)',
+                    (client.nom_entreprise, client.latitude, client.longitude, client.adresse, client.date_debut_contrat, client.date_fin_contrat)
                 )
                 conn.commit()
                 client.id = cursor.lastrowid
@@ -30,9 +30,19 @@ class ClientRepository:
     def recuperer_tous_les_clients(self):
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT id, nom_entreprise, latitude, longitude, adresse FROM clients')
+            cursor.execute('SELECT id, nom_entreprise, latitude, longitude, adresse, date_debut_contrat, date_fin_contrat FROM clients')
             lignes = cursor.fetchall()
-            return [Client(id=l[0], nom_entreprise=l[1], latitude=l[2], longitude=l[3], adresse=l[4]) for l in lignes]
+            return [Client(id=l[0], nom_entreprise=l[1], latitude=l[2], longitude=l[3], adresse=l[4], date_debut_contrat=l[5], date_fin_contrat=l[6]) for l in lignes]
+
+    def get_disponibilites_client(self, client_id):
+        with self.db_core.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT id, client_id, jour_semaine, heure_debut, heure_fin FROM disponibilites_clients WHERE client_id = ? ORDER BY jour_semaine',
+                (client_id,)
+            )
+            rows = cursor.fetchall()
+            return [{'id': r[0], 'client_id': r[1], 'jour_semaine': r[2], 'heure_debut': r[3], 'heure_fin': r[4]} for r in rows]
 
     def supprimer_client(self, client_id):
         with self.db_core.get_connection() as conn:

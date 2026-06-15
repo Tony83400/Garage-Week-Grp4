@@ -7,6 +7,16 @@ export interface Client {
   latitude: number;
   longitude: number;
   adresse?: string;
+  date_debut_contrat?: string;
+  date_fin_contrat?: string;
+}
+
+export interface Disponibilite {
+  id?: number;
+  client_id: number;
+  jour_semaine: number;
+  heure_debut: string;
+  heure_fin: string;
 }
 
 export function getClients() {
@@ -32,4 +42,8 @@ export function deleteClient(id: number) {
 
 export function backfillAdresses() {
   return api.post<{ message: string }>('/clients/backfill-adresses', {});
+}
+
+export function getClientDisponibilites(id: number) {
+  return api.get<Disponibilite[]>(`/clients/${id}/disponibilites`);
 }

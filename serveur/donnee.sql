@@ -46,7 +46,9 @@ CREATE TABLE clients (
     nom_entreprise TEXT NOT NULL,
     latitude REAL NOT NULL,
     longitude REAL NOT NULL,
-    adresse TEXT DEFAULT NULL
+    adresse TEXT DEFAULT NULL,
+    date_debut_contrat TEXT DEFAULT NULL,
+    date_fin_contrat TEXT DEFAULT NULL
 );
 
 CREATE TABLE disponibilites_clients (
@@ -126,27 +128,27 @@ INSERT INTO camions (immatriculation, charge_max_kg, bacs_max) VALUES
 ('EF-456-GH', 1000, 15);
 
 
-INSERT INTO clients (nom_entreprise, latitude, longitude, adresse) VALUES
-('Supermarché Port', 43.1200, 5.9300, 'Quai de la Sinse, 83000 Toulon'),
-('Restaurant Plage', 43.1000, 5.8800, 'Boulevard Toussaint Merle, 83500 La Seyne-sur-Mer'),
-('Usine Tech', 43.1381, 5.9822, 'Zone Industrielle du Parc, 83160 La Valette-du-Var'),
-('Hôpital Sud', 43.1205, 6.1286, 'Allée des Marguerites, 83400 Hyères'),
-('Lycée Campus', 43.1250, 6.0100, 'Route de Toulon, 83130 La Garde'),
-('Centre Commercial', 43.0936, 5.8385, 'Avenue du Maréchal Juin, 83140 Six-Fours-les-Plages'),
-('Hôtel de la Baie', 43.1167, 5.8000, 'Quai du Port, 83110 Sanary-sur-Mer'),
-('Boulangerie Matin', 43.1333, 5.7500, 'Rue de la République, 83150 Bandol'),
-('Cinéma Central', 43.4000, 6.0500, 'Place du Général de Gaulle, 83170 Brignoles'),
-('Gare Routière', 43.5333, 6.4667, 'Avenue de Montferrat, 83300 Draguignan'),
-('Camping Les Pins', 43.4333, 6.7333, 'Boulevard de la Mer, 83600 Fréjus'),
-('Port de Plaisance', 43.2667, 6.6333, 'Quai Jean Jaurès, 83990 Saint-Tropez'),
-('Marché Provençal', 43.3167, 6.6333, 'Avenue Charles de Gaulle, 83120 Sainte-Maxime'),
-('Entreprise Logistique', 43.3833, 6.3167, 'Zone Artisanale les Béguinières, 83340 Le Luc'),
-('Mairie Centrale', 43.2333, 6.0833, 'Place de la Mairie, 83390 Cuers'),
-('Clinique Vallée', 43.1833, 6.0333, 'Avenue des Palmiers, 83210 Solliès-Pont'),
-('Magasin Bio', 43.1500, 6.0833, 'Route de Pierrefeu, 83260 La Crau'),
-('Pharmacie Littoral', 43.1000, 6.0167, 'Rue du Littoral, 83220 Le Pradet'),
-('Bibliothèque Municipale', 43.0833, 6.0833, 'Avenue de la Plage, 83320 Carqueiranne'),
-('Musée d''Art', 43.1500, 6.3500, 'Route de la Vieille, 83230 Bormes-les-Mimosas');
+INSERT INTO clients (nom_entreprise, latitude, longitude, adresse, date_debut_contrat, date_fin_contrat) VALUES
+('Supermarché Port',       43.1200, 5.9300, 'Quai de la Sinse, 83000 Toulon',                          '2025-01-01', '2026-12-31'),
+('Restaurant Plage',       43.1000, 5.8800, 'Boulevard Toussaint Merle, 83500 La Seyne-sur-Mer',        '2025-01-01', '2026-12-31'),
+('Usine Tech',             43.1381, 5.9822, 'Zone Industrielle du Parc, 83160 La Valette-du-Var',       '2025-01-01', '2026-12-31'),
+('Hôpital Sud',            43.1205, 6.1286, 'Allée des Marguerites, 83400 Hyères',                      '2024-01-01', '2027-12-31'),
+('Lycée Campus',           43.1250, 6.0100, 'Route de Toulon, 83130 La Garde',                          '2025-01-01', '2026-12-31'),
+('Centre Commercial',      43.0936, 5.8385, 'Avenue du Maréchal Juin, 83140 Six-Fours-les-Plages',      '2025-01-01', '2026-12-31'),
+('Hôtel de la Baie',       43.1167, 5.8000, 'Quai du Port, 83110 Sanary-sur-Mer',                       '2025-01-01', '2026-12-31'),
+('Boulangerie Matin',      43.1333, 5.7500, 'Rue de la République, 83150 Bandol',                       '2025-01-01', '2026-12-31'),
+('Cinéma Central',         43.4000, 6.0500, 'Place du Général de Gaulle, 83170 Brignoles',              '2025-01-01', '2026-12-31'),
+('Gare Routière',          43.5333, 6.4667, 'Avenue de Montferrat, 83300 Draguignan',                   '2025-01-01', '2026-12-31'),
+('Camping Les Pins',       43.4333, 6.7333, 'Boulevard de la Mer, 83600 Fréjus',                        '2025-01-01', '2026-12-31'),
+('Port de Plaisance',      43.2667, 6.6333, 'Quai Jean Jaurès, 83990 Saint-Tropez',                     '2025-01-01', '2026-12-31'),
+('Marché Provençal',       43.3167, 6.6333, 'Avenue Charles de Gaulle, 83120 Sainte-Maxime',            '2025-01-01', '2026-12-31'),
+('Entreprise Logistique',  43.3833, 6.3167, 'Zone Artisanale les Béguinières, 83340 Le Luc',            '2025-01-01', '2026-12-31'),
+('Mairie Centrale',        43.2333, 6.0833, 'Place de la Mairie, 83390 Cuers',                          '2025-01-01', '2026-07-05'),
+('Clinique Vallée',        43.1833, 6.0333, 'Avenue des Palmiers, 83210 Solliès-Pont',                  '2025-01-01', '2026-06-25'),
+('Magasin Bio',            43.1500, 6.0833, 'Route de Pierrefeu, 83260 La Crau',                        '2025-01-01', '2026-06-20'),
+('Pharmacie Littoral',     43.1000, 6.0167, 'Rue du Littoral, 83220 Le Pradet',                         '2025-01-01', '2026-05-01'),
+('Bibliothèque Municipale',43.0833, 6.0833, 'Avenue de la Plage, 83320 Carqueiranne',                   '2024-01-01', '2027-12-31'),
+('Musée d''Art',           43.1500, 6.3500, 'Route de la Vieille, 83230 Bormes-les-Mimosas',            '2025-06-01', '2026-06-01');
 
 
 -- =============================================================================

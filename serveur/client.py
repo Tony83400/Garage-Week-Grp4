@@ -1,10 +1,12 @@
 class Client:
-    def __init__(self, nom_entreprise, latitude, longitude, id=None, adresse=None):
+    def __init__(self, nom_entreprise, latitude, longitude, id=None, adresse=None, date_debut_contrat=None, date_fin_contrat=None):
         self.id = id
         self.nom_entreprise = nom_entreprise
         self.latitude = latitude
         self.longitude = longitude
         self.adresse = adresse
+        self.date_debut_contrat = date_debut_contrat
+        self.date_fin_contrat = date_fin_contrat
 
     def __str__(self):
         id_str = f"[{self.id}]" if self.id is not None else "[Nouveau]"
@@ -17,4 +19,6 @@ class Client:
             "latitude": self.latitude,
             "longitude": self.longitude,
             "adresse": self.adresse,
+            "date_debut_contrat": self.date_debut_contrat,
+            "date_fin_contrat": self.date_fin_contrat,
         }
