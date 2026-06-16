@@ -8,8 +8,16 @@ import os
 def heure_vers_minutes(heure_str):
     if not heure_str:
         return 0
-    h, m, s = map(int, heure_str.split(':'))
-    return h * 60 + m
+    parts = list(map(int, heure_str.split(':')))
+    if len(parts) >= 2:
+        return parts[0] * 60 + parts[1]
+    return 0
+
+def minutes_en_heure(minutes):
+    """Convertit des minutes depuis minuit en format 'HH:MM'."""
+    h = int(minutes // 60)
+    m = int(minutes % 60)
+    return f"{h:02d}:{m:02d}"
 
 def calculer_distance_matrice(coordonnees):
     """
@@ -315,7 +323,30 @@ class TourneeRepository:
                 camions = [r[0] for r in cursor.fetchall()]
                 if camions:
                     for i, (cid, hd, hf) in enumerate(ch_dispo):
-                        cursor.execute('INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, depot_id, heure_debut_service, heure_fin_service, statut) VALUES (?, ?, ?, 1, ?, ?, "brouillon")', (date_jour, cid, camions[i % len(camions)], hd, hf))
+                        # --- NOUVEAUTÉ : PROTECTION ANTI-CHEVAUCHEMENT ---
+                        # On cherche si le chauffeur a déjà une tournée démarrée ou terminée aujourd'hui
+                        cursor.execute("""
+                            SELECT MAX(heure_fin_service) 
+                            FROM tournees_jour 
+                            WHERE chauffeur_id = ? AND date_tournee = ? 
+                            AND statut IN ('demarree', 'terminee')
+                        """, (cid, date_jour))
+                        derniere_fin = cursor.fetchone()[0]
+                        
+                        heure_debut_travail = hd
+                        if derniere_fin:
+                            # Fin de la précédente + 30 min au dépôt
+                            fin_min = heure_vers_minutes(derniere_fin) + 30
+                            hd_min = heure_vers_minutes(hd)
+                            # Le nouveau départ est le max entre l'horaire contractuel et la fin réelle + buffer
+                            nouveau_hd_min = max(hd_min, fin_min)
+                            heure_debut_travail = minutes_en_heure(nouveau_hd_min)
+                            
+                        # Si l'heure de début ajustée dépasse l'heure de fin contractuelle, on ne crée pas de tournée
+                        if heure_vers_minutes(heure_debut_travail) >= heure_vers_minutes(hf):
+                            continue
+                            
+                        cursor.execute('INSERT INTO tournees_jour (date_tournee, chauffeur_id, camion_id, depot_id, heure_debut_service, heure_fin_service, statut) VALUES (?, ?, ?, 1, ?, ?, "brouillon")', (date_jour, cid, camions[i % len(camions)], heure_debut_travail, hf))
             
             # 3. On supprime les tâches en attente qui n'appartiennent PAS à une tournée démarrée
             cursor.execute("""
