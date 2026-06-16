@@ -23,7 +23,7 @@ import EditPlanningModal from '../components/EditPlanningModal';
 
 import { getDashboardStats, type DashboardStats } from '../services/dashboard';
 import { getClients, type Client } from '../services/clients';
-import { getPlanningAdmin, genererBrouillons, optimiserTournees, getPlanningPreview, type TourneeAdmin } from '../services/planning';
+import { getPlanningAdmin, genererBrouillons, optimiserTournees, getPlanningPreview, type TourneeAdmin, type ClientJour } from '../services/planning';
 
 type VehicleRow = { chauffeurId: number; chauffeurNom: string; heureDepart: string; heureFin: string; arrets: any[]; capaciteMaxKg: number; distance_km: number; immatriculation: string };
 
@@ -55,7 +55,7 @@ export default function PlanningScreen() {
   const [selectedDate, setSelectedDate] = useState(todayISO);
   const [viewMode, setViewMode] = useState<'routes' | 'carte'>('routes');
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [preview, setPreview] = useState<{ clients_dispo: number; chauffeurs_dispo: number } | null>(null);
+  const [preview, setPreview] = useState<{ clients_dispo: number; chauffeurs_dispo: number; clients_jour: ClientJour[] } | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [vehicles, setVehicles] = useState<VehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -338,28 +338,35 @@ export default function PlanningScreen() {
                 ))}
               </View>
 
-              {/* Sites aperçu */}
+              {/* Sites du jour */}
               <View style={s.panel}>
                 <Text style={s.panelTitle}>À collecter aujourd'hui</Text>
-                {clients.slice(0, 4).map((c, i) => (
-                  <React.Fragment key={c.id ?? i}>
-                    <View style={s.clientRow}>
-                      <Text style={s.clientName} numberOfLines={1}>{c.nom_entreprise}</Text>
-                      <Text style={s.clientMeta} numberOfLines={1}>
-                        {c.latitude ? 'GPS ✓' : 'GPS manquant'}
-                      </Text>
-                    </View>
-                    {i < Math.min(clients.length, 4) - 1 && <View style={s.metricDividerH} />}
-                  </React.Fragment>
-                ))}
-                {clients.length === 0 && (
-                  <Text style={[s.clientMeta, { paddingHorizontal: 10, paddingBottom: 10 }]}>Chargement…</Text>
-                )}
-                {clients.length > 4 && (
-                  <TouchableOpacity style={s.panelLink} onPress={() => setShowClientsModal(true)} activeOpacity={0.7}>
-                    <Text style={s.panelLinkText}>Voir les {clients.length} sites →</Text>
-                  </TouchableOpacity>
-                )}
+                {(() => {
+                  const liste = preview?.clients_jour ?? [];
+                  if (liste.length === 0) {
+                    return <Text style={[s.clientMeta, { paddingHorizontal: 10, paddingBottom: 10 }]}>
+                      {preview ? 'Aucun client ce jour' : 'Chargement…'}
+                    </Text>;
+                  }
+                  return (
+                    <>
+                      {liste.slice(0, 4).map((c, i) => (
+                        <React.Fragment key={c.id}>
+                          <View style={s.clientRow}>
+                            <Text style={s.clientName} numberOfLines={1}>{c.nom_entreprise}</Text>
+                            <Text style={s.clientMeta}>{c.latitude ? 'GPS ✓' : 'GPS —'}</Text>
+                          </View>
+                          {i < Math.min(liste.length, 4) - 1 && <View style={s.metricDividerH} />}
+                        </React.Fragment>
+                      ))}
+                      {liste.length > 4 && (
+                        <TouchableOpacity style={s.panelLink} onPress={() => setShowClientsModal(true)} activeOpacity={0.7}>
+                          <Text style={s.panelLinkText}>Voir les {liste.length} sites du jour →</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  );
+                })()}
               </View>
             </View>
           </View>
@@ -610,15 +617,15 @@ export default function PlanningScreen() {
       >
         <SafeAreaView style={s.modalContainer}>
           <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Clients à collecter</Text>
-            <Text style={s.modalSub}>{clients.length} sites enregistrés</Text>
+            <Text style={s.modalTitle}>Sites du jour</Text>
+            <Text style={s.modalSub}>{preview?.clients_jour.length ?? 0} clients à collecter</Text>
             <TouchableOpacity style={s.modalClose} onPress={() => setShowClientsModal(false)} activeOpacity={0.7}>
               <Ionicons name="close" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
           <FlatList
-            data={clients}
-            keyExtractor={(c, i) => String(c.id ?? i)}
+            data={preview?.clients_jour ?? []}
+            keyExtractor={c => String(c.id)}
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
             ItemSeparatorComponent={() => <View style={s.modalDivider} />}
             renderItem={({ item: c }) => (
@@ -629,7 +636,7 @@ export default function PlanningScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={s.modalClientName}>{c.nom_entreprise}</Text>
                   <Text style={s.modalClientMeta}>
-                    {c.adresse ?? (c.latitude ? `GPS ${c.latitude?.toFixed(4)}, ${c.longitude?.toFixed(4)}` : 'Adresse manquante')}
+                    {c.latitude ? `GPS ${c.latitude.toFixed(4)}, ${c.longitude?.toFixed(4)}` : 'GPS manquant'}
                   </Text>
                 </View>
                 <View style={[s.checkPill, c.latitude ? s.checkPillOk : undefined]}>

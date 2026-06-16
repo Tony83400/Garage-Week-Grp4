@@ -301,10 +301,29 @@ class TourneeRepository:
         jour_semaine = date_obj.weekday() + 1
         with self.db_core.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT COUNT(DISTINCT d.client_id) FROM disponibilites_clients d WHERE d.jour_semaine = ? AND d.client_id NOT IN (SELECT client_id FROM exceptions_calendrier_clients WHERE date_exception = ? AND est_ferme = 1)', (jour_semaine, date_jour))
-            c_dispo = cursor.fetchone()[0] or 0
+            cursor.execute(
+                '''SELECT c.id, c.nom_entreprise, c.latitude, c.longitude
+                   FROM clients c
+                   JOIN disponibilites_clients d ON d.client_id = c.id
+                   WHERE d.jour_semaine = ?
+                   AND c.id NOT IN (
+                       SELECT client_id FROM exceptions_calendrier_clients
+                       WHERE date_exception = ? AND est_ferme = 1
+                   )
+                   GROUP BY c.id''',
+                (jour_semaine, date_jour)
+            )
+            rows = cursor.fetchall()
+            clients_jour = [
+                {'id': r[0], 'nom_entreprise': r[1], 'latitude': r[2], 'longitude': r[3]}
+                for r in rows
+            ]
             cursor.execute('SELECT COUNT(chauffeur_id) FROM disponibilites_chauffeurs WHERE jour_semaine = ?', (jour_semaine,))
-            return {'clients_dispo': c_dispo, 'chauffeurs_dispo': cursor.fetchone()[0] or 0}
+            return {
+                'clients_dispo': len(clients_jour),
+                'chauffeurs_dispo': cursor.fetchone()[0] or 0,
+                'clients_jour': clients_jour,
+            }
 
     def generer_brouillons_jour(self, date_jour):
         date_obj = datetime.datetime.strptime(date_jour, '%Y-%m-%d')

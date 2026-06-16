@@ -48,11 +48,13 @@ export async function optimiserTournees(date: string): Promise<any> {
   return await api.post('/api/planning/optimiser', { date });
 }
 
-// 4. Obtenir les stats pré-génération
-export async function getPlanningPreview(date: string): Promise<{ clients_dispo: number; chauffeurs_dispo: number }> {
+export type ClientJour = { id: number; nom_entreprise: string; latitude: number | null; longitude: number | null };
+
+// 4. Obtenir les stats pré-génération + liste clients du jour
+export async function getPlanningPreview(date: string): Promise<{ clients_dispo: number; chauffeurs_dispo: number; clients_jour: ClientJour[] }> {
   try {
     return await api.get(`/api/planning/preview?date=${date}`);
   } catch {
-    return { clients_dispo: 0, chauffeurs_dispo: 0 };
+    return { clients_dispo: 0, chauffeurs_dispo: 0, clients_jour: [] };
   }
 }
