@@ -220,18 +220,18 @@ export default function PlanningScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
 
       {/* Topbar + date nav intégrés */}
       <View style={s.topbar}>
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={s.menuBtn}>
-          <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
+          <Ionicons name="menu-outline" size={26} color="#fff8e9" />
         </TouchableOpacity>
 
         {/* Date nav centré */}
         <View style={s.topbarDateNav}>
           <TouchableOpacity onPress={() => navigateDate(-1)} activeOpacity={0.7} style={s.topbarDateBtn}>
-            <Ionicons name="chevron-back" size={20} color={colors.primaryLight} />
+            <Ionicons name="chevron-back" size={20} color="#fff8e9" />
           </TouchableOpacity>
           <View style={s.topbarDateCenter}>
             <Text style={s.topbarDateText}>{formatDateFR(selectedDate)}</Text>
@@ -242,7 +242,7 @@ export default function PlanningScreen() {
             )}
           </View>
           <TouchableOpacity onPress={() => navigateDate(1)} activeOpacity={0.7} style={s.topbarDateBtn}>
-            <Ionicons name="chevron-forward" size={20} color={colors.primaryLight} />
+            <Ionicons name="chevron-forward" size={20} color="#fff8e9" />
           </TouchableOpacity>
         </View>
 
@@ -254,7 +254,7 @@ export default function PlanningScreen() {
           <Ionicons
             name="notifications-outline"
             size={20}
-            color={hasAlerts ? '#CC1F1F' : colors.primaryLight}
+            color={hasAlerts ? '#FF8A80' : '#fff8e9'}
           />
           {hasAlerts && (
             <View style={s.notifCount}>
@@ -673,23 +673,21 @@ export default function PlanningScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F5EEDF' },
 
   // Topbar avec date nav intégrée
   topbar: {
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8F0EC',
-    height: 64,
+    backgroundColor: '#063D34',
+    height: 76,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowColor: '#031e1a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   menuBtn: { padding: 4 },
   topbarDateNav: {
@@ -708,17 +706,17 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  topbarDateText: { fontSize: 15, fontWeight: '700', color: colors.text },
+  topbarDateText: { fontSize: 15, fontWeight: '700', color: '#fff8e9' },
   todayBadge: {
-    backgroundColor: '#E8F5EE',
+    backgroundColor: 'rgba(255,248,233,0.15)',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  todayBadgeText: { fontSize: 11, fontWeight: '600', color: colors.primaryLight },
+  todayBadgeText: { fontSize: 11, fontWeight: '600', color: '#fff8e9' },
   notifBtn: {
     width: 44, height: 36, borderRadius: 10,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
     alignItems: 'center', justifyContent: 'center',
   },
   notifBtnAlert: {
