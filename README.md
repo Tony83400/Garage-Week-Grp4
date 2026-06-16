@@ -458,10 +458,10 @@ Debounce : 500 ms après la dernière frappe
 | GET | `/clients/<id>/disponibilites` | Créneaux de collecte d'un client |
 | POST | `/disponibilites` | Ajouter un créneau (client_id, jour, heure_debut, heure_fin) |
 | POST | `/clients/backfill-adresses` | Lancer reverse geocoding Nominatim (thread daemon) |
-| GET | `/api/dashboard/stats?date=` | KPIs : poids, collectes, alertes, km, flotte |
+| GET | `/api/dashboard/stats?date=` | KPIs : poids, collectes, alertes, km, flotte — flotte groupée par chauffeur avec `km` et `nb_tournees` |
 | GET | `/api/dashboard/activite?date=` | 5 dernières actions (terminee/erreur) |
 | GET | `/api/admin/planning?date=` | Tournées détaillées pour l'admin |
-| GET | `/api/planning/preview?date=` | clients_dispo + chauffeurs_dispo pour la PrepCard |
+| GET | `/api/planning/preview?date=` | clients_dispo + chauffeurs_dispo + clients_jour (liste des sites du jour) pour la PrepCard |
 | POST | `/api/planning/generer` | Étape 1 : créer les brouillons de tâches |
 | POST | `/api/planning/optimiser` | Étape 2 : OR-Tools → affectation tournées |
 | GET | `/api/chauffeur/<id>/tournee?date=` | Tournée du chauffeur (arrets, statuts, poids) |
@@ -508,7 +508,7 @@ const api = {
 |---|---|
 | `auth.ts` | `login(email, mdp)` |
 | `clients.ts` | `getClients`, `addClient`, `deleteClient`, `addDisponibilite`, `getClientDisponibilites`, `backfillAdresses` |
-| `planning.ts` | `getPlanningAdmin`, `genererBrouillons`, `optimiserTournees`, `getPlanningPreview` |
+| `planning.ts` | `getPlanningAdmin`, `genererBrouillons`, `optimiserTournees`, `getPlanningPreview` — type `ClientJour` (id, nom_entreprise, heure_debut, heure_fin, poids_prevu_kg) |
 | `dashboard.ts` | `getDashboardStats`, `getActiviteRecente` |
 | `chauffeur.ts` | `getTournee`, `updateStatutTache` |
 | `imprevus.ts` | `getImprevus`, `replanifierImprevu`, `reassignerImprevu` |
@@ -525,12 +525,18 @@ const api = {
 - 4 StatCards avec count-up animé : biodéchets (kg), collectes validées, alertes actives, distance (km)
 - Section flotte : point coloré (vert = terminé, amber = en cours, coral = erreur) + dernier point connu
 - Section activité récente : 5 dernières actions
+- **Section « Répartition par km »** : barre de progression par chauffeur (km / km_total), badge `N T` si le chauffeur a plusieurs tournées dans la journée — interface `FlotteVehicule` étendue avec `km`, `nb_tournees`, `nom_chauffeur`
 
 **`planning.tsx` — Planning Admin**
-- Mode **Préparation** (aucune tournée affectée) : PrepCard avec contexte jour (clients dispo / chauffeurs) + bouton « Générer » en 2 étapes (brouillons → OR-Tools)
-- Mode **Supervision** (tournées affectées) : StatsBar (camions / arrêts / validées / km) + AlertBanner + toggle Tournées/Carte + liste VehicleCard
+- Mode **Préparation** (aucune tournée affectée) :
+  - PrepCard avec contexte jour (clients dispo / chauffeurs) + bouton « Générer » en 2 étapes (brouillons → OR-Tools)
+  - Panneau droit « À collecter aujourd'hui » : liste des clients réellement programmés ce jour (`clients_jour` depuis `getPlanningPreview`), avec modal plein écran pour voir la liste complète
+- Mode **Supervision** (tournées affectées) :
+  - **Disposition deux colonnes 50/50** : colonne gauche = liste des VehicleCard, colonne droite = liste des arrêts de la tournée sélectionnée (pas de modal)
+  - Navigation par jour déplacée dans la **topbar** (`topbarDateNav`) — fléchettes gauche/droite + date centrée
+  - StatsBar (camions / arrêts / validées / km) + AlertBanner en en-tête
+  - La carte MapTournees (Leaflet/WebView) a été retirée du mode supervision
 - GenerationModal : résumé post-optimisation OR-Tools (véhicules utilisés, nombre d'arrêts)
-- MapTournees : carte Leaflet rendue dans une WebView (mobile) ou iframe (web)
 
 **`driver.tsx` — Vue Chauffeur**
 - Header : avatar gradient + nom chauffeur + immatriculation + bouton déconnexion (double-tap)
