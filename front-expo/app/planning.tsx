@@ -39,6 +39,17 @@ function formatDateFR(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+function initiales(nom: string): string {
+  return nom.split(' ').map(w => w[0] ?? '').join('').toUpperCase().slice(0, 2);
+}
+
+const DRIVER_COLORS = [
+  { border: '#2D6A4F', avatar: '#2D6A4F', chip: '#E8F5EE', chipText: '#1B4332' },
+  { border: '#1b67a6', avatar: '#1565a0', chip: '#d8e8f3', chipText: '#135f98' },
+  { border: '#7472ae', avatar: '#6c76b4', chip: '#e2def4', chipText: '#5e55a2' },
+  { border: '#c0784a', avatar: '#b56a3a', chip: '#fdecd8', chipText: '#8c4a22' },
+];
+
 export default function PlanningScreen() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(todayISO);
@@ -54,6 +65,9 @@ export default function PlanningScreen() {
   const [showGenModal, setShowGenModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showClientsModal, setShowClientsModal] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
+  const [selectedTourneeIdx, setSelectedTourneeIdx] = useState<number | null>(null);
+  const [detailViewMode, setDetailViewMode] = useState<'routes' | 'carte'>('routes');
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -165,8 +179,24 @@ export default function PlanningScreen() {
     showToast(`Export BlueBob — ${chauffeurNom}`);
   }
 
-  const mapVehicles = useMemo<MapVehicle[]>(() =>
-    vehicles.map((v, idx) => ({
+  const groupedDrivers = useMemo(() => {
+    const map: Record<number, { chauffeurNom: string; tournees: VehicleRow[] }> = {};
+    vehicles.forEach(v => {
+      if (!map[v.chauffeurId]) map[v.chauffeurId] = { chauffeurNom: v.chauffeurNom, tournees: [] };
+      map[v.chauffeurId].tournees.push(v);
+    });
+    return Object.entries(map).map(([id, data]) => ({ chauffeurId: Number(id), ...data }));
+  }, [vehicles]);
+
+  const selectedTournee = useMemo(() => {
+    if (selectedDriverId === null || selectedTourneeIdx === null) return null;
+    const driver = groupedDrivers.find(d => d.chauffeurId === selectedDriverId);
+    return driver?.tournees[selectedTourneeIdx] ?? null;
+  }, [groupedDrivers, selectedDriverId, selectedTourneeIdx]);
+
+  const mapVehicles = useMemo<MapVehicle[]>(() => {
+    const source = selectedTournee ? [selectedTournee] : vehicles;
+    return source.map((v, idx) => ({
       vehiculeIndex: idx,
       label: `VL${idx + 1}`,
       stops: v.arrets
@@ -178,9 +208,8 @@ export default function PlanningScreen() {
           statut: a.statut,
           ordre: a.ordre,
         })),
-    })),
-    [vehicles]
-  );
+    }));
+  }, [vehicles, selectedTournee]);
 
   const totalArrets = vehicles.reduce((acc, v) => acc + v.arrets.length, 0);
   const validees = stats?.collectes_validees ?? 0;
@@ -193,15 +222,30 @@ export default function PlanningScreen() {
     <SafeAreaView style={s.container}>
       <StatusBar style="dark" />
 
-      {/* Topbar */}
+      {/* Topbar + date nav intégrés */}
       <View style={s.topbar}>
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={s.menuBtn}>
           <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.topbarTitle}>Planning</Text>
-          <Text style={s.topbarSub}>Var 83 · tournées</Text>
+
+        {/* Date nav centré */}
+        <View style={s.topbarDateNav}>
+          <TouchableOpacity onPress={() => navigateDate(-1)} activeOpacity={0.7} style={s.topbarDateBtn}>
+            <Ionicons name="chevron-back" size={20} color={colors.primaryLight} />
+          </TouchableOpacity>
+          <View style={s.topbarDateCenter}>
+            <Text style={s.topbarDateText}>{formatDateFR(selectedDate)}</Text>
+            {isToday && (
+              <View style={s.todayBadge}>
+                <Text style={s.todayBadgeText}>aujourd'hui</Text>
+              </View>
+            )}
+          </View>
+          <TouchableOpacity onPress={() => navigateDate(1)} activeOpacity={0.7} style={s.topbarDateBtn}>
+            <Ionicons name="chevron-forward" size={20} color={colors.primaryLight} />
+          </TouchableOpacity>
         </View>
+
         <TouchableOpacity
           style={[s.notifBtn, hasAlerts && s.notifBtnAlert]}
           onPress={() => { if (hasAlerts) router.push('/imprevus'); }}
@@ -217,24 +261,6 @@ export default function PlanningScreen() {
               <Text style={s.notifCountText}>{stats!.alertes}</Text>
             </View>
           )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Navigateur de date — pleine largeur, toujours visible */}
-      <View style={s.dateStrip}>
-        <TouchableOpacity style={s.dateBtn} onPress={() => navigateDate(-1)} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={colors.primaryLight} />
-        </TouchableOpacity>
-        <View style={s.dateCenterBlock}>
-          <Text style={s.dateText}>{formatDateFR(selectedDate)}</Text>
-          {isToday && (
-            <View style={s.todayBadge}>
-              <Text style={s.todayBadgeText}>aujourd'hui</Text>
-            </View>
-          )}
-        </View>
-        <TouchableOpacity style={s.dateBtn} onPress={() => navigateDate(1)} activeOpacity={0.7}>
-          <Ionicons name="chevron-forward" size={20} color={colors.primaryLight} />
         </TouchableOpacity>
       </View>
 
@@ -346,117 +372,196 @@ export default function PlanningScreen() {
         {/* ── MODE SUPERVISION ── */}
         {inSupervision && (
           <>
-            {/* Stats rapides */}
-            <View style={s.statsBar}>
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{vehicles.length}</Text>
-                <Text style={s.statLabel}>Camions</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{totalArrets}</Text>
-                <Text style={s.statLabel}>Arrêts</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{validees}/{totalCollectes}</Text>
-                <Text style={s.statLabel}>Validées</Text>
-              </View>
-              <View style={s.statDivider} />
-              <View style={s.statItem}>
-                <Text style={s.statValue}>{stats?.km_total || 0} km</Text>
-                <Text style={s.statLabel}>Distance</Text>
-              </View>
+            {/* Barre 5 métriques — pleine largeur */}
+            <View style={s.supMetricsRow}>
+              {([
+                { icon: 'car-outline' as const, val: String(groupedDrivers.length), label1: 'véhicules', label2: 'mobilisés' },
+                { icon: 'git-branch-outline' as const, val: String(vehicles.length), label1: 'tournées', label2: 'générées' },
+                { icon: 'location-outline' as const, val: String(totalArrets), label1: 'arrêts', label2: 'planifiés' },
+                { icon: 'checkmark-circle-outline' as const, val: `${validees}/${totalCollectes}`, label1: 'collectes', label2: 'validées' },
+                { icon: 'speedometer-outline' as const, val: `${stats?.km_total ?? 0} km`, label1: 'distance', label2: 'totale' },
+              ]).map(item => (
+                <View key={item.label1} style={s.supMetricCard}>
+                  <View style={s.supMetricIcon}>
+                    <Ionicons name={item.icon} size={20} color={colors.primaryLight} />
+                  </View>
+                  <Text style={s.supMetricVal}>{item.val}</Text>
+                  <Text style={s.supMetricLabel}>{item.label1}</Text>
+                  <Text style={s.supMetricLabel}>{item.label2}</Text>
+                </View>
+              ))}
             </View>
 
-            {/* Alerte erreurs — cliquable */}
+            {/* Alerte imprévus — grande, visible */}
             {stats && stats.alertes > 0 && (
-              <TouchableOpacity onPress={handleImprevus} activeOpacity={0.85}>
-                <View style={s.alertBanner}>
-                  <Ionicons name="warning-outline" size={18} color={colors.coral} />
-                  <Text style={s.alertText}>
+              <TouchableOpacity onPress={handleImprevus} activeOpacity={0.85} style={s.alertBarBig}>
+                <View style={s.alertIconBig}>
+                  <Ionicons name="warning" size={20} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.alertBigTitle}>
                     {stats.alertes} imprévu{stats.alertes > 1 ? 's' : ''} à traiter
                   </Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.coral} />
+                  <Text style={s.alertBigSub}>Appuyez pour réassigner ou reporter</Text>
                 </View>
+                <View style={s.alertCountBadge}>
+                  <Text style={s.alertCountText}>{stats.alertes}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.coral} />
               </TouchableOpacity>
             )}
 
-            {/* Toggle Tournées / Carte */}
-            <View style={s.viewToggle}>
-              <TouchableOpacity
-                style={[s.viewToggleBtn, viewMode === 'routes' && s.viewToggleActive]}
-                onPress={() => setViewMode('routes')}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="list-outline"
-                  size={15}
-                  color={viewMode === 'routes' ? colors.primaryLight : colors.textMuted}
-                />
-                <Text style={[s.viewToggleText, viewMode === 'routes' && s.viewToggleTextActive]}>
-                  Tournées
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.viewToggleBtn, viewMode === 'carte' && s.viewToggleActive]}
-                onPress={() => setViewMode('carte')}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="map-outline"
-                  size={15}
-                  color={viewMode === 'carte' ? colors.primaryLight : colors.textMuted}
-                />
-                <Text style={[s.viewToggleText, viewMode === 'carte' && s.viewToggleTextActive]}>
-                  Carte
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Vue Tournées */}
+            {/* Vue Tournées — deux colonnes */}
             {viewMode === 'routes' && (
-              <>
-                <View style={s.vehiclesSection}>
-                  <Text style={s.sectionTitle}>Tournées · {formatDateFR(selectedDate)}</Text>
-                  <Text style={s.sectionSub}>
-                    {vehicles.length} véhicule{vehicles.length > 1 ? 's' : ''} en service
-                  </Text>
-                </View>
-                {vehicles.map((v, i) => (
-                  <VehicleCard
-                    key={`vehicle-card-${v.chauffeurId}-${i}`}
-                    index={i}
-                    chauffeurId={v.chauffeurId}
-                    chauffeurNom={v.chauffeurNom}
-                    heureDepart={v.heureDepart}
-                    heureFin={v.heureFin}
-                    immatriculation={v.immatriculation}
-                    arrets={v.arrets}
-                    capaciteMaxKg={v.capaciteMaxKg}
-                    animDelay={i * 80}
-                    onExport={() => handleExportBluebob(v.chauffeurNom)}
-                    onStopPress={(lat, lon) => setSelectedStop({ lat, lon })}
-                  />
-                ))}
-              </>
-            )}
+              <View style={s.workspaceRow}>
 
-            {/* Vue Carte */}
-            {viewMode === 'carte' && (
-              <View style={s.mapCard}>
-                <View style={s.mapHeader}>
-                  <Ionicons name="map-outline" size={16} color={colors.primaryLight} />
-                  <Text style={s.mapTitle}>Carte des tournées</Text>
-                  <View style={s.mapChip}>
-                    <Text style={s.mapChipText}>
-                      {mapVehicles.reduce((a, v) => a + v.stops.length, 0)} arrêts
-                    </Text>
-                  </View>
+                {/* ── Colonne gauche : driver cards ── */}
+                <View style={s.leftCol}>
+                  {groupedDrivers.map((driver, dIdx) => {
+                    const dc = DRIVER_COLORS[dIdx % DRIVER_COLORS.length];
+                    return (
+                      <View key={driver.chauffeurId} style={[s.driverCard, { borderLeftColor: dc.border }]}>
+                        {/* Header chauffeur */}
+                        <View style={s.driverCardTop}>
+                          <View style={[s.driverAvatar, { backgroundColor: dc.avatar }]}>
+                            <Text style={s.driverAvatarText}>{initiales(driver.chauffeurNom)}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.driverName} numberOfLines={1}>{driver.chauffeurNom}</Text>
+                            <View style={[s.driverChip, { backgroundColor: dc.chip }]}>
+                              <Text style={[s.driverChipText, { color: dc.chipText }]}>
+                                {driver.tournees.length} tournée{driver.tournees.length > 1 ? 's' : ''}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Lignes "Tournée N" */}
+                        {driver.tournees.map((t, tIdx) => {
+                          const isSelected = selectedDriverId === driver.chauffeurId && selectedTourneeIdx === tIdx;
+                          const arretsDone = t.arrets.filter(a => a.statut === 'terminee').length;
+                          return (
+                            <TouchableOpacity
+                              key={tIdx}
+                              style={[s.tourRow, isSelected && { backgroundColor: dc.chip }]}
+                              onPress={() => {
+                                setSelectedDriverId(driver.chauffeurId);
+                                setSelectedTourneeIdx(tIdx);
+                                setDetailViewMode('routes');
+                              }}
+                              activeOpacity={0.75}
+                            >
+                              <View style={[s.tourNumBadge, { backgroundColor: isSelected ? dc.avatar : dc.chip }]}>
+                                <Text style={[s.tourNumText, { color: isSelected ? '#fff' : dc.chipText }]}>{tIdx + 1}</Text>
+                              </View>
+                              <View style={{ flex: 1, paddingLeft: 10 }}>
+                                <Text style={[s.tourLabel, { color: isSelected ? dc.border : colors.text }]}>
+                                  Tournée {tIdx + 1}
+                                </Text>
+                                <Text style={s.tourSummary}>{t.arrets.length} arrêts · {t.distance_km} km</Text>
+                              </View>
+                              <Text style={[s.tourProgress, { color: dc.border }]}>{arretsDone}/{t.arrets.length}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    );
+                  })}
                 </View>
-                <MapTournees height={400} vehicles={mapVehicles} selectedStop={selectedStop} />
+
+                {/* ── Colonne droite : détail ── */}
+                <View style={s.rightCol}>
+                  {selectedTournee ? (() => {
+                    const driverIdx = groupedDrivers.findIndex(d => d.chauffeurId === selectedDriverId);
+                    const dc = DRIVER_COLORS[Math.max(0, driverIdx) % DRIVER_COLORS.length];
+                    const arretsDone = selectedTournee.arrets.filter(a => a.statut === 'terminee').length;
+
+                    return (
+                      <>
+                        {/* Header du panneau */}
+                        <View style={[s.rightPanelHead, { borderTopColor: dc.border }]}>
+                          <Text style={s.rightPanelTitle}>
+                            {selectedTournee.chauffeurNom} · Tournée {(selectedTourneeIdx ?? 0) + 1}
+                          </Text>
+                          <Text style={s.rightPanelSub}>
+                            {selectedTournee.heureDepart} → {selectedTournee.heureFin} · {selectedTournee.distance_km} km · {arretsDone}/{selectedTournee.arrets.length} validés
+                          </Text>
+                        </View>
+
+                        {/* Toggle Arrêts / Carte */}
+                        <View style={[s.viewToggle, { marginBottom: 14 }]}>
+                          <TouchableOpacity
+                            style={[s.viewToggleBtn, detailViewMode === 'routes' && s.viewToggleActive]}
+                            onPress={() => setDetailViewMode('routes')}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="list-outline" size={15} color={detailViewMode === 'routes' ? colors.primaryLight : colors.textMuted} />
+                            <Text style={[s.viewToggleText, detailViewMode === 'routes' && s.viewToggleTextActive]}>Arrêts</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[s.viewToggleBtn, detailViewMode === 'carte' && s.viewToggleActive]}
+                            onPress={() => setDetailViewMode('carte')}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="map-outline" size={15} color={detailViewMode === 'carte' ? colors.primaryLight : colors.textMuted} />
+                            <Text style={[s.viewToggleText, detailViewMode === 'carte' && s.viewToggleTextActive]}>Carte</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Liste arrêts */}
+                        {detailViewMode === 'routes' && selectedTournee.arrets.map((arret, aIdx) => {
+                          const statusColor = arret.statut === 'terminee' ? colors.primaryLight
+                            : arret.statut === 'erreur' ? colors.coral
+                            : arret.statut === 'en_cours' ? '#1b67a6'
+                            : colors.textMuted;
+                          const statusLabel = arret.statut === 'terminee' ? 'Validé'
+                            : arret.statut === 'erreur' ? 'Erreur'
+                            : arret.statut === 'en_cours' ? 'En cours'
+                            : 'En attente';
+                          return (
+                            <View key={arret.tache_id ?? aIdx} style={s.stopRow}>
+                              <View style={s.stopLineWrap}>
+                                <View style={[s.stopDot, { backgroundColor: statusColor }]} />
+                                {aIdx < selectedTournee.arrets.length - 1 && <View style={s.stopLine} />}
+                              </View>
+                              <View style={s.stopContent}>
+                                <View style={s.stopTopRow}>
+                                  <Text style={s.stopName} numberOfLines={1}>{arret.client_nom}</Text>
+                                  <View style={[s.stopStatusPill, { backgroundColor: statusColor + '22' }]}>
+                                    <Text style={[s.stopStatusText, { color: statusColor }]}>{statusLabel}</Text>
+                                  </View>
+                                </View>
+                                <Text style={s.stopMeta}>
+                                  {arret.heure_estimee ? `${arret.heure_estimee} · ` : ''}{arret.poids_prevu_kg} kg
+                                </Text>
+                                {arret.type_imprevu && (
+                                  <Text style={[s.stopMeta, { color: colors.coral }]}>⚠ {arret.type_imprevu}</Text>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
+
+                        {/* Carte filtrée */}
+                        {detailViewMode === 'carte' && (
+                          <View style={s.mapCard}>
+                            <MapTournees height={420} vehicles={mapVehicles} selectedStop={selectedStop} />
+                          </View>
+                        )}
+                      </>
+                    );
+                  })() : (
+                    <View style={s.rightColEmpty}>
+                      <Ionicons name="hand-left-outline" size={32} color={colors.textMuted} />
+                      <Text style={s.rightColEmptyText}>Sélectionnez une tournée</Text>
+                      <Text style={s.rightColEmptySub}>Cliquez sur une tournée à gauche pour voir les arrêts</Text>
+                    </View>
+                  )}
+                </View>
+
               </View>
             )}
+
           </>
         )}
       </ScrollView>
@@ -563,25 +668,47 @@ export default function PlanningScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
-  // Topbar
+  // Topbar avec date nav intégrée
   topbar: {
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: '#E8F0EC',
-    height: 68,
-    paddingHorizontal: 24,
+    height: 64,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 3,
   },
-  menuBtn: { marginRight: 12, padding: 4 },
-  topbarTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  topbarSub: { fontSize: 11, color: colors.textMuted, fontWeight: '500', marginTop: 1 },
+  menuBtn: { padding: 4 },
+  topbarDateNav: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  topbarDateBtn: {
+    padding: 6,
+    borderRadius: 8,
+  },
+  topbarDateCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topbarDateText: { fontSize: 15, fontWeight: '700', color: colors.text },
+  todayBadge: {
+    backgroundColor: '#E8F5EE',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  todayBadgeText: { fontSize: 11, fontWeight: '600', color: colors.primaryLight },
   notifBtn: {
     width: 44, height: 36, borderRadius: 10,
     backgroundColor: colors.background,
@@ -602,38 +729,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   notifCountText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-
-  // Navigateur de date
-  dateStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8F0EC',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  dateBtn: {
-    width: 40, height: 40,
-    alignItems: 'center', justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: colors.background,
-  },
-  dateCenterBlock: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  dateText: { fontSize: 16, fontWeight: '700', color: colors.text },
-  todayBadge: {
-    backgroundColor: '#E8F5EE',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  todayBadgeText: { fontSize: 11, fontWeight: '600', color: colors.primaryLight },
 
   // Contenu
   content: { flex: 1 },
@@ -946,4 +1041,132 @@ const s = StyleSheet.create({
     shadowOpacity: 0.35, shadowRadius: 12, elevation: 10,
   },
   toastText: { color: '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+
+  // ── Mode supervision — métriques ─────────────────────────────────────
+  supMetricsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  supMetricCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1, borderColor: '#E4EEE9',
+    alignItems: 'center',
+    paddingVertical: 14, paddingHorizontal: 4,
+  },
+  supMetricIcon: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: '#E8F5EE',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 8,
+  },
+  supMetricVal: { fontSize: 16, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
+  supMetricLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '600', textAlign: 'center', marginTop: 1 },
+
+  // Alerte grande
+  alertBarBig: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FEF2EE',
+    borderWidth: 1.5, borderColor: 'rgba(231,111,81,0.4)',
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 14,
+  },
+  alertIconBig: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: colors.coral,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  alertBigTitle: { fontSize: 14, fontWeight: '700', color: '#9e2616' },
+  alertBigSub: { fontSize: 12, color: colors.coral, fontWeight: '500', marginTop: 2 },
+  alertCountBadge: {
+    backgroundColor: '#b7291a',
+    borderRadius: 14, minWidth: 28, height: 28,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8,
+  },
+  alertCountText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+
+  // ── Workspace deux colonnes ───────────────────────────────────────────
+  workspaceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  leftCol: { flex: 1 },
+  rightCol: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1, borderColor: '#E4EEE9',
+    overflow: 'hidden',
+    minHeight: 300,
+  },
+  rightColEmpty: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 60, paddingHorizontal: 20, gap: 10,
+  },
+  rightColEmptyText: { fontSize: 14, fontWeight: '700', color: colors.text },
+  rightColEmptySub: { fontSize: 12, color: colors.textMuted, textAlign: 'center', fontWeight: '500' },
+
+  // Header panneau droit
+  rightPanelHead: {
+    borderTopWidth: 3,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#EEF4F1',
+  },
+  rightPanelTitle: { fontSize: 14, fontWeight: '800', color: colors.text, letterSpacing: -0.2 },
+  rightPanelSub: { fontSize: 11, color: colors.textMuted, fontWeight: '500', marginTop: 3 },
+
+  // Driver cards (colonne gauche)
+  driverCard: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1, borderLeftWidth: 4, borderColor: '#E4EEE9',
+    marginBottom: 12, overflow: 'hidden',
+  },
+  driverCardTop: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    borderBottomWidth: 1, borderBottomColor: '#EEF4F1',
+  },
+  driverAvatar: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  driverAvatarText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  driverName: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 },
+  driverChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2,
+  },
+  driverChipText: { fontSize: 10, fontWeight: '700' },
+
+  // Tournée row dans driver card
+  tourRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderTopWidth: 1, borderTopColor: '#EEF4F1',
+  },
+  tourNumBadge: {
+    width: 22, height: 22, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tourNumText: { fontSize: 11, fontWeight: '800' },
+  tourLabel: { fontSize: 12, fontWeight: '700' },
+  tourSummary: { fontSize: 11, color: colors.textMuted, fontWeight: '500', marginTop: 1 },
+  tourHours: { fontSize: 10, color: colors.textMuted, fontWeight: '500' },
+  tourProgress: { fontSize: 11, fontWeight: '700', marginRight: 2 },
+
+  // Stop list (panneau droit)
+  stopRow: { flexDirection: 'row', minHeight: 52, paddingHorizontal: 14 },
+  stopLineWrap: { width: 20, alignItems: 'center', paddingTop: 5 },
+  stopDot: { width: 9, height: 9, borderRadius: 5 },
+  stopLine: { flex: 1, width: 2, backgroundColor: '#D9E8E0', marginTop: 3 },
+  stopContent: { flex: 1, paddingLeft: 10, paddingBottom: 14 },
+  stopTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  stopName: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.text },
+  stopStatusPill: { borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  stopStatusText: { fontSize: 10, fontWeight: '700' },
+  stopMeta: { fontSize: 11, color: colors.textMuted, fontWeight: '500' },
 });
