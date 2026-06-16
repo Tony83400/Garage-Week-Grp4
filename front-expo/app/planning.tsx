@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
@@ -52,6 +53,7 @@ export default function PlanningScreen() {
   const [generating, setGenerating] = useState(false);
   const [showGenModal, setShowGenModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showClientsModal, setShowClientsModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -145,31 +147,6 @@ export default function PlanningScreen() {
       } else {
         showToast('Erreur lors de la génération IA');
       }
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  // ── Ré-optimisation en cours de journée (Real-Time VRP) ──────────────
-  async function handleReoptimise() {
-    setGenerating(true);
-    showToast('Calcul du nouveau futur...');
-    try {
-      const res = await reoptimiserTournees(selectedDate);
-      
-      // On utilise une Alert pour un message détaillé et bloquant (important pour la supervision)
-      const { Alert } = require('react-native');
-      Alert.alert(
-        "Ré-optimisation terminée",
-        `${res.points_reaffectes} points ont été ré-affectés aux tournées en cours.\n${res.points_reportes} points ont été automatiquement reportés au lendemain.`,
-        [{ text: "OK", onPress: () => fetchData(selectedDate) }]
-      );
-      
-      // Rafraîchissement immédiat en arrière-plan
-      await fetchData(selectedDate);
-    } catch (e: any) {
-      console.error(e);
-      showToast('Erreur ré-optimisation');
     } finally {
       setGenerating(false);
     }
@@ -269,51 +246,96 @@ export default function PlanningScreen() {
       >
         {/* ── MODE PRÉPARATION ── */}
         {!loading && vehicles.length === 0 && (
-          <View style={s.prepCard}>
-            <View style={s.prepIconBox}>
-              <Ionicons name="sparkles-outline" size={28} color={colors.primaryLight} />
+          <View style={s.prepWrap}>
+
+            {/* Hero plat */}
+            <View style={s.heroBlock}>
+              <Text style={s.heroTitle}>Aucune tournée{'\n'}générée pour cette date</Text>
+              <Text style={s.heroSub}>Vérifiez les données ci-dessous puis lancez la préparation par l'IA.</Text>
+              <TouchableOpacity style={s.btnPrimary} onPress={handleGenerate} activeOpacity={0.85} disabled={generating}>
+                {generating && <ActivityIndicator size="small" color="#fff" />}
+                <Text style={s.btnPrimaryText}>{generating ? 'Calcul IA en cours...' : 'Préparer les tournées'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.btnSecondary} activeOpacity={0.7} onPress={() => router.push('/ressources')}>
+                <Text style={s.btnSecondaryText}>Voir le planning hebdomadaire</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={s.prepTitle}>Prêt à planifier</Text>
 
-            {preview ? (
-              <View style={s.prepMetrics}>
-                <View style={s.prepMetricItem}>
-                  <Text style={s.prepMetricValue}>{preview.clients_dispo}</Text>
-                  <Text style={s.prepMetricLabel}>clients disponibles</Text>
+            {/* 4 métriques — grille horizontale */}
+            <View style={s.sectionHeader}>
+              <View style={s.sectionDash} />
+              <Text style={s.sectionLabel}>Aperçu du jour</Text>
+            </View>
+            <View style={s.metricsGrid}>
+              {([
+                { icon: 'people-outline' as const, val: preview?.clients_dispo ?? '—', line1: 'clients', line2: 'avec créneau' },
+                { icon: 'car-outline' as const, val: preview?.chauffeurs_dispo ?? '—', line1: 'véhicules', line2: 'disponibles' },
+                { icon: 'business-outline' as const, val: clients.length || '—', line1: 'sites', line2: 'enregistrés' },
+                { icon: 'scale-outline' as const, val: '—', line1: 'kg estimés', line2: 'à collecter' },
+              ]).map(item => (
+                <View key={item.line1} style={s.metricCard}>
+                  <View style={s.metricIconBox}>
+                    <Ionicons name={item.icon} size={16} color={colors.primaryLight} />
+                  </View>
+                  <Text style={s.metricCardVal}>{String(item.val)}</Text>
+                  <Text style={s.metricCardLabel}>{item.line1}</Text>
+                  <Text style={s.metricCardLabel}>{item.line2}</Text>
                 </View>
-                <View style={s.prepMetricDivider} />
-                <View style={s.prepMetricItem}>
-                  <Text style={s.prepMetricValue}>{preview.chauffeurs_dispo}</Text>
-                  <Text style={s.prepMetricLabel}>chauffeurs planifiés</Text>
-                </View>
+              ))}
+            </View>
+
+            {/* Checklist + Clients — côte à côte */}
+            <View style={s.contentGrid}>
+              {/* Checklist */}
+              <View style={s.panel}>
+                <Text style={s.panelTitle}>À vérifier</Text>
+                {([
+                  {
+                    label: 'GPS manquants',
+                    val: clients.length > 0
+                      ? (clients.filter(c => !c.latitude || !c.longitude).length === 0 ? 'OK' : String(clients.filter(c => !c.latitude || !c.longitude).length))
+                      : '—',
+                  },
+                  { label: 'Sans créneau', val: '—' },
+                  { label: 'Calendrier', val: '—' },
+                  { label: 'Chauffeurs', val: preview ? (preview.chauffeurs_dispo > 0 ? 'OK' : '0') : '—' },
+                ] as { label: string; val: string }[]).map((item, i, arr) => (
+                  <React.Fragment key={item.label}>
+                    <View style={s.checkRow}>
+                      <Text style={s.checkLabel} numberOfLines={1}>{item.label}</Text>
+                      <View style={[s.checkPill, item.val === 'OK' && s.checkPillOk]}>
+                        <Text style={[s.checkPillText, item.val === 'OK' && s.checkPillTextOk]}>{item.val}</Text>
+                      </View>
+                    </View>
+                    {i < arr.length - 1 && <View style={s.metricDividerH} />}
+                  </React.Fragment>
+                ))}
               </View>
-            ) : (
-              <Text style={s.prepSub}>
-                {clients.length} sites enregistrés
-              </Text>
-            )}
 
-            <TouchableOpacity
-              style={s.btnGenerateHero}
-              onPress={handleGenerate}
-              activeOpacity={0.85}
-              disabled={generating}
-            >
-              <LinearGradient
-                colors={[colors.primaryLight, colors.accent]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.btnGenerateGradient}
-              >
-                {generating
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="sparkles-outline" size={18} color="#fff" />
-                }
-                <Text style={s.btnGenerateText}>
-                  {generating ? 'Calcul IA en cours...' : 'Générer les tournées'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              {/* Sites aperçu */}
+              <View style={s.panel}>
+                <Text style={s.panelTitle}>À collecter aujourd'hui</Text>
+                {clients.slice(0, 4).map((c, i) => (
+                  <React.Fragment key={c.id ?? i}>
+                    <View style={s.clientRow}>
+                      <Text style={s.clientName} numberOfLines={1}>{c.nom_entreprise}</Text>
+                      <Text style={s.clientMeta} numberOfLines={1}>
+                        {c.latitude ? 'GPS ✓' : 'GPS manquant'}
+                      </Text>
+                    </View>
+                    {i < Math.min(clients.length, 4) - 1 && <View style={s.metricDividerH} />}
+                  </React.Fragment>
+                ))}
+                {clients.length === 0 && (
+                  <Text style={[s.clientMeta, { paddingHorizontal: 10, paddingBottom: 10 }]}>Chargement…</Text>
+                )}
+                {clients.length > 4 && (
+                  <TouchableOpacity style={s.panelLink} onPress={() => setShowClientsModal(true)} activeOpacity={0.7}>
+                    <Text style={s.panelLinkText}>Voir les {clients.length} sites →</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </View>
         )}
 
@@ -474,6 +496,48 @@ export default function PlanningScreen() {
         </Animated.View>
       )}
 
+      {/* Modale liste complète des clients */}
+      <Modal
+        visible={showClientsModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowClientsModal(false)}
+      >
+        <SafeAreaView style={s.modalContainer}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Clients à collecter</Text>
+            <Text style={s.modalSub}>{clients.length} sites enregistrés</Text>
+            <TouchableOpacity style={s.modalClose} onPress={() => setShowClientsModal(false)} activeOpacity={0.7}>
+              <Ionicons name="close" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={clients}
+            keyExtractor={(c, i) => String(c.id ?? i)}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+            ItemSeparatorComponent={() => <View style={s.modalDivider} />}
+            renderItem={({ item: c }) => (
+              <View style={s.modalRow}>
+                <View style={s.modalIconBox}>
+                  <Ionicons name="business-outline" size={16} color={colors.primaryLight} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.modalClientName}>{c.nom_entreprise}</Text>
+                  <Text style={s.modalClientMeta}>
+                    {c.adresse ?? (c.latitude ? `GPS ${c.latitude?.toFixed(4)}, ${c.longitude?.toFixed(4)}` : 'Adresse manquante')}
+                  </Text>
+                </View>
+                <View style={[s.checkPill, c.latitude ? s.checkPillOk : undefined]}>
+                  <Text style={[s.checkPillText, c.latitude ? s.checkPillTextOk : undefined]}>
+                    {c.latitude ? 'GPS ✓' : 'GPS —'}
+                  </Text>
+                </View>
+              </View>
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
+
       <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} activeRoute="planning" />
 
       <GenerationModal
@@ -575,74 +639,168 @@ const s = StyleSheet.create({
   content: { flex: 1 },
   contentContainer: { padding: 20, paddingBottom: 40 },
 
-  // Mode préparation
-  prepCard: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#EAF2EE',
-    padding: 32,
+  // ── Mode préparation ──────────────────────────────────────────────────
+  prepWrap: { paddingTop: 4 },
+
+  heroBlock: { marginBottom: 28 },
+  heroTitle: {
+    fontSize: 26, fontWeight: '800', color: colors.text,
+    letterSpacing: -0.5, marginBottom: 8, lineHeight: 32,
+  },
+  heroSub: {
+    fontSize: 14, color: colors.textMuted, fontWeight: '500',
+    marginBottom: 20, lineHeight: 20,
+  },
+  btnPrimary: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: 'row' as const,
     alignItems: 'center',
-    marginTop: 8,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 10,
   },
-  prepIconBox: {
-    width: 56, height: 56, borderRadius: 18,
-    backgroundColor: '#E8F5EE',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
+  btnPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  btnSecondary: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C8E0D4',
   },
-  prepTitle: {
-    fontSize: 18, fontWeight: '800', color: colors.text,
-    marginBottom: 6, letterSpacing: -0.3,
-  },
-  prepSub: {
-    fontSize: 13, color: colors.textMuted, fontWeight: '500',
-    marginBottom: 24, textAlign: 'center',
-  },
-  prepMetrics: {
+  btnSecondaryText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
+
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F7F4',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#C8E8D4',
-    marginBottom: 24,
-    overflow: 'hidden',
-    width: '100%',
+    gap: 8,
+    marginBottom: 10,
   },
-  prepMetricItem: {
+  sectionDash: {
+    width: 3, height: 16, borderRadius: 2,
+    backgroundColor: colors.primaryLight,
+  },
+  sectionLabel: {
+    fontSize: 12, fontWeight: '700', color: colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.8,
+  },
+
+  // Grille 4 métriques horizontale
+  metricsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 0,
+  },
+  metricCard: {
     flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E4EEE9',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
   },
-  prepMetricDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#C8E8D4',
+  metricIconBox: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#E8F5EE',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 6,
   },
-  prepMetricValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.primaryLight,
-    letterSpacing: -0.5,
+  metricCardVal: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
+  metricCardLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '600', textAlign: 'center', marginTop: 2 },
+
+  // Panels côte à côte
+  contentGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
   },
-  prepMetricLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    marginTop: 3,
+  panel: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E4EEE9',
+    overflow: 'hidden',
+    paddingTop: 12,
   },
-  btnGenerateHero: { borderRadius: 14, overflow: 'hidden', width: '100%' },
-  btnGenerateGradient: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingHorizontal: 20, paddingVertical: 14,
+  panelTitle: {
+    fontSize: 12, fontWeight: '800', color: colors.text,
+    letterSpacing: -0.2, marginBottom: 8, paddingHorizontal: 12,
   },
-  btnGenerateText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  metricDividerH: { height: 1, backgroundColor: '#EEF4F1', marginHorizontal: 10 },
+
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 4,
+  },
+  checkLabel: { fontSize: 11, color: colors.text, fontWeight: '500', flex: 1 },
+  checkPill: {
+    backgroundColor: '#F0F4F3',
+    borderRadius: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  checkPillOk: { backgroundColor: '#E8F5EE' },
+  checkPillText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+  checkPillTextOk: { color: colors.primaryLight },
+
+  clientRow: { paddingHorizontal: 10, paddingVertical: 9 },
+  clientName: { fontSize: 11, fontWeight: '700', color: colors.text, marginBottom: 1 },
+  clientMeta: { fontSize: 10, color: colors.textMuted, fontWeight: '500' },
+
+  panelLink: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF4F1',
+    marginTop: 2,
+  },
+  panelLinkText: { fontSize: 11, fontWeight: '700', color: colors.primaryLight },
+
+  // Modale clients
+  modalContainer: { flex: 1, backgroundColor: colors.background },
+  modalHeader: {
+    backgroundColor: colors.card,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8F0EC',
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
+  modalSub: { fontSize: 13, color: colors.textMuted, fontWeight: '500', marginTop: 2 },
+  modalClose: {
+    position: 'absolute', top: 16, right: 20,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.background,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 13,
+  },
+  modalIconBox: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: '#E8F5EE',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalClientName: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  modalClientMeta: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  modalDivider: { height: 1, backgroundColor: '#EEF4F1' },
+
+  // ── Mode supervision ──────────────────────────────────────────────────
 
   // Stats Bar
   statsBar: {

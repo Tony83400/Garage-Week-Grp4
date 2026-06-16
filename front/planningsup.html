@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AlchiRoute - Planning généré</title>
+  <style>
+    :root {
+      --dark: #003d31;
+      --dark-2: #034233;
+      --green: #005c3d;
+      --green-2: #0a7148;
+      --lime: #86bd22;
+      --cream: #f7f1e4;
+      --paper: #fbf7ed;
+      --line: #d9cfbd;
+      --text: #102d23;
+      --muted: #554e43;
+      --red: #e03b22;
+      --orange: #ed7440;
+      --blue: #166aa4;
+      --purple: #6b63aa;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 85% 95%, rgba(151, 135, 91, .12) 0 12%, transparent 12.5%),
+        linear-gradient(110deg, #f3e9d8 0%, #fff9ef 46%, #f2e6d5 100%);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .35;
+      background:
+        repeating-radial-gradient(circle at 82% 19%, transparent 0 22px, rgba(12, 72, 52, .06) 23px, transparent 24px),
+        repeating-radial-gradient(circle at 43% 68%, transparent 0 30px, rgba(12, 72, 52, .045) 31px, transparent 32px);
+    }
+
+    svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    a, button { color: inherit; font: inherit; }
+
+    .sidebar {
+      width: 286px;
+      min-height: 100vh;
+      position: fixed;
+      inset: 0 auto 0 0;
+      padding: 43px 17px 0;
+      color: #fff9e9;
+      background:
+        radial-gradient(circle at 27% 65%, rgba(118, 176, 55, .12), transparent 21%),
+        linear-gradient(160deg, #003e32, #00392e 58%, #004535);
+      box-shadow: 12px 0 28px rgba(38, 29, 15, .24);
+      overflow: hidden;
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 255px -60px 80px -40px;
+      opacity: .24;
+      background:
+        repeating-radial-gradient(circle at 28% 35%, transparent 0 20px, rgba(242, 218, 145, .18) 21px, transparent 22px),
+        repeating-radial-gradient(circle at 75% 56%, transparent 0 28px, rgba(242, 218, 145, .14) 29px, transparent 30px);
+    }
+
+    .sidebar::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 158px;
+      opacity: .7;
+      background:
+        linear-gradient(160deg, transparent 42%, rgba(108, 163, 44, .35) 42.5% 43%, transparent 43.5%),
+        linear-gradient(18deg, transparent 38%, rgba(108, 163, 44, .38) 38.5% 39.2%, transparent 40%),
+        radial-gradient(ellipse at 74% 98%, rgba(134, 189, 34, .22), transparent 52%);
+    }
+
+    .brand, .nav, .logout { position: relative; z-index: 2; }
+
+    .brand {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 0 13px;
+      margin-bottom: 48px;
+    }
+
+    .brand-mark {
+      color: var(--lime);
+      padding-top: 5px;
+    }
+
+    .brand-mark svg {
+      width: 36px;
+      height: 36px;
+      stroke-width: 2.1;
+    }
+
+    .brand strong {
+      display: block;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 35px;
+      line-height: .9;
+      letter-spacing: -.02em;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 13px;
+      color: var(--lime);
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    .nav {
+      display: grid;
+      gap: 14px;
+    }
+
+    .nav-item {
+      height: 62px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 0 20px;
+      border-radius: 10px;
+      color: #fff7e8;
+      text-decoration: none;
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    .nav-item.active {
+      background: rgba(91, 146, 64, .42);
+      box-shadow: inset 0 1px rgba(255,255,255,.06);
+    }
+
+    .nav-item .icon {
+      width: 31px;
+      display: grid;
+      place-items: center;
+    }
+
+    .badge {
+      margin-left: auto;
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--red);
+      color: white;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .logout {
+      position: absolute;
+      left: 18px;
+      right: 24px;
+      bottom: 40px;
+      display: flex;
+      align-items: center;
+      gap: 19px;
+      min-height: 67px;
+      padding-top: 28px;
+      border-top: 1px solid rgba(255, 248, 229, .55);
+      color: #fbf2df;
+      text-decoration: none;
+      font-size: 16px;
+    }
+
+    .page {
+      width: calc(100% - 286px);
+      min-height: 100vh;
+      margin-left: 286px;
+      padding: 26px 38px 36px 27px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 21px;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 54px;
+      line-height: .93;
+      letter-spacing: -.04em;
+    }
+
+    .topbar p {
+      margin-top: 8px;
+      color: #574e44;
+      font-size: 18px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 25px;
+    }
+
+    .date-btn {
+      height: 55px;
+      min-width: 268px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 13px;
+      padding: 0 18px;
+      border: 1px solid #d8cdbb;
+      border-radius: 9px;
+      background: rgba(255, 251, 244, .86);
+      color: #352e27;
+      font-size: 17px;
+      box-shadow: 0 8px 18px rgba(55, 38, 16, .06);
+    }
+
+    .chevron {
+      margin-left: 7px;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .bell {
+      position: relative;
+      width: 72px;
+      height: 67px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-left: 1px solid #d8cdbb;
+      border-right: 1px solid #d8cdbb;
+      background: transparent;
+    }
+
+    .bell span {
+      position: absolute;
+      top: 5px;
+      right: 18px;
+      width: 25px;
+      height: 25px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--red);
+      color: white;
+      font-weight: 900;
+      font-size: 14px;
+    }
+
+    .user {
+      display: grid;
+      grid-template-columns: 61px auto 22px;
+      align-items: center;
+      gap: 14px;
+      min-width: 242px;
+    }
+
+    .avatar {
+      width: 61px;
+      height: 61px;
+      overflow: hidden;
+      border-radius: 50%;
+      border: 1px solid #cfc4ae;
+      background:
+        radial-gradient(circle at 50% 34%, #f1c8a9 0 19%, transparent 20%),
+        radial-gradient(circle at 50% 43%, #1c2d27 0 24%, transparent 25%),
+        linear-gradient(#e9d5bb 0 62%, #315c49 63%);
+      position: relative;
+    }
+
+    .avatar::before {
+      content: "";
+      position: absolute;
+      left: 19px;
+      top: 13px;
+      width: 23px;
+      height: 10px;
+      border: 3px solid #1e2524;
+      border-left-width: 4px;
+      border-right-width: 4px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.28);
+    }
+
+    .user strong {
+      display: block;
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+    .user small {
+      display: block;
+      margin-top: 7px;
+      color: var(--green);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .metrics {
+      min-height: 121px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+      gap: 0;
+      padding: 15px 0;
+      border: 1px solid #d9cfbd;
+      border-radius: 12px;
+      background: rgba(252, 247, 236, .78);
+      box-shadow: 0 7px 17px rgba(45, 35, 20, .08);
+      overflow: hidden;
+    }
+
+    .metric {
+      min-height: 86px;
+      display: grid;
+      grid-template-columns: 69px auto;
+      align-items: center;
+      gap: 16px;
+      padding: 0 31px;
+      border-right: 1px dashed #cfc2ad;
+    }
+
+    .metric:last-child { border-right: 0; }
+
+    .metric-icon {
+      width: 69px;
+      height: 69px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid #bdd0a3;
+      background: #dce9c9;
+      color: var(--green);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
+    }
+
+    .metric-icon svg {
+      width: 34px;
+      height: 34px;
+    }
+
+    .metric strong {
+      display: inline-block;
+      margin-right: 12px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 47px;
+      line-height: .92;
+      color: var(--green);
+    }
+
+    .metric b {
+      color: #18281f;
+      font-size: 17px;
+      line-height: 1.05;
+    }
+
+    .metric small {
+      display: block;
+      margin-top: 6px;
+      color: #38352e;
+      font-size: 16px;
+    }
+
+    .alert-bar {
+      height: 69px;
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      margin-top: 14px;
+      padding: 0 28px;
+      border: 2px solid #f06a3d;
+      border-radius: 11px;
+      background: linear-gradient(90deg, rgba(255, 235, 224, .9), rgba(255, 244, 236, .75));
+      color: #9e2616;
+      box-shadow: 0 7px 18px rgba(141, 57, 22, .08);
+    }
+
+    .alert-bar svg {
+      width: 40px;
+      height: 40px;
+      color: var(--orange);
+      fill: var(--orange);
+      stroke: white;
+    }
+
+    .alert-bar strong {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 30px;
+    }
+
+    .alert-dot {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #b7291a;
+      color: white;
+      font-size: 19px;
+      font-weight: 900;
+    }
+
+    .alert-bar .arrow {
+      margin-left: auto;
+      font-size: 42px;
+      line-height: 1;
+      font-weight: 300;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 36.4% 1fr;
+      gap: 12px;
+      margin-top: 13px;
+    }
+
+    .panel {
+      border: 1px solid #d9cfbd;
+      border-radius: 11px;
+      background: rgba(252, 247, 236, .82);
+      box-shadow: 0 8px 18px rgba(48, 36, 17, .1);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 27px;
+      border-bottom: 1px solid #dfd4c2;
+    }
+
+    .panel-head h2,
+    .detail-head h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .drivers {
+      padding: 10px 12px 24px;
+    }
+
+    .driver {
+      position: relative;
+      padding: 12px 15px 13px 17px;
+      margin-bottom: 12px;
+      border-left: 4px solid var(--green-2);
+      border-radius: 9px;
+      background: rgba(255, 252, 244, .45);
+    }
+
+    .driver.blue { border-left-color: #1b67a6; }
+    .driver.purple { border-left-color: #7472ae; }
+
+    .driver-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .person {
+      width: 33px;
+      height: 33px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #6b9552;
+      color: white;
+    }
+
+    .driver.blue .person { background: #0e6aa8; }
+    .driver.purple .person { background: #6c76b4; }
+
+    .driver-name {
+      font-size: 17px;
+      font-weight: 850;
+    }
+
+    .chip {
+      display: inline-grid;
+      place-items: center;
+      height: 25px;
+      padding: 0 13px;
+      border-radius: 999px;
+      background: #dce9c9;
+      color: #35651d;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .driver.blue .chip,
+    .chip.blue { background: #d8e8f3; color: #135f98; }
+    .driver.purple .chip,
+    .chip.purple { background: #e2def4; color: #5e55a2; }
+
+    .count {
+      margin-left: auto;
+      height: 27px;
+      display: grid;
+      place-items: center;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: #dce9c9;
+      color: #1d6e31;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .driver.blue .count { background: #d8e8f3; color: #135f98; }
+    .driver.purple .count { background: #e2def4; color: #5e55a2; }
+
+    .tour {
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: 35px 94px 1fr 20px;
+      align-items: center;
+      gap: 12px;
+      padding: 0 10px;
+      border: 1px solid #c4b89f;
+      border-radius: 8px;
+      background: #faf7ea;
+      font-size: 14px;
+    }
+
+    .tour + .tour { margin-top: 7px; }
+
+    .tour.active {
+      border-color: #8faa72;
+      box-shadow: inset 0 0 0 1px rgba(83, 136, 55, .2);
+    }
+
+    .tour-num {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #d7e1c8;
+      color: #20311f;
+      font-weight: 900;
+    }
+
+    .tour.active .tour-num { background: #09843f; color: white; }
+    .driver.blue .tour.active .tour-num { background: #0e6aa8; }
+    .driver.purple .tour.active .tour-num { background: #6874b0; }
+
+    .tour strong { font-size: 15px; }
+    .tour span { color: #1d201d; white-space: nowrap; }
+    .tour b { font-size: 27px; line-height: 1; font-weight: 300; }
+
+    .detail {
+      padding: 11px 15px 15px;
+    }
+
+    .detail-head {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .planned {
+      display: inline-grid;
+      place-items: center;
+      height: 24px;
+      margin-left: 10px;
+      padding: 0 13px;
+      border-radius: 999px;
+      background: #dce9c9;
+      color: #2d6d2f;
+      font: 800 13px "Segoe UI", Arial, sans-serif;
+      vertical-align: 3px;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 112px 112px;
+      border: 1px solid #cfc4ae;
+      border-radius: 7px;
+      overflow: hidden;
+      background: #fbf7ed;
+    }
+
+    .tab {
+      height: 36px;
+      border: 0;
+      background: transparent;
+      font-weight: 600;
+    }
+
+    .tab.active {
+      background: #004334;
+      color: white;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+
+    .summary-card {
+      min-height: 92px;
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      align-items: start;
+      gap: 10px;
+      padding: 14px 10px;
+      border: 1px solid #e1d6c4;
+      border-radius: 8px;
+      background: rgba(251, 247, 237, .72);
+    }
+
+    .summary-card svg {
+      color: #7a9b66;
+    }
+
+    .summary-card small {
+      display: block;
+      color: #5b554c;
+      font-size: 12px;
+    }
+
+    .summary-card strong {
+      display: block;
+      margin-top: 7px;
+      color: #15180f;
+      font-size: 15px;
+    }
+
+    .summary-card em {
+      display: block;
+      margin-top: 4px;
+      color: #15180f;
+      font-size: 12px;
+      font-style: normal;
+    }
+
+    .route {
+      border: 1px solid #dbd0be;
+      border-radius: 9px;
+      overflow: hidden;
+      background: rgba(252, 248, 239, .7);
+    }
+
+    .route h3 {
+      padding: 13px 8px;
+      font-size: 18px;
+      border-bottom: 1px solid #dbd0be;
+    }
+
+    .stop {
+      min-height: 53px;
+      display: grid;
+      grid-template-columns: 44px 46px 1fr 130px 92px 108px;
+      align-items: center;
+      gap: 9px;
+      padding: 0 9px;
+      border-bottom: 1px solid #ddd2bf;
+      position: relative;
+    }
+
+    .stop:last-child { border-bottom: 0; }
+    .stop.depot { background: rgba(225, 231, 209, .42); }
+
+    .stop::before {
+      content: "";
+      position: absolute;
+      left: 25px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #88a879;
+    }
+
+    .stop:first-of-type::before { top: 27px; }
+    .stop:last-of-type::before { bottom: 27px; }
+
+    .stop-num {
+      position: relative;
+      z-index: 1;
+      width: 29px;
+      height: 29px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #006338;
+      color: white;
+      font-weight: 900;
+      font-size: 14px;
+    }
+
+    .stop-icon svg {
+      width: 29px;
+      height: 29px;
+      color: #89a769;
+    }
+
+    .stop strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .stop small {
+      display: block;
+      margin-top: 4px;
+      color: #595146;
+      font-size: 13px;
+    }
+
+    .stop span {
+      color: #4e473e;
+      font-size: 14px;
+    }
+
+    .status {
+      justify-self: end;
+      min-width: 89px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      color: #2d6d2f;
+      background: #dce9c9;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .status.depot {
+      border: 1px solid #8faa72;
+      background: transparent;
+      color: #3e6f2d;
+    }
+
+    .bottom-summary {
+      min-height: 66px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: center;
+      margin-top: 12px;
+      border: 1px solid #dfd4c2;
+      border-radius: 9px;
+      background: rgba(252, 247, 236, .78);
+    }
+
+    .bottom-item {
+      height: 45px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      border-right: 1px solid #d9cfbd;
+      font-size: 15px;
+      font-weight: 850;
+    }
+
+    .bottom-item:last-child { border-right: 0; }
+
+    .bottom-item svg {
+      width: 33px;
+      height: 33px;
+      color: #668e4f;
+    }
+
+    @media (max-width: 1300px) {
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric { border-bottom: 1px dashed #cfc2ad; }
+      .workspace { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 860px) {
+      body { display: block; }
+      .sidebar { position: relative; width: 100%; min-height: auto; padding-bottom: 105px; }
+      .page { width: 100%; margin-left: 0; padding: 24px 16px; }
+      .topbar, .top-actions { flex-wrap: wrap; }
+      .metrics, .summary-grid, .bottom-summary { grid-template-columns: 1fr; }
+      .metric { border-right: 0; }
+      .summary-card, .stop, .tour { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 21V9"/><path d="M6 12C3 8 5 3 12 3c7 0 9 5 6 9-2 3-6 4-6 4s-4-1-6-4Z"/><path d="M12 9c2-2 4-3 7-4M12 9C10 7 8 6 5 5"/></svg></span>
+      <span><strong>AlchiRoute</strong><small>Var 83</small></span>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-item" href="index.html"><span class="icon"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg></span>Tableau de bord</a>
+      <a class="nav-item active" href="#"><span class="icon"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg></span>Planning</a>
+      <a class="nav-item" href="#"><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 22s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>Sites de collecte</a>
+      <a class="nav-item" href="#"><span class="icon"><svg viewBox="0 0 24 24"><path d="m13 2-9 12h8l-1 8 9-12h-8l1-8Z"/></svg></span>Imprévus <span class="badge">2</span></a>
+      <a class="nav-item" href="#"><span class="icon"><svg viewBox="0 0 24 24"><path d="M4 20h16M6 20V10M12 20V4M18 20v-7"/></svg></span>Rapports</a>
+      <a class="nav-item" href="#"><span class="icon"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5Z"/><path d="M8 9h8M8 13h8M8 17h4"/></svg></span>Ressources</a>
+    </nav>
+
+    <a class="logout" href="#"><span class="icon"><svg viewBox="0 0 24 24"><path d="M14 8V5a2 2 0 0 0-2-2H5v18h7a2 2 0 0 0 2-2v-3M9 12h12M17 8l4 4-4 4"/></svg></span>Déconnexion</a>
+  </aside>
+
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <h1>Planning</h1>
+        <p>Tournées générées pour le lundi 15 juin 2025</p>
+      </div>
+      <div class="top-actions">
+        <button class="date-btn"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z"/></svg>Lundi 15 juin 2025 <span class="chevron">⌄</span></button>
+        <button class="bell" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span>2</span></button>
+        <div class="user"><div class="avatar"></div><div><strong>Admin AlchiRoute</strong><small>Administrateur</small></div><span class="chevron">⌄</span></div>
+      </div>
+    </header>
+
+    <section class="metrics">
+      <article class="metric"><span class="metric-icon"><svg viewBox="0 0 24 24"><path d="M3 7h11v10H3Z"/><path d="M14 11h3l4 4v2h-7Z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></span><span><strong>3</strong><b>véhicules<br>mobilisés</b><small>3 chauffeurs</small></span></article>
+      <article class="metric"><span class="metric-icon"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg></span><span><strong>6</strong><b>tournées<br>générées</b><small>2 tournées par chauffeur</small></span></article>
+      <article class="metric"><span class="metric-icon"><svg viewBox="0 0 24 24"><path d="M12 22s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span><strong>34</strong><b>arrêts<br>planifiés</b></span></article>
+      <article class="metric"><span class="metric-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-5"/></svg></span><span><strong>0 / 22</strong><b>collectes<br>validées</b></span></article>
+      <article class="metric"><span class="metric-icon"><svg viewBox="0 0 24 24"><path d="M20 4c-9 1-14 6-15 15 9-1 14-6 15-15Z"/><path d="M5 19c4-4 8-7 15-15"/></svg></span><span><strong>3 715 kg</strong><b>poids estimé</b></span></article>
+    </section>
+
+    <section class="alert-bar">
+      <svg viewBox="0 0 24 24"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5M12 18h.01"/></svg>
+      <strong>Traiter les imprévus</strong>
+      <span class="alert-dot">2</span>
+      <span class="arrow">›</span>
+    </section>
+
+    <section class="workspace">
+      <aside class="panel">
+        <div class="panel-head"><h2>Chauffeurs et tournées (3)</h2><span>⌃</span></div>
+        <div class="drivers">
+          <article class="driver">
+            <div class="driver-top"><span class="person"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6 19a6 6 0 0 1 12 0"/></svg></span><strong class="driver-name">Jean Dupont</strong><span class="chip">VL1</span><span class="count">2 tournées</span></div>
+            <div class="tour active"><span class="tour-num">1</span><strong>Tournée 1</strong><span>5 arrêts · 42 km · 620 / 1500 kg · 06:30–10:45</span><b>›</b></div>
+            <div class="tour"><span class="tour-num">2</span><strong>Tournée 2</strong><span>3 arrêts · 30 km · 100 / 1500 kg · 11:30–15:40</span><b>›</b></div>
+          </article>
+
+          <article class="driver blue">
+            <div class="driver-top"><span class="person"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6 19a6 6 0 0 1 12 0"/></svg></span><strong class="driver-name">Alice Martin</strong><span class="chip">VL2</span><span class="count">2 tournées</span></div>
+            <div class="tour active"><span class="tour-num">1</span><strong>Tournée 1</strong><span>6 arrêts · 65 km · 410 / 1500 kg · 06:45–11:40</span><b>›</b></div>
+            <div class="tour"><span class="tour-num">2</span><strong>Tournée 2</strong><span>3 arrêts · 38 km · 140 / 1500 kg · 12:30–16:10</span><b>›</b></div>
+          </article>
+
+          <article class="driver purple">
+            <div class="driver-top"><span class="person"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6 19a6 6 0 0 1 12 0"/></svg></span><strong class="driver-name">Marc Bernard</strong><span class="chip">VL3</span><span class="count">2 tournées</span></div>
+            <div class="tour active"><span class="tour-num">1</span><strong>Tournée 1</strong><span>4 arrêts · 50 km · 380 / 1500 kg · 06:40–11:10</span><b>›</b></div>
+            <div class="tour"><span class="tour-num">2</span><strong>Tournée 2</strong><span>5 arrêts · 38 km · 280 / 1500 kg · 12:00–16:45</span><b>›</b></div>
+          </article>
+        </div>
+      </aside>
+
+      <section class="panel detail">
+        <div class="detail-head">
+          <h2>Jean Dupont — Tournée 1 <span class="planned">Planifiée</span></h2>
+          <div class="tabs"><button class="tab active">Tournées</button><button class="tab">Carte</button></div>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card"><svg viewBox="0 0 24 24"><path d="M3 7h11v10H3Z"/><path d="M14 11h3l4 4v2h-7Z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg><span><small>Véhicule</small><strong>VL1</strong><em>AB-123-CD</em></span></article>
+          <article class="summary-card"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6 19a6 6 0 0 1 12 0"/></svg><span><small>Chauffeur</small><strong>Jean Dupont</strong></span></article>
+          <article class="summary-card"><svg viewBox="0 0 24 24"><path d="M12 22s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12Z"/><circle cx="12" cy="10" r="2.5"/></svg><span><small>Arrêts</small><strong>5 arrêts</strong><em>dont 4 dépôts</em></span></article>
+          <article class="summary-card"><svg viewBox="0 0 24 24"><path d="M4 20 12 4l8 16M8 20l4-16 4 16M4 20h16"/></svg><span><small>Distance</small><strong>42 km</strong></span></article>
+          <article class="summary-card"><svg viewBox="0 0 24 24"><path d="M6 20h12M8 20l1-9h6l1 9M12 4v7M9 7h6"/></svg><span><small>Charge estimée</small><strong>620 / 1500 kg</strong></span></article>
+          <article class="summary-card"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><small>Service estimé</small><strong>06:30–10:45</strong><em>4h15</em></span></article>
+        </div>
+
+        <div class="route">
+          <h3>Itinéraire et arrêts</h3>
+          <div class="stop depot"><span class="stop-num">0</span><span class="stop-icon"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7M5 10v10h14V10M9 20v-6h6v6"/></svg></span><div><strong>Dépôt La Farlède</strong></div><span>Départ</span><span>06:30</span><span class="status depot">Dépôt</span></div>
+          <div class="stop"><span class="stop-num">1</span><span class="stop-icon"><svg viewBox="0 0 24 24"><path d="M4 21V9l6 3V6l10 5v10M4 21h16M8 17h2M13 17h2"/></svg></span><div><strong>Usine Tech</strong><small>220 kg · 06:40–07:20</small></div><span></span><span>06:40</span><span class="status">Planifiée</span></div>
+          <div class="stop"><span class="stop-num">2</span><span class="stop-icon"><svg viewBox="0 0 24 24"><path d="M12 3c2 3 2 5 0 7-2-2-2-4 0-7ZM6 10c4 0 6 2 6 6-4 0-6-2-6-6ZM18 10c-4 0-6 2-6 6 4 0 6-2 6-6ZM12 16v5"/></svg></span><div><strong>Domaine Viticole</strong><small>120 kg · 07:40–08:20</small></div><span></span><span>07:40</span><span class="status">Planifiée</span></div>
+          <div class="stop"><span class="stop-num">3</span><span class="stop-icon"><svg viewBox="0 0 24 24"><path d="M4 14c3-5 8-6 16-2-3 5-8 6-16 2ZM7 13l2 3M11 12l2 4M15 12l2 3"/></svg></span><div><strong>Boulangerie Martin</strong><small>60 kg · 08:40–09:10</small></div><span></span><span>08:40</span><span class="status">Planifiée</span></div>
+          <div class="stop"><span class="stop-num">4</span><span class="stop-icon"><svg viewBox="0 0 24 24"><path d="M4 21V7h16v14M8 21V3h8v18M4 11h16M9 7h2M13 7h2M9 15h2M13 15h2"/></svg></span><div><strong>Hôtel de la Baie</strong><small>140 kg · 09:20–10:00</small></div><span></span><span>09:20</span><span class="status">Planifiée</span></div>
+          <div class="stop depot"><span class="stop-num">5</span><span class="stop-icon"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7M5 10v10h14V10M9 20v-6h6v6"/></svg></span><div><strong>Dépôt La Farlède</strong></div><span>Retour</span><span>10:45</span><span class="status depot">Dépôt</span></div>
+        </div>
+
+        <div class="bottom-summary">
+          <div class="bottom-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Durée totale estimée : ~4h15</div>
+          <div class="bottom-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M4 12h16M12 12l5-5M12 12l-5 5"/></svg>Temps de conduite : ~1h15</div>
+          <div class="bottom-item"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6"/></svg>Temps sur site : ~3h00</div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
