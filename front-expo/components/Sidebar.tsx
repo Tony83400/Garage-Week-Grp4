@@ -1,26 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../constants/colors';
-
-function LogoIcon() {
-  return (
-    <Svg width={22} height={22} viewBox="0 0 22 22" fill="none">
-      <Path d="M4 11 C4 7 7 4 11 4" stroke="white" strokeWidth={2} strokeLinecap="round" />
-      <Path d="M10 2L11 4L8.5 4Z" fill="white" />
-      <Path d="M18 11 C18 15 15 18 11 18" stroke="white" strokeWidth={2} strokeLinecap="round" />
-      <Path d="M12 20L11 18L13.5 18Z" fill="white" />
-      <Path
-        d="M11 6 C14 6 16 8.5 16 11.5 C16 14 13.5 16 11 16 C8.5 16 6.5 14 6.5 11.5 C6.5 8.5 8 6 11 6Z"
-        fill="rgba(255,255,255,0.3)"
-      />
-    </Svg>
-  );
-}
 
 interface Props {
   activeRoute: 'dashboard' | 'planning' | 'sites' | 'ressources';
@@ -45,10 +29,14 @@ export default function Sidebar({ activeRoute, style }: Props) {
           end={{ x: 1, y: 1 }}
           style={styles.logoIcon}
         >
-          <LogoIcon />
+          <Image
+            source={require('../assets/ref/vrai A en blanc.png')}
+            style={{ width: 22, height: 22 }}
+            resizeMode="contain"
+          />
         </LinearGradient>
         <View>
-          <Text style={styles.logoName}>ArchAppli</Text>
+          <Text style={styles.logoName}>AlchiRoute</Text>
           <Text style={styles.logoSub}>portail admin</Text>
         </View>
       </View>
