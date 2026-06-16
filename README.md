@@ -9,7 +9,8 @@
 
 ```bash
 # 1. Backend (depuis /serveur)
-pip install flask flask-cors ortools requests
+# Créer serveur/.env à partir de .env.exemple (optionnel)
+pip install -r requirements.txt
 python main.py
 # → http://localhost:5000  (reset DB automatique au démarrage)
 
@@ -73,6 +74,8 @@ GarageGrp4/
     ├── solveur_ortools.py    # Moteur d'optimisation Google OR-Tools
     ├── client.py             # Classe modèle Client
     ├── donnee.sql            # Script SQL — schéma + données de test
+    ├── requirements.txt      # Dépendances Python
+    ├── .env.exemple          # Modèle de variables d'environnement
     └── database/             # Couche accès données (4 repositories)
         ├── db_core.py
         ├── database_manager.py
