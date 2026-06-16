@@ -9,6 +9,7 @@ import {
   Animated,
   Modal,
   FlatList,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -265,11 +266,17 @@ export default function PlanningScreen() {
       </View>
 
       {/* Contenu scrollable */}
-      <ScrollView
-        style={s.content}
-        contentContainerStyle={[s.contentContainer, inSupervision && { paddingBottom: 84 }]}
-        showsVerticalScrollIndicator={false}
+      <ImageBackground
+        source={require('../assets/ref/truck.png')}
+        style={s.imageBg}
+        resizeMode="cover"
       >
+        <View style={s.imageOverlay} />
+        <ScrollView
+          style={s.content}
+          contentContainerStyle={[s.contentContainer, inSupervision && { paddingBottom: 84 }]}
+          showsVerticalScrollIndicator={false}
+        >
         {/* ── MODE PRÉPARATION ── */}
         {!loading && vehicles.length === 0 && (
           <View style={s.prepWrap}>
@@ -607,6 +614,7 @@ export default function PlanningScreen() {
           <Text style={s.toastText}>{toast}</Text>
         </Animated.View>
       )}
+      </ImageBackground>
 
       {/* Modale liste complète des clients */}
       <Modal
@@ -673,7 +681,9 @@ export default function PlanningScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5EEDF' },
+  container: { flex: 1, backgroundColor: '#063D34' },
+  imageBg: { flex: 1 },
+  imageOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255, 255, 255, 0.25)' },
 
   // Topbar avec date nav intégrée
   topbar: {
@@ -768,7 +778,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#C8E0D4',
+    borderColor: '#1A6B52',
   },
   btnSecondaryText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
 
@@ -795,10 +805,10 @@ const s = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E4EEE9',
+    borderColor: '#1A6B52',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 4,
@@ -820,10 +830,10 @@ const s = StyleSheet.create({
   },
   panel: {
     flex: 1,
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E4EEE9',
+    borderColor: '#1A6B52',
     overflow: 'hidden',
     paddingTop: 12,
   },
@@ -869,7 +879,7 @@ const s = StyleSheet.create({
   // Modale clients
   modalContainer: { flex: 1, backgroundColor: colors.background },
   modalHeader: {
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 14,
@@ -906,12 +916,12 @@ const s = StyleSheet.create({
   statsBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 8,
     marginBottom: 14,
-    borderWidth: 1, borderColor: '#EAF2EE',
+    borderWidth: 1, borderColor: '#1A6B52',
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
@@ -942,7 +952,7 @@ const s = StyleSheet.create({
     padding: 3,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#DDE8E3',
+    borderColor: '#1A6B52',
   },
   viewToggleBtn: {
     flex: 1,
@@ -954,7 +964,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
   },
   viewToggleActive: {
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
@@ -972,11 +982,11 @@ const s = StyleSheet.create({
   // Carte
   mapCard: {
     borderRadius: 18, overflow: 'hidden',
-    borderWidth: 1, borderColor: '#EAF2EE',
+    borderWidth: 1, borderColor: '#1A6B52',
     shadowColor: colors.primaryDark,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
   },
   mapHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -997,7 +1007,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 16,
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E8F0EC',
     shadowColor: colors.primaryDark,
@@ -1031,7 +1041,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 13,
     borderRadius: 12,
-    borderWidth: 1, borderColor: '#D4E8DC',
+    borderWidth: 1, borderColor: '#1A6B52',
     backgroundColor: '#F0F7F4',
   },
   btnRegenerateText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
@@ -1055,9 +1065,9 @@ const s = StyleSheet.create({
   },
   supMetricCard: {
     flex: 1,
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    borderWidth: 1, borderColor: '#E4EEE9',
+    borderWidth: 1, borderColor: '#1A6B52',
     alignItems: 'center',
     paddingVertical: 14, paddingHorizontal: 4,
   },
@@ -1101,9 +1111,9 @@ const s = StyleSheet.create({
   leftCol: { flex: 1 },
   rightCol: {
     flex: 1,
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    borderWidth: 1, borderColor: '#E4EEE9',
+    borderWidth: 1, borderColor: '#1A6B52',
     overflow: 'hidden',
     minHeight: 300,
   },
@@ -1125,9 +1135,9 @@ const s = StyleSheet.create({
 
   // Driver cards (colonne gauche)
   driverCard: {
-    backgroundColor: colors.card,
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    borderWidth: 1, borderLeftWidth: 4, borderColor: '#E4EEE9',
+    borderWidth: 1, borderLeftWidth: 4, borderColor: '#1A6B52',
     marginBottom: 12, overflow: 'hidden',
   },
   driverCardTop: {
