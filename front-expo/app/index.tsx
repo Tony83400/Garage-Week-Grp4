@@ -96,18 +96,22 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+    <View style={styles.root}>
+      {/* Photo + overlay en fond absolu — couvre tout l'écran physique */}
+      <ImageBackground
+        source={require('../assets/ref/logistique.jpg')}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
       >
-        <ImageBackground
-          source={require('../assets/ref/logistique.jpg')}
-          style={styles.bg}
-          resizeMode="cover"
-        >
-          <View style={styles.overlay} />
+        <View style={styles.overlay} />
+      </ImageBackground>
 
+      {/* Contenu par-dessus — SafeAreaView gère les insets */}
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+          style={styles.safeArea}
+        >
           <View style={styles.truckRow}>
             <TruckAnimation
               phase={phase}
@@ -166,18 +170,20 @@ export default function LoginScreen() {
 
             </Animated.View>
           </ScrollView>
-        </ImageBackground>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
+    backgroundColor: '#0A1C0F',
   },
-  bg: {
+  safeArea: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

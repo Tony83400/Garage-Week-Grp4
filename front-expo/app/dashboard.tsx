@@ -7,10 +7,13 @@ import {
   StyleSheet,
   ActivityIndicator,
   Animated,
+  ImageBackground,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/colors';
 import MobileDrawer from '../components/MobileDrawer';
 import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activite } from '../services/dashboard';
@@ -18,23 +21,227 @@ import { useRouter } from 'expo-router';
 
 const DATE_DEMO = new Date().toISOString().split('T')[0];
 
-// ── Journée card — état + chiffres fusionnés ──────────────────────────────────
+const CREAM        = '#F5EEDF';
+const TEXT_DARK    = '#0C3A34';
+const TEXT_MUTED   = '#5F6D68';
+const PANEL_BORDER = '#D9CBB4';
+const LINE         = '#DFD3BD';
+const GREEN_CTA    = '#063F35';
+const SERIF        = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
-function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
+// ── Hero section ─────────────────────────────────────────────────────────────
+
+function HeroSection({
+  stats,
+  loading,
+  hasAlerts,
+  onGoPlanning,
+  onGoImprevus,
+}: {
   stats: DashboardStats | null;
+  loading: boolean;
+  hasAlerts: boolean;
   onGoPlanning: () => void;
   onGoImprevus: () => void;
 }) {
-  const progressAnim = useRef(new Animated.Value(0)).current;
-
   const isGenerated = !!stats && stats.collectes_total > 0;
   const isDone = isGenerated && stats!.collectes_validees === stats!.collectes_total;
-  const pct = (stats && stats.poids_prevu_kg > 0)
+
+  const pillLabel = !isGenerated
+    ? 'ÉTAT DU JOUR'
+    : isDone
+    ? 'JOURNÉE TERMINÉE'
+    : 'EN COURS';
+
+  const title = !isGenerated
+    ? 'Aucune tournée générée \npour cette date\n'
+    : isDone
+    ? `Journée terminée ✓`
+    : `Tournées en cours`;
+
+  const desc = !isGenerated
+    ? '\nLa journée n\'est pas encore préparée. \nOuvrez Planning pour vérifier les données\net lancer la génération.\n'
+    : isDone
+    ? `${stats!.collectes_total} collectes · ${stats!.poids_collecte_kg.toLocaleString('fr-FR')} kg collectés · ${stats!.km_total} km parcourus`
+    : `${stats!.collectes_validees}/${stats!.collectes_total} collectes validées · ${stats!.poids_collecte_kg.toLocaleString('fr-FR')} kg collectés`;
+
+  return (
+    <ImageBackground
+      source={require('../assets/ref/truck.png')}
+      style={hero.container}
+      resizeMode="cover"
+      imageStyle={{ transform: [{ translateX: 130 }, { translateY: -310 }, { scale: 0.6 }] }}
+    >
+      <LinearGradient
+        colors={[
+          'rgba(250,244,229,0.98)',
+          'rgba(250,244,229,0.96)',
+          'rgba(250,244,229,0.82)',
+          'rgba(250,244,229,0.45)',
+          'rgba(250,244,229,0.12)',
+          'rgba(250,244,229,0.12)',
+        ]}
+        locations={[0, 0.26, 0.43, 0.58, 0.72, 1]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {loading ? (
+        <ActivityIndicator size="small" color={GREEN_CTA} style={{ margin: 40 }} />
+      ) : (
+        <View style={hero.copy}>
+          <View style={hero.pill}>
+            <Text style={hero.pillText}>{pillLabel}</Text>
+          </View>
+
+          <Text style={hero.title}>{title}</Text>
+          <Text style={hero.desc}>{desc}</Text>
+
+          {!isGenerated && (
+            <View style={hero.actions}>
+              <TouchableOpacity style={hero.cta} onPress={onGoPlanning} activeOpacity={0.8}>
+                <Ionicons name="calendar-outline" size={18} color="#fff" />
+                <Text style={hero.ctaText}>Ouvrir Planning</Text>
+                <Text style={hero.ctaArrow}>→</Text>
+              </TouchableOpacity>
+
+              {hasAlerts && (
+                <TouchableOpacity style={hero.alertLink} onPress={onGoImprevus} activeOpacity={0.75}>
+                  <Ionicons name="warning-outline" size={17} color="#CC3A25" />
+                  <Text style={hero.alertLinkText}>
+                    {stats?.alertes ?? 0} imprévus à consulter ›
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {isGenerated && !isDone && hasAlerts && (
+            <View style={hero.actions}>
+              <TouchableOpacity style={hero.alertLinkFull} onPress={onGoImprevus} activeOpacity={0.75}>
+                <Ionicons name="alert-circle-outline" size={17} color="#CC3A25" />
+                <Text style={hero.alertLinkText}>
+                  {stats!.alertes} imprév{stats!.alertes > 1 ? 'us' : 'u'} à traiter ›
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+    </ImageBackground>
+  );
+}
+
+const hero = StyleSheet.create({
+  container: {
+    minHeight: 460,
+    overflow: 'hidden',
+    backgroundColor: CREAM,
+    borderBottomWidth: 1,
+    borderBottomColor: PANEL_BORDER,
+  },
+  copy: {
+    width: '56%',
+    paddingLeft: 28,
+    paddingRight: 12,
+    paddingTop: 44,
+    paddingBottom: 44,
+  },
+  pill: {
+    alignSelf: 'flex-start',
+    height: 34,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: '#D9E1C6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  pillText: {
+    color: '#244E38',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  title: {
+    fontFamily: SERIF,
+    fontSize: 45,
+    lineHeight: 38,
+    color: TEXT_DARK,
+    marginBottom: 12,
+  },
+  desc: {
+    fontSize: 21,
+    lineHeight: 22,
+    color: TEXT_MUTED,
+    marginBottom: 24,
+  },
+  actions: {
+    flexDirection: 'column',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  cta: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: GREEN_CTA,
+  },
+  ctaText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  ctaArrow: {
+    color: '#fff',
+    fontSize: 22,
+    lineHeight: 26,
+    marginLeft: 2,
+  },
+  alertLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 40,
+    paddingHorizontal: 2,
+  },
+  alertLinkFull: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 46,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#F87171',
+  },
+  alertLinkText: {
+    color: '#CC3A25',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+});
+
+// ── JourneeCard (données de progression) ─────────────────────────────────────
+
+function JourneeCard({ stats, onGoImprevus }: {
+  stats: DashboardStats;
+  onGoImprevus: () => void;
+}) {
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const isDone = stats.collectes_validees === stats.collectes_total;
+  const pct = stats.poids_prevu_kg > 0
     ? Math.min(stats.poids_collecte_kg / stats.poids_prevu_kg, 1)
     : 0;
+  const hasAlert = stats.alertes > 0 && !isDone;
 
   useEffect(() => {
-    if (!isGenerated) return;
     progressAnim.setValue(0);
     Animated.timing(progressAnim, {
       toValue: pct,
@@ -42,60 +249,32 @@ function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
       delay: 150,
       useNativeDriver: false,
     }).start();
-  }, [pct, isGenerated]);
+  }, [pct]);
 
-  // État vide — pas de tournées générées
-  if (!isGenerated) {
-    return (
-      <TouchableOpacity
-        activeOpacity={0.75}
-        onPress={onGoPlanning}
-        style={[jc.card, { backgroundColor: '#F5F7F6', borderColor: '#D4E0DC' }]}
-      >
-        <View style={jc.emptyRow}>
-          <View style={[jc.iconBox, { backgroundColor: '#E8EDEB' }]}>
-            <Ionicons name="time-outline" size={20} color={colors.textMuted} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[jc.statusLabel, { color: colors.textMuted }]}>Tournées non générées</Text>
-            <Text style={jc.statusSub}>Générer les tournées depuis Planning</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </View>
-      </TouchableOpacity>
-    );
-  }
-
-  const s = stats!;
-  const enCoursVrai = Math.max(0, s.collectes_total - s.collectes_validees - s.alertes);
-  const hasAlert = s.alertes > 0 && !isDone;
-
-  // Feu de circulation : vert (terminée) / rouge (alerte) / ambre (en cours)
   const RED = { bg: '#FEE2E2', border: '#F87171', fg: '#CC1F1F', iconBg: '#FECACA' };
-
-  const statusColor = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.status.en_cours.fg;
-  const statusBg    = isDone ? colors.status.terminee.bg : hasAlert ? RED.bg : colors.status.en_cours.bg;
-  const statusBorder= isDone ? colors.status.terminee.border : hasAlert ? RED.border : colors.status.en_cours.border;
-  const statusIconBg= isDone ? '#C8E8D4' : hasAlert ? RED.iconBg : '#F5D9A0';
-  const statusIcon  = isDone ? 'checkmark-circle' : hasAlert ? 'alert-circle' : 'car-outline';
-  const statusText  = isDone
-    ? `Journée terminée · ${s.km_total} km parcourus`
+  const statusColor  = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.status.en_cours.fg;
+  const statusBg     = isDone ? colors.status.terminee.bg : hasAlert ? RED.bg : colors.status.en_cours.bg;
+  const statusBorder = isDone ? colors.status.terminee.border : hasAlert ? RED.border : colors.status.en_cours.border;
+  const statusIconBg = isDone ? '#C8E8D4' : hasAlert ? RED.iconBg : '#F5D9A0';
+  const statusIcon   = isDone ? 'checkmark-circle' : hasAlert ? 'alert-circle' : 'car-outline';
+  const statusText   = isDone
+    ? `Journée terminée · ${stats.km_total} km parcourus`
     : hasAlert
-      ? `Imprévus détectés · ${s.km_total} km planifiés`
-      : `Tournées en cours · ${s.km_total} km planifiés`;
+    ? `Imprévus détectés · ${stats.km_total} km planifiés`
+    : `Tournées en cours · ${stats.km_total} km planifiés`;
   const progressColor = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.accent;
 
+  const enCoursVrai = Math.max(0, stats.collectes_total - stats.collectes_validees - stats.alertes);
   const bottomSuffix = (() => {
-    if (s.alertes === 0 && enCoursVrai === 0) return ' · tout validé';
+    if (stats.alertes === 0 && enCoursVrai === 0) return ' · tout validé';
     const parts: string[] = [];
     if (enCoursVrai > 0) parts.push(`${enCoursVrai} en cours`);
-    if (s.alertes > 0)   parts.push(`${s.alertes} imprévu${s.alertes > 1 ? 's' : ''}`);
+    if (stats.alertes > 0) parts.push(`${stats.alertes} imprévu${stats.alertes > 1 ? 's' : ''}`);
     return ' · ' + parts.join(' · ');
   })();
 
   return (
     <View style={[jc.card, { backgroundColor: statusBg, borderColor: statusBorder }]}>
-      {/* Header statut */}
       <View style={jc.statusRow}>
         <View style={[jc.iconBox, { backgroundColor: statusIconBg }]}>
           <Ionicons name={statusIcon as any} size={18} color={statusColor} />
@@ -105,51 +284,40 @@ function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
 
       <View style={[jc.sep, hasAlert && { backgroundColor: 'rgba(204,31,31,0.12)' }]} />
 
-      {/* Biodéchets + progress */}
       <View style={jc.metricRow}>
         <Ionicons name="leaf-outline" size={14} color={colors.primaryLight} style={{ marginTop: 1 }} />
         <View style={{ flex: 1, gap: 6 }}>
           <View style={jc.metricTop}>
             <Text style={jc.metricValue}>
-              {s.poids_collecte_kg.toLocaleString('fr-FR')}
+              {stats.poids_collecte_kg.toLocaleString('fr-FR')}
               <Text style={jc.metricUnit}> kg</Text>
             </Text>
-            <Text style={jc.metricRight}>
-              sur {s.poids_prevu_kg.toLocaleString('fr-FR')} kg prévus
-            </Text>
+            <Text style={jc.metricRight}>sur {stats.poids_prevu_kg.toLocaleString('fr-FR')} kg prévus</Text>
           </View>
           <View style={jc.progressTrack}>
             <Animated.View
-              style={[
-                jc.progressFill,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                  backgroundColor: progressColor,
-                },
-              ]}
+              style={[jc.progressFill, {
+                width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+                backgroundColor: progressColor,
+              }]}
             />
           </View>
         </View>
       </View>
 
-      {/* Collectes */}
       <View style={jc.bottomRow}>
         <Ionicons name="checkmark-circle-outline" size={14} color={colors.secondary} />
         <Text style={jc.bottomText}>
-          <Text style={jc.bottomBold}>{s.collectes_validees}/{s.collectes_total}</Text>
+          <Text style={jc.bottomBold}>{stats.collectes_validees}/{stats.collectes_total}</Text>
           {' '}collectes validées{bottomSuffix}
         </Text>
       </View>
 
-      {/* Footer alerte — visible seulement si imprévus */}
       {hasAlert && (
         <TouchableOpacity onPress={onGoImprevus} activeOpacity={0.75} style={jc.alertFooter}>
           <Ionicons name="alert-circle-outline" size={14} color={RED.fg} />
           <Text style={[jc.alertFooterText, { color: RED.fg }]}>
-            {s.alertes} impr{s.alertes > 1 ? 'évus' : 'évu'} à traiter
+            {stats.alertes} impr{stats.alertes > 1 ? 'évus' : 'évu'} à traiter
           </Text>
           <Ionicons name="chevron-forward" size={13} color={RED.fg} />
         </TouchableOpacity>
@@ -160,116 +328,35 @@ function JourneeCard({ stats, onGoPlanning, onGoImprevus }: {
 
 const jc = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
     padding: 18,
-    marginBottom: 14,
-    shadowColor: colors.primaryDark,
+    shadowColor: '#0C3A34',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 8,
     elevation: 3,
   },
-  emptyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  iconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
-  },
-  statusLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  statusSub: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  sep: {
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    marginBottom: 14,
-  },
-  metricRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 12,
-  },
-  metricTop: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-  },
-  metricValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text,
-    letterSpacing: -0.3,
-  },
-  metricUnit: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  metricRight: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontWeight: '500',
-  },
-  progressTrack: {
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  bottomText: {
-    fontSize: 13,
-    color: colors.textMuted,
-    fontWeight: '500',
-    flex: 1,
-  },
-  bottomBold: {
-    fontWeight: '700',
-    color: colors.text,
-  },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  statusLabel: { fontSize: 14, fontWeight: '700', flex: 1 },
+  iconBox: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  sep: { height: 1, backgroundColor: 'rgba(0,0,0,0.06)', marginBottom: 14 },
+  metricRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
+  metricTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  metricValue: { fontSize: 20, fontWeight: '800', color: TEXT_DARK, letterSpacing: -0.3 },
+  metricUnit: { fontSize: 14, fontWeight: '600', color: TEXT_MUTED },
+  metricRight: { fontSize: 12, color: TEXT_MUTED, fontWeight: '500' },
+  progressTrack: { height: 4, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bottomText: { fontSize: 13, color: TEXT_MUTED, fontWeight: '500', flex: 1 },
+  bottomBold: { fontWeight: '700', color: TEXT_DARK },
   alertFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(231,111,81,0.2)',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: 10, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: 'rgba(231,111,81,0.2)',
   },
-  alertFooterText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.coral,
-  },
+  alertFooterText: { flex: 1, fontSize: 13, fontWeight: '700' },
 });
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -282,6 +369,9 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const toastAnim = useRef(new Animated.Value(0)).current;
 
+  const isGenerated = !!stats && stats.collectes_total > 0;
+  const hasAlerts = (stats?.alertes ?? 0) > 0;
+
   function showOkToast() {
     Animated.sequence([
       Animated.timing(toastAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
@@ -289,8 +379,6 @@ export default function DashboardScreen() {
       Animated.timing(toastAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
     ]).start();
   }
-
-  const hasAlerts = (stats?.alertes ?? 0) > 0;
 
   useEffect(() => {
     async function fetchData() {
@@ -311,17 +399,15 @@ export default function DashboardScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <StatusBar style="light" />
 
       {/* Topbar */}
       <View style={styles.topbar}>
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuBtn}>
-          <Ionicons name="menu-outline" size={26} color={colors.primaryLight} />
+          <Ionicons name="menu-outline" size={26} color="#fff8e9" />
         </TouchableOpacity>
-        <Text style={styles.greeting}>
-          Bonjour, <Text style={styles.greetingName}>Nicolas</Text>
-        </Text>
+        <Text style={styles.topbarTitle}>AlchiRoute</Text>
         <TouchableOpacity
           style={[styles.notifBtn, hasAlerts && styles.notifBtnAlert]}
           onPress={() => hasAlerts ? router.push('/imprevus') : showOkToast()}
@@ -330,163 +416,182 @@ export default function DashboardScreen() {
           <Ionicons
             name="notifications-outline"
             size={20}
-            color={hasAlerts ? '#CC1F1F' : colors.primaryLight}
+            color={hasAlerts ? '#CC1F1F' : '#fff8e9'}
           />
           {hasAlerts && (
-            <View style={styles.notifCount}>
-              <Text style={styles.notifCountText}>{stats!.alertes}</Text>
+            <View style={styles.notifBadge}>
+              <Text style={styles.notifBadgeText}>{stats!.alertes}</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
       <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primaryLight} style={{ marginTop: 40 }} />
-        ) : (
-          <>
+        {/* ── Hero ── */}
+        <HeroSection
+          stats={stats}
+          loading={loading}
+          hasAlerts={hasAlerts}
+          onGoPlanning={() => router.push('/planning')}
+          onGoImprevus={() => router.push('/imprevus')}
+        />
+
+        <View style={styles.body}>
+          {/* Données de progression — visible seulement si tournées générées */}
+          {!loading && isGenerated && (
             <JourneeCard
-              stats={stats}
-              onGoPlanning={() => router.push('/planning')}
+              stats={stats!}
               onGoImprevus={() => router.push('/imprevus')}
             />
+          )}
 
-            {/* Flotte en temps réel */}
-            {stats && stats.flotte.length > 0 && (() => {
-              const allDone    = stats.flotte.every(f => f.termine);
-              const anyError   = stats.flotte.some(f => f.erreurs > 0);
-              const globalBadgeBg = !allDone
-                ? colors.status.en_cours.bg
-                : anyError ? colors.coralLight : colors.status.terminee.bg;
-              const globalBadgeFg = !allDone
-                ? colors.status.en_cours.fg
-                : anyError ? colors.coral : colors.status.terminee.fg;
-              const globalBadgeLabel = !allDone ? 'En tournée' : anyError ? 'Terminé avec erreurs' : 'Terminé';
-              return (
-                <>
-                  <View style={styles.sectionLabel}>
-                    <Text style={styles.sectionLabelText}>
-                      FLOTTE · {stats.flotte.length} CHAUFFEUR{stats.flotte.length > 1 ? 'S' : ''}
+          {/* ── À faire maintenant + Accès rapides côte à côte ── */}
+          <View style={styles.panelRow}>
+
+            {/* À faire — informatif (planning non-cliquable, imprévus cliquable) */}
+            <View style={[panel.box, styles.panelFlex]}>
+              <View style={panel.header}>
+                <Text style={panel.headerTitle}>À faire</Text>
+                <View style={panel.headerLine} />
+              </View>
+
+              {/* Planning — non-cliquable, juste un rappel contextuel */}
+              <View style={panel.task}>
+                <View style={[panel.tile, { backgroundColor: '#DFE7CC' }]}>
+                  <Ionicons name="calendar-outline" size={18} color={TEXT_DARK} />
+                </View>
+                <View style={panel.taskBody}>
+                  <Text style={panel.taskTitle} numberOfLines={2}>
+                    {isGenerated ? 'Superviser les tournées' : 'Préparer les tournées'}
+                  </Text>
+                  <Text style={panel.taskSub} numberOfLines={2}>
+                    {isGenerated ? 'Suivez l\'avancement.' : 'Lancez la génération.'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Imprévus — cliquable, urgent */}
+              {hasAlerts ? (
+                <TouchableOpacity style={[panel.task, panel.taskLast]} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
+                  <View style={[panel.tile, { backgroundColor: '#F0DFBE' }]}>
+                    <Ionicons name="warning-outline" size={18} color="#C43B25" />
+                  </View>
+                  <View style={panel.taskBody}>
+                    <Text style={[panel.taskTitle, { color: '#C43B25' }]} numberOfLines={2}>
+                      {stats!.alertes} imprév{stats!.alertes > 1 ? 'us' : 'u'} actifs
                     </Text>
-                    <View style={[styles.sectionLabelBadge, { backgroundColor: globalBadgeBg }]}>
-                      <Text style={[styles.sectionLabelBadgeText, { color: globalBadgeFg }]}>
-                        {globalBadgeLabel}
-                      </Text>
-                    </View>
+                    <Text style={panel.taskSub} numberOfLines={2}>Action requise.</Text>
                   </View>
-                  <View style={[styles.sectionCard, { marginBottom: 14 }]}>
-                    {stats.flotte.map((f, i) => {
-                      const initials = f.chauffeur
-                        .split(' ')
-                        .map((w: string) => w[0])
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase();
-                      const avatarBg = !f.termine
-                        ? colors.status.en_cours.fg
-                        : f.erreurs > 0 ? colors.coral : colors.status.terminee.fg;
-                      return (
-                        <React.Fragment key={i}>
-                          {i > 0 && <View style={styles.divider} />}
-                          <View style={styles.fleetRow}>
-                            <View style={[styles.fleetAvatar, { backgroundColor: avatarBg }]}>
-                              <Text style={styles.fleetAvatarText}>{initials}</Text>
-                            </View>
-                            <View style={styles.fleetInfo}>
-                              <Text style={styles.fleetName}>{f.chauffeur}</Text>
-                              <Text style={styles.fleetPoint}>
-                                {f.termine ? f.dernier_point : `Dernier arrêt · ${f.dernier_point}`}
-                              </Text>
-                            </View>
-                            {(() => {
-                              const hasErr = f.erreurs > 0;
-                              const badgeBg = !f.termine
-                                ? colors.status.en_cours.bg
-                                : hasErr ? colors.coralLight : colors.status.terminee.bg;
-                              const badgeFg = !f.termine
-                                ? colors.status.en_cours.fg
-                                : hasErr ? colors.coral : colors.status.terminee.fg;
-                              const badgeLabel = !f.termine
-                                ? 'En tournée'
-                                : hasErr
-                                  ? `Terminé · ${f.erreurs} erreur${f.erreurs > 1 ? 's' : ''}`
-                                  : 'Terminé ✓';
-                              return (
-                                <View style={[styles.fleetBadge, { backgroundColor: badgeBg }]}>
-                                  <Text style={[styles.fleetBadgeText, { color: badgeFg }]}>
-                                    {badgeLabel}
-                                  </Text>
-                                </View>
-                              );
-                            })()}
+                  <Text style={[panel.chevron, { color: '#C43B25' }]}>›</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[panel.task, panel.taskLast]}>
+                  <View style={[panel.tile, { backgroundColor: '#E8F5EE' }]}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#2D6A4F" />
+                  </View>
+                  <View style={panel.taskBody}>
+                    <Text style={[panel.taskTitle, { color: '#2D6A4F' }]} numberOfLines={2}>Aucun imprévu</Text>
+                    <Text style={panel.taskSub} numberOfLines={2}>Tout roule.</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Accès rapides — 3 tuiles en grille */}
+            <View style={[panel.box, styles.panelFlex]}>
+              <View style={panel.header}>
+                <Text style={panel.headerTitle}>Accès</Text>
+                <View style={panel.headerLine} />
+              </View>
+
+              <View style={quick.triGrid}>
+                <TouchableOpacity style={quick.triItem} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
+                  <View style={[quick.triIcon, { backgroundColor: '#F0DFBE' }]}>
+                    <Ionicons name="warning-outline" size={18} color="#C43B25" />
+                  </View>
+                  <Text style={quick.triLabel}>Imprévus</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={quick.triItem} onPress={() => router.push('/sites')} activeOpacity={0.75}>
+                  <View style={[quick.triIcon, { backgroundColor: '#DFE7CC' }]}>
+                    <Ionicons name="location-outline" size={18} color={TEXT_DARK} />
+                  </View>
+                  <Text style={quick.triLabel}>Sites</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={quick.triItem} onPress={() => router.push('/ressources')} activeOpacity={0.75}>
+                  <View style={[quick.triIcon, { backgroundColor: '#DCE5CD' }]}>
+                    <Ionicons name="document-text-outline" size={18} color={TEXT_DARK} />
+                  </View>
+                  <Text style={quick.triLabel}>Ressources</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+          </View>
+
+          {/* ── Flotte en temps réel ── */}
+          {!loading && stats && stats.flotte.length > 0 && (() => {
+            const allDone  = stats.flotte.every(f => f.termine);
+            const anyError = stats.flotte.some(f => f.erreurs > 0);
+            const badgeBg  = !allDone ? colors.status.en_cours.bg : anyError ? colors.coralLight : colors.status.terminee.bg;
+            const badgeFg  = !allDone ? colors.status.en_cours.fg : anyError ? colors.coral : colors.status.terminee.fg;
+            const badgeLabel = !allDone ? 'En tournée' : anyError ? 'Terminé avec erreurs' : 'Terminé';
+            return (
+              <>
+                <View style={styles.sectionLabel}>
+                  <Text style={styles.sectionLabelText}>
+                    FLOTTE · {stats.flotte.length} CHAUFFEUR{stats.flotte.length > 1 ? 'S' : ''}
+                  </Text>
+                  <View style={[styles.sectionBadge, { backgroundColor: badgeBg }]}>
+                    <Text style={[styles.sectionBadgeText, { color: badgeFg }]}>{badgeLabel}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.sectionCard}>
+                  {stats.flotte.map((f, i) => {
+                    const initials = f.chauffeur
+                      .split(' ')
+                      .map((w: string) => w[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase();
+                    const avatarBg = !f.termine
+                      ? colors.status.en_cours.fg
+                      : f.erreurs > 0 ? colors.coral : colors.status.terminee.fg;
+                    const fBadgeBg = !f.termine ? colors.status.en_cours.bg : f.erreurs > 0 ? colors.coralLight : colors.status.terminee.bg;
+                    const fBadgeFg = !f.termine ? colors.status.en_cours.fg : f.erreurs > 0 ? colors.coral : colors.status.terminee.fg;
+                    const fLabel   = !f.termine ? 'En tournée' : f.erreurs > 0 ? `${f.erreurs} erreur${f.erreurs > 1 ? 's' : ''}` : 'Terminé ✓';
+                    return (
+                      <React.Fragment key={i}>
+                        {i > 0 && <View style={styles.divider} />}
+                        <View style={styles.fleetRow}>
+                          <View style={[styles.fleetAvatar, { backgroundColor: avatarBg }]}>
+                            <Text style={styles.fleetAvatarText}>{initials}</Text>
                           </View>
-                        </React.Fragment>
-                      );
-                    })}
-                  </View>
-                </>
-              );
-            })()}
-
-            {/* Rapport de collectes */}
-            {(() => {
-              const successes = activites.filter(a => a.statut === 'terminee');
-              const errors    = activites.filter(a => a.statut === 'erreur');
-              const sepLabel  = errors.length > 0
-                ? `Rapport · ${successes.length} réussie${successes.length !== 1 ? 's' : ''} · ${errors.length} erreur${errors.length > 1 ? 's' : ''}`
-                : 'Rapport de collectes';
-
-              return (
-                <>
-                  {/* Séparateur éditorial */}
-                  <View style={styles.daySep}>
-                    <View style={styles.daySepLine} />
-                    <Text style={styles.daySepText}>{sepLabel}</Text>
-                    <View style={styles.daySepLine} />
-                  </View>
-
-                  {/* Cas : aucune activité ou tout réussi → ligne verte sobre */}
-                  {errors.length === 0 && (
-                    <View style={styles.actAllGood}>
-                      <Ionicons name="checkmark-circle" size={15} color={colors.status.terminee.fg} />
-                      <Text style={styles.actAllGoodText}>
-                        {activites.length === 0
-                          ? 'Aucune collecte enregistrée pour cette journée'
-                          : 'Toutes les collectes se sont bien passées'}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Cas : erreurs → items flottants avec bande accent */}
-                  {errors.length > 0 && (
-                    <View style={styles.actErrorList}>
-                      {errors.map((e, i) => (
-                        <React.Fragment key={i}>
-                          {i > 0 && <View style={styles.actErrorDivider} />}
-                          <View style={styles.actErrorRow}>
-                            <View style={styles.actErrorAccent} />
-                            <View style={styles.actErrorInfo}>
-                              <Text style={styles.actErrorName}>{e.client}</Text>
-                              <Text style={styles.actErrorDetail}>Collecte en erreur</Text>
-                            </View>
-                            <View style={styles.actErrorBadge}>
-                              <Text style={styles.actErrorBadgeText}>Erreur</Text>
-                            </View>
+                          <View style={styles.fleetInfo}>
+                            <Text style={styles.fleetName}>{f.chauffeur}</Text>
+                            <Text style={styles.fleetPoint}>
+                              {f.termine ? f.dernier_point : `Dernier arrêt · ${f.dernier_point}`}
+                            </Text>
                           </View>
-                        </React.Fragment>
-                      ))}
-                    </View>
-                  )}
-                </>
-              );
-            })()}
-          </>
-        )}
+                          <View style={[styles.fleetBadge, { backgroundColor: fBadgeBg }]}>
+                            <Text style={[styles.fleetBadgeText, { color: fBadgeFg }]}>{fLabel}</Text>
+                          </View>
+                        </View>
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
+              </>
+            );
+          })()}
+
+        </View>
       </ScrollView>
 
       <MobileDrawer
@@ -495,7 +600,6 @@ export default function DashboardScreen() {
         activeRoute="dashboard"
       />
 
-      {/* Toast "tout va bien" */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -513,45 +617,153 @@ export default function DashboardScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── Panel styles ──────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  topbar: {
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8F0EC',
-    height: 68,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+const panel = StyleSheet.create({
+  box: {
+    backgroundColor: 'rgba(252,247,235,0.9)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PANEL_BORDER,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 8,
+    marginBottom: 16,
+    shadowColor: '#4a3218',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
     elevation: 3,
   },
-  menuBtn: {
-    marginRight: 12,
-    padding: 4,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 14,
   },
-  greeting: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
+  headerTitle: {
+    fontFamily: SERIF,
+    fontSize: 19,
+    color: TEXT_DARK,
+    lineHeight: 22,
+  },
+  headerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: LINE,
+  },
+  task: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E3D7C0',
+    paddingVertical: 8,
+  },
+  taskLast: {
+    borderBottomWidth: 0,
+    marginBottom: 4,
+  },
+  tile: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  taskBody: {
     flex: 1,
   },
-  greetingName: {
-    color: colors.primaryLight,
+  taskTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    lineHeight: 17,
+    flex: 1,
+  },
+  taskSub: {
+    fontSize: 12,
+    color: TEXT_MUTED,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  chevron: {
+    fontSize: 20,
+    color: TEXT_MUTED,
+    lineHeight: 24,
+    flexShrink: 0,
+  },
+});
+
+const quick = StyleSheet.create({
+  triGrid: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingBottom: 8,
+    paddingTop: 2,
+  },
+  triItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(223,231,204,0.28)',
+    borderWidth: 1,
+    borderColor: '#E3D7C0',
+  },
+  triIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  triLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: TEXT_DARK,
+    textAlign: 'center',
+    letterSpacing: 0.4,
+  },
+});
+
+// ── Screen styles ─────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: CREAM,
+  },
+  topbar: {
+    backgroundColor: '#063D34',
+    height: 64,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#031e1a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  menuBtn: {
+    marginRight: 10,
+    padding: 4,
+  },
+  topbarTitle: {
+    flex: 1,
+    fontFamily: SERIF,
+    fontSize: 22,
+    color: '#fff8e9',
+    letterSpacing: 0.2,
   },
   notifBtn: {
-    width: 44,
+    width: 40,
     height: 36,
     borderRadius: 10,
-    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -559,12 +771,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     borderWidth: 1,
     borderColor: '#F87171',
-    paddingHorizontal: 10,
     width: 'auto',
+    paddingHorizontal: 10,
     flexDirection: 'row',
     gap: 5,
   },
-  notifCount: {
+  notifBadge: {
     backgroundColor: '#CC1F1F',
     borderRadius: 8,
     minWidth: 18,
@@ -573,173 +785,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  notifCountText: {
+  notifBadgeText: {
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
   },
-  toast: {
-    position: 'absolute',
-    bottom: 32,
-    alignSelf: 'center',
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 48 },
+  body: {
+    padding: 16,
+    paddingTop: 48,
+  },
+  panelRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.status.terminee.bg,
-    borderWidth: 1,
-    borderColor: colors.status.terminee.border,
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 6,
+    gap: 12,
+    marginBottom: 16,
   },
-  toastText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.status.terminee.fg,
+  panelFlex: {
+    flex: 1,
+    marginBottom: 0,
   },
-  content: { flex: 1 },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  sectionCard: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#EAF2EE',
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
-  },
+  // fleet
   sectionLabel: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
-    marginTop: 6,
-    paddingHorizontal: 2,
+    marginTop: 4,
   },
   sectionLabelText: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.textMuted,
+    color: TEXT_MUTED,
     letterSpacing: 1.2,
   },
-  sectionLabelBadge: {
+  sectionBadge: {
     borderRadius: 20,
     paddingVertical: 2,
     paddingHorizontal: 8,
   },
-  sectionLabelBadgeText: {
+  sectionBadgeText: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
+  sectionCard: {
+    backgroundColor: '#FAF5EB',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PANEL_BORDER,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: '#4a3218',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   divider: {
     height: 1,
-    backgroundColor: colors.background,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  daySep: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginVertical: 18,
-    paddingHorizontal: 2,
-  },
-  daySepLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#D8E8E0',
-  },
-  daySepText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    letterSpacing: 0.4,
-  },
-  actAllGood: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 2,
-  },
-  actAllGoodText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.status.terminee.fg,
-    flex: 1,
-  },
-  actErrorList: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#EAF2EE',
-    overflow: 'hidden',
-    shadowColor: colors.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
-    paddingHorizontal: 16,
-  },
-  actErrorDivider: {
-    height: 1,
-    backgroundColor: colors.background,
-    marginLeft: 15,
-  },
-  actErrorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 11,
-  },
-  actErrorAccent: {
-    width: 3,
-    height: 36,
-    borderRadius: 2,
-    backgroundColor: colors.coral,
-    flexShrink: 0,
-  },
-  actErrorInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  actErrorName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  actErrorDetail: {
-    fontSize: 12,
-    color: colors.coral,
-    fontWeight: '500',
-  },
-  actErrorBadge: {
-    backgroundColor: colors.coralLight,
-    borderRadius: 20,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    flexShrink: 0,
-  },
-  actErrorBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.coral,
+    backgroundColor: CREAM,
   },
   fleetRow: {
     flexDirection: 'row',
@@ -755,34 +860,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  fleetAvatarText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  fleetAvatarText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
+  fleetInfo: { flex: 1, gap: 2 },
+  fleetName: { fontSize: 14, fontWeight: '700', color: TEXT_DARK },
+  fleetPoint: { fontSize: 12, color: TEXT_MUTED, fontWeight: '500' },
+  fleetBadge: { borderRadius: 20, paddingVertical: 4, paddingHorizontal: 10, flexShrink: 0 },
+  fleetBadgeText: { fontSize: 11, fontWeight: '700' },
+  // activity
+  daySep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 16,
   },
-  fleetInfo: {
-    flex: 1,
-    gap: 2,
+  daySepLine: { flex: 1, height: 1, backgroundColor: '#D8E0CC' },
+  daySepText: { fontSize: 11, fontWeight: '600', color: TEXT_MUTED, letterSpacing: 0.4 },
+  actAllGood: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
   },
-  fleetName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
+  actAllGoodText: { fontSize: 13, fontWeight: '600', color: colors.status.terminee.fg, flex: 1 },
+  actErrorList: {
+    backgroundColor: '#FAF5EB',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PANEL_BORDER,
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  fleetPoint: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontWeight: '500',
-  },
-  fleetBadge: {
+  actErrorDivider: { height: 1, backgroundColor: CREAM, marginLeft: 15 },
+  actErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
+  actErrorAccent: { width: 3, height: 36, borderRadius: 2, backgroundColor: colors.coral, flexShrink: 0 },
+  actErrorInfo: { flex: 1, gap: 2 },
+  actErrorName: { fontSize: 14, fontWeight: '700', color: TEXT_DARK },
+  actErrorDetail: { fontSize: 12, color: colors.coral, fontWeight: '500' },
+  actErrorBadge: { backgroundColor: colors.coralLight, borderRadius: 20, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0 },
+  actErrorBadgeText: { fontSize: 11, fontWeight: '700', color: colors.coral },
+  // toast
+  toast: {
+    position: 'absolute',
+    bottom: 32,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.status.terminee.bg,
+    borderWidth: 1,
+    borderColor: colors.status.terminee.border,
     borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    flexShrink: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    shadowColor: TEXT_DARK,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  fleetBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
+  toastText: { fontSize: 13, fontWeight: '700', color: colors.status.terminee.fg },
 });
