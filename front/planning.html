@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AlchiRoute - Planning</title>
+  <style>
+    :root {
+      --green-950: #003d34;
+      --green-900: #004437;
+      --green-800: #006346;
+      --green-700: #0b7754;
+      --cream: #fbfbfa;
+      --line: #e3e7e4;
+      --text: #070d22;
+      --muted: #31394f;
+      --soft: #eef4f0;
+      --orange: #f29a22;
+      --red: #f0203b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      color: var(--text);
+      background: #fbfcfb;
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    }
+
+    svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    a, button { color: inherit; font: inherit; }
+
+    .sidebar {
+      width: 264px;
+      min-height: 100vh;
+      position: fixed;
+      inset: 0 auto 0 0;
+      padding: 36px 17px 0;
+      color: white;
+      background:
+        radial-gradient(circle at 63% 26%, rgba(255,255,255,.05), transparent 21%),
+        radial-gradient(circle at 14% 86%, rgba(38,124,83,.22), transparent 24%),
+        linear-gradient(145deg, #00473d 0%, #00392f 60%, #00362d 100%);
+      overflow: hidden;
+      box-shadow: 12px 0 24px rgba(13, 24, 21, .18);
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: .18;
+      background:
+        linear-gradient(28deg, transparent 0 62%, rgba(223, 190, 110, .35) 62.5%, transparent 63%),
+        linear-gradient(118deg, transparent 0 54%, rgba(223, 190, 110, .25) 54.5%, transparent 55%);
+    }
+
+    .brand,
+    .nav,
+    .logout { position: relative; z-index: 1; }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 0 13px;
+      margin-bottom: 49px;
+    }
+
+    .brand-mark {
+      width: 49px;
+      height: 49px;
+      display: grid;
+      place-items: center;
+    }
+
+    .brand-mark svg {
+      width: 53px;
+      height: 53px;
+      stroke-width: 1.9;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 25px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -.01em;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 7px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .nav {
+      display: grid;
+      gap: 14px;
+    }
+
+    .nav-item {
+      height: 57px;
+      display: flex;
+      align-items: center;
+      gap: 19px;
+      padding: 0 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .nav-item.active {
+      background: rgba(75, 143, 97, .54);
+      box-shadow: inset 0 1px rgba(255,255,255,.1);
+    }
+
+    .nav-item .icon {
+      width: 29px;
+      display: grid;
+      place-items: center;
+    }
+
+    .badge {
+      width: 25px;
+      height: 25px;
+      display: grid;
+      place-items: center;
+      margin-left: auto;
+      border-radius: 50%;
+      background: var(--red);
+      color: white;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .logout {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      min-height: 82px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 33px;
+      border-top: 1px solid rgba(255,255,255,.15);
+      color: #f3a22b;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .page {
+      width: calc(100% - 264px);
+      min-height: 100vh;
+      margin-left: 264px;
+      padding: 33px 30px 36px 38px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 30px;
+      margin-bottom: 38px;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      font-size: 32px;
+      line-height: 1;
+      letter-spacing: -.03em;
+      font-weight: 900;
+    }
+
+    .topbar p {
+      margin-top: 13px;
+      color: #353a52;
+      font-size: 15px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 23px;
+    }
+
+    .date-btn {
+      height: 58px;
+      min-width: 247px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 13px;
+      padding: 0 17px;
+      border: 1px solid #dde2e1;
+      border-radius: 9px;
+      background: white;
+      color: #090e22;
+      font-size: 15px;
+      font-weight: 850;
+      box-shadow: 0 5px 14px rgba(25, 34, 48, .04);
+    }
+
+    .chevron {
+      margin-left: 9px;
+      font-size: 21px;
+      line-height: 1;
+    }
+
+    .bell {
+      position: relative;
+      width: 74px;
+      height: 58px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-left: 1px solid #e1e5e3;
+      border-right: 1px solid #e1e5e3;
+      background: transparent;
+    }
+
+    .bell span {
+      position: absolute;
+      top: 0;
+      right: 20px;
+      width: 23px;
+      height: 23px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--red);
+      color: white;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .user {
+      display: grid;
+      grid-template-columns: 58px auto 24px;
+      align-items: center;
+      gap: 15px;
+      min-width: 211px;
+    }
+
+    .avatar {
+      width: 58px;
+      height: 58px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e6f0eb;
+      color: #08734f;
+      font-size: 19px;
+      font-weight: 900;
+    }
+
+    .user strong {
+      display: block;
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .user small {
+      display: block;
+      margin-top: 7px;
+      color: #31364b;
+      font-size: 14px;
+    }
+
+    .hero {
+      min-height: 365px;
+      display: grid;
+      grid-template-columns: 43% 1fr;
+      align-items: center;
+      gap: 42px;
+      padding: 38px 45px;
+      border: 1px solid #dde4e1;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(20, 34, 42, .04);
+    }
+
+    .illustration {
+      height: 278px;
+      display: grid;
+      place-items: center;
+    }
+
+    .illustration svg {
+      width: 100%;
+      height: 100%;
+      max-width: 530px;
+      stroke-width: 0;
+    }
+
+    .hero-copy h2 {
+      font-size: 32px;
+      line-height: 1.14;
+      letter-spacing: -.02em;
+      font-weight: 950;
+    }
+
+    .hero-copy p {
+      max-width: 610px;
+      margin-top: 22px;
+      color: #30364b;
+      font-size: 16px;
+      line-height: 1.62;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      margin-top: 29px;
+    }
+
+    .primary,
+    .secondary {
+      height: 67px;
+      min-width: 284px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .primary {
+      background: linear-gradient(140deg, #00805a, #004d3b);
+      color: white;
+      box-shadow: inset 0 1px rgba(255,255,255,.12), 0 10px 18px rgba(0, 76, 54, .18);
+    }
+
+    .secondary {
+      border: 1px solid #d1d7d6;
+      background: #fff;
+      color: #080d21;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 21px;
+      margin-top: 22px;
+    }
+
+    .stat-card {
+      min-height: 136px;
+      display: grid;
+      grid-template-columns: 74px 1fr;
+      align-items: center;
+      gap: 18px;
+      padding: 22px 26px;
+      border: 1px solid #dde4e1;
+      border-radius: 10px;
+      background: white;
+      box-shadow: 0 8px 20px rgba(20, 34, 42, .04);
+    }
+
+    .stat-icon {
+      width: 74px;
+      height: 74px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e9f2ed;
+      color: #08714f;
+    }
+
+    .stat-icon svg {
+      width: 34px;
+      height: 34px;
+    }
+
+    .stat-card strong {
+      display: block;
+      font-size: 27px;
+      line-height: 1;
+      font-weight: 950;
+    }
+
+    .stat-card small {
+      display: block;
+      margin-top: 11px;
+      color: #14182b;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 38% 1fr;
+      gap: 21px;
+      margin-top: 22px;
+    }
+
+    .panel {
+      min-height: 394px;
+      padding: 23px 29px 22px;
+      border: 1px solid #dde4e1;
+      border-radius: 10px;
+      background: white;
+      box-shadow: 0 8px 20px rgba(20, 34, 42, .04);
+    }
+
+    .panel h3 {
+      margin-bottom: 21px;
+      font-size: 18px;
+      font-weight: 950;
+      letter-spacing: -.02em;
+    }
+
+    .check-row {
+      min-height: 66px;
+      display: grid;
+      grid-template-columns: 40px 1fr 115px;
+      align-items: center;
+      gap: 20px;
+      border-bottom: 1px solid #e4e8e6;
+    }
+
+    .check-icon,
+    .site-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: #eaf3ef;
+      color: #08714f;
+    }
+
+    .check-row strong {
+      color: #080d21;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .ok-pill {
+      height: 38px;
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      align-items: center;
+      border-radius: 999px;
+      background: #edf4f0;
+      overflow: hidden;
+      color: #006346;
+      font-size: 14px;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .ok-pill span:first-child {
+      height: 100%;
+      display: grid;
+      place-items: center;
+      background: rgba(218, 229, 223, .8);
+      color: #0e513d;
+    }
+
+    .panel-link {
+      width: max-content;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 28px auto 0;
+      color: #006346;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .panel-link span {
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .client-table {
+      width: 100%;
+      border-collapse: collapse;
+      color: #080d21;
+      font-size: 15px;
+    }
+
+    .client-table th {
+      padding: 0 8px 14px;
+      border-bottom: 1px solid #e4e8e6;
+      color: #606579;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .client-table td {
+      height: 45px;
+      padding: 0 8px;
+      border-bottom: 1px solid #e4e8e6;
+      vertical-align: middle;
+    }
+
+    .client-table td:nth-child(2),
+    .client-table td:nth-child(3) {
+      white-space: nowrap;
+    }
+
+    .site-name {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 800;
+    }
+
+    .site-icon {
+      width: 29px;
+      height: 29px;
+      border-radius: 5px;
+    }
+
+    .site-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .note {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 22px;
+      padding: 0 27px;
+      border: 1px solid #dde4e1;
+      border-radius: 10px;
+      background: #f4f8f6;
+      color: #006346;
+      font-size: 15px;
+      box-shadow: 0 8px 20px rgba(20, 34, 42, .03);
+    }
+
+    .note p {
+      display: flex;
+      align-items: center;
+      gap: 17px;
+    }
+
+    .note a {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      color: #006346;
+      text-decoration: none;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .note svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    @media (max-width: 1200px) {
+      .hero,
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 820px) {
+      body { display: block; }
+
+      .sidebar {
+        position: relative;
+        width: 100%;
+        min-height: auto;
+        padding-bottom: 24px;
+      }
+
+      .logout {
+        position: relative;
+        margin: 22px -17px -24px;
+      }
+
+      .page {
+        width: 100%;
+        margin-left: 0;
+        padding: 24px 16px;
+      }
+
+      .topbar,
+      .top-actions,
+      .hero-actions,
+      .note {
+        flex-wrap: wrap;
+      }
+
+      .hero {
+        padding: 24px;
+      }
+
+      .stats,
+      .check-row {
+        grid-template-columns: 1fr;
+      }
+
+      .client-table {
+        min-width: 650px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48"><path d="M24 5 13 16v13l11 12 11-12V16L24 5Z"/><path d="M24 41V5M13 16 5 24l19 17 19-17-8-8M5 24v9l19 11 19-11v-9"/></svg>
+      </span>
+      <span><strong>AlchiRoute</strong><small>Var 83</small></span>
+    </div>
+
+    <nav class="nav" aria-label="Navigation principale">
+      <a class="nav-item" href="index.html">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg></span>
+        Tableau de bord
+      </a>
+      <a class="nav-item active" href="#">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg></span>
+        Planning
+      </a>
+      <a class="nav-item" href="#">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 22s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        Sites de collecte
+      </a>
+      <a class="nav-item" href="#">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5M12 18h.01"/></svg></span>
+        Impr&eacute;vus
+        <span class="badge">2</span>
+      </a>
+      <a class="nav-item" href="#">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v6h5M9 13h6M9 17h6"/></svg></span>
+        Rapports
+      </a>
+      <a class="nav-item" href="#">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg></span>
+        Ressources
+      </a>
+    </nav>
+
+    <a class="logout" href="#">
+      <span class="icon"><svg viewBox="0 0 24 24"><path d="M14 8V5a2 2 0 0 0-2-2H5v18h7a2 2 0 0 0 2-2v-3M9 12h12M17 8l4 4-4 4"/></svg></span>
+      D&eacute;connexion
+    </a>
+  </aside>
+
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <h1>Planning</h1>
+        <p>Pr&eacute;paration des tourn&eacute;es du jour</p>
+      </div>
+      <div class="top-actions">
+        <button class="date-btn">
+          <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z"/></svg>
+          Lun. 15 juin 2025
+          <span class="chevron">⌄</span>
+        </button>
+        <button class="bell" aria-label="Notifications">
+          <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+          <span>2</span>
+        </button>
+        <div class="user">
+          <div class="avatar">AD</div>
+          <div><strong>Admin</strong><small>Administrateur</small></div>
+          <span class="chevron">⌄</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="illustration" aria-hidden="true">
+        <svg viewBox="0 0 560 300">
+          <rect width="560" height="300" fill="#fff"/>
+          <ellipse cx="270" cy="235" rx="246" ry="36" fill="#e6eee8"/>
+          <path d="M118 95h26v116h-26zM470 101h24v106h-24zM177 83h30v126h-30zM375 70h25v142h-25zM414 93h25v119h-25z" fill="#eef4f1"/>
+          <path d="M92 73c8-18 35-16 40 4 17-4 31 8 29 22H64c-1-15 12-26 28-26ZM409 46c8-18 35-16 40 4 17-4 31 8 29 22h-97c-1-15 12-26 28-26Z" fill="#eef4f1"/>
+          <path d="M196 95 313 58l117 37v12L313 70l-117 37Z" fill="#3a7059"/>
+          <path d="M211 105h205v107H211z" fill="#f3f6f3"/>
+          <rect x="257" y="135" width="112" height="77" rx="2" fill="#7b8b82"/>
+          <path d="M260 151h106M260 167h106M260 183h106M260 199h106" stroke="#65776e" stroke-width="3"/>
+          <rect x="304" y="111" width="18" height="14" fill="#8d9c94" stroke="#6f8178" stroke-width="2"/>
+          <path d="M98 196c0-54 42-57 42 0" stroke="#7ca58b" stroke-width="4" fill="none"/>
+          <circle cx="118" cy="125" r="16" fill="#a8c7b2"/>
+          <circle cx="107" cy="146" r="16" fill="#9abcaa"/>
+          <circle cx="129" cy="151" r="18" fill="#95bca5"/>
+          <path d="M118 158v54M100 212h37" stroke="#6d927d" stroke-width="4"/>
+          <path d="M213 201h43v30h-43zM256 209h14l12 11v11h-26z" fill="#fff" stroke="#a3b3ac" stroke-width="2"/>
+          <circle cx="228" cy="235" r="7" fill="#6d7b74"/><circle cx="269" cy="235" r="7" fill="#6d7b74"/>
+          <path d="M334 194h66v37h-66zM400 205h27l17 17v9h-44z" fill="#fff" stroke="#a3b3ac" stroke-width="2"/>
+          <rect x="348" y="203" width="28" height="18" fill="#dfe8e3"/>
+          <circle cx="354" cy="235" r="8" fill="#6d7b74"/><circle cx="428" cy="235" r="8" fill="#6d7b74"/>
+          <path d="M356 248c64 15 138 8 148-33" stroke="#7e9a8d" stroke-width="2" stroke-dasharray="7 7" fill="none"/>
+          <path d="M498 113c-24 0-43 20-43 44 0 34 43 73 43 73s43-39 43-73c0-24-19-44-43-44Z" fill="#e9f0ec"/>
+          <circle cx="498" cy="156" r="22" fill="#fff"/>
+          <circle cx="498" cy="156" r="8" fill="#fff" stroke="#0b7754" stroke-width="5"/>
+          <path d="M480 230c-18 11-51 16-91 13" stroke="#7e9a8d" stroke-width="2" stroke-dasharray="7 7" fill="none"/>
+        </svg>
+      </div>
+      <div class="hero-copy">
+        <h2>Aucune tourn&eacute;e g&eacute;n&eacute;r&eacute;e pour cette date</h2>
+        <p>Aucune tourn&eacute;e n&rsquo;a encore &eacute;t&eacute; g&eacute;n&eacute;r&eacute;e pour le lundi 15 juin 2025. Pr&eacute;parez les tourn&eacute;es &agrave; partir des donn&eacute;es disponibles et lancez la g&eacute;n&eacute;ration pour optimiser vos tourn&eacute;es.</p>
+        <div class="hero-actions">
+          <a class="primary" href="#"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/></svg>Pr&eacute;parer les tourn&eacute;es</a>
+          <a class="secondary" href="#"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>Voir le planning hebdomadaire</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <article class="stat-card"><span class="stat-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M17 3.13a4 4 0 0 1 0 7.75M2 21v-2a4 4 0 0 1 3-3.87M7 3.13a4 4 0 0 0 0 7.75"/></svg></span><span><strong>22</strong><small>clients<br>avec cr&eacute;neau</small></span></article>
+      <article class="stat-card"><span class="stat-icon"><svg viewBox="0 0 24 24"><path d="M3 7h11v10H3Z"/><path d="M14 11h3l4 4v2h-7Z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></span><span><strong>6</strong><small>v&eacute;hicules<br>disponibles</small></span></article>
+      <article class="stat-card"><span class="stat-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6"/></svg></span><span><strong>2</strong><small>chauffeurs<br>configur&eacute;s</small></span></article>
+      <article class="stat-card"><span class="stat-icon"><svg viewBox="0 0 24 24"><path d="M20 4c-9 1-14 6-15 15 9-1 14-6 15-15Z"/><path d="M5 19c4-4 8-7 15-15M4 14c-1-5 1-9 6-11M10 20c5 1 9-1 11-6"/></svg></span><span><strong>3 715 kg</strong><small>poids estim&eacute;<br>&agrave; collecter</small></span></article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel">
+        <h3>Donn&eacute;es &agrave; v&eacute;rifier avant g&eacute;n&eacute;ration</h3>
+        <div class="check-row"><span class="check-icon"><svg viewBox="0 0 24 24"><path d="M12 22s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><strong>Sites sans adresse GPS</strong><span class="ok-pill"><span>0</span><span>OK</span></span></div>
+        <div class="check-row"><span class="check-icon"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg></span><strong>Clients sans cr&eacute;neau</strong><span class="ok-pill"><span>0</span><span>OK</span></span></div>
+        <div class="check-row"><span class="check-icon"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2Z"/><path d="M9 16l2 2 4-5"/></svg></span><strong>Exceptions calendrier</strong><span class="ok-pill"><span>0</span><span>OK</span></span></div>
+        <div class="check-row"><span class="check-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6"/></svg></span><strong>Chauffeurs avec horaires d&eacute;finis</strong><span class="ok-pill"><span>2</span><span>OK</span></span></div>
+        <a class="panel-link" href="#">Voir toutes les v&eacute;rifications <span>→</span></a>
+      </article>
+
+      <article class="panel">
+        <h3>Aper&ccedil;u des clients &agrave; collecter aujourd&rsquo;hui</h3>
+        <div class="table-wrap">
+          <table class="client-table">
+            <thead><tr><th>Site</th><th>Cr&eacute;neau</th><th>Poids estim&eacute;</th></tr></thead>
+            <tbody>
+              <tr><td><span class="site-name"><span class="site-icon"><svg viewBox="0 0 24 24"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M9 21v-4h6v4M9 7h.01M15 7h.01M9 11h.01M15 11h.01"/></svg></span>Usine Tech</span></td><td>06:30 - 09:00</td><td>220 kg</td></tr>
+              <tr><td><span class="site-name"><span class="site-icon"><svg viewBox="0 0 24 24"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M9 21v-4h6v4M9 7h.01M15 7h.01M9 11h.01M15 11h.01"/></svg></span>Th&eacute;&acirc;tre Municipal</span></td><td>07:00 - 11:00</td><td>180 kg</td></tr>
+              <tr><td><span class="site-name"><span class="site-icon"><svg viewBox="0 0 24 24"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M9 21v-4h6v4M9 7h.01M15 7h.01M9 11h.01M15 11h.01"/></svg></span>Domaine Viticole</span></td><td>08:00 - 12:00</td><td>120 kg</td></tr>
+              <tr><td><span class="site-name"><span class="site-icon"><svg viewBox="0 0 24 24"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M9 21v-4h6v4M9 7h.01M15 7h.01M9 11h.01M15 11h.01"/></svg></span>Boulangerie Martin</span></td><td>06:30 - 09:00</td><td>60 kg</td></tr>
+              <tr><td><span class="site-name"><span class="site-icon"><svg viewBox="0 0 24 24"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M9 21v-4h6v4M9 7h.01M15 7h.01M9 11h.01M15 11h.01"/></svg></span>H&ocirc;tel de la Baie</span></td><td>08:00 - 12:00</td><td>140 kg</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <a class="panel-link" href="#">Voir les 22 clients <span>→</span></a>
+      </article>
+    </section>
+
+    <section class="note">
+      <p><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>La g&eacute;n&eacute;ration cr&eacute;e des brouillons puis optimise les tourn&eacute;es avec OR-Tools.</p>
+      <a href="#">En savoir plus <svg viewBox="0 0 24 24"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>
+    </section>
+  </main>
+</body>
+</html>

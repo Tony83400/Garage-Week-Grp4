@@ -359,8 +359,8 @@ const met = StyleSheet.create({
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: LINE,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingTop: 28,
+    paddingBottom: 16,
     marginBottom: 4,
   },
   col: {
@@ -515,7 +515,10 @@ export default function DashboardScreen() {
 
             {/* Colonne gauche — À faire / Priorités */}
             <View style={flat.col}>
-              <Text style={flat.sectionTitle}>{isGenerated ? 'PRIORITÉS' : 'À FAIRE'}</Text>
+              <View style={flat.sectionHeader}>
+                <View style={flat.sectionRule} />
+                <Text style={flat.sectionTitle}>{isGenerated ? 'PRIORITÉS' : 'À FAIRE'}</Text>
+              </View>
 
               {/* Imprévus en premier quand actif */}
               {isGenerated && (
@@ -604,7 +607,10 @@ export default function DashboardScreen() {
             <View style={flat.col}>
               {isGenerated ? (
                 <>
-                  <Text style={flat.sectionTitle}>RÉPARTITION KM</Text>
+                  <View style={flat.sectionHeader}>
+                    <View style={flat.sectionRule} />
+                    <Text style={flat.sectionTitle}>RÉPARTITION KM</Text>
+                  </View>
                   {stats!.flotte.map((f, i) => {
                     const nomVl = f.nom_vl ?? `VL${i + 1}`;
                     const dotColor = f.termine ? '#2D6A4F' : f.erreurs > 0 ? '#C43B25' : '#D4820A';
@@ -643,7 +649,10 @@ export default function DashboardScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={flat.sectionTitle}>ACCÈS</Text>
+                  <View style={flat.sectionHeader}>
+                    <View style={flat.sectionRule} />
+                    <Text style={flat.sectionTitle}>ACCÈS</Text>
+                  </View>
 
                   <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
                     <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
@@ -743,7 +752,10 @@ export default function DashboardScreen() {
             return (
               <>
                 <View style={act.section}>
-                  <Text style={flat.sectionTitle}>ACTIVITÉ RÉCENTE</Text>
+                  <View style={flat.sectionHeader}>
+                    <View style={flat.sectionRule} />
+                    <Text style={flat.sectionTitle}>ACTIVITÉ RÉCENTE</Text>
+                  </View>
                   {shown.map((a, i) => {
                     const isOk = a.statut === 'terminee';
                     const cat = a.categorie ?? (isOk ? 'validation' : 'imprevue');
@@ -835,8 +847,8 @@ const act = StyleSheet.create({
   section: {
     borderTopWidth: 1,
     borderTopColor: LINE,
-    paddingTop: 18,
-    paddingBottom: 10,
+    paddingTop: 28,
+    paddingBottom: 14,
     marginBottom: 4,
   },
   row: {
@@ -953,8 +965,8 @@ const flat = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: LINE,
     flexDirection: 'row',
-    paddingTop: 18,
-    paddingBottom: 10,
+    paddingTop: 28,
+    paddingBottom: 14,
     marginBottom: 4,
   },
   col: {
@@ -968,17 +980,28 @@ const flat = StyleSheet.create({
   section: {
     borderTopWidth: 1,
     borderTopColor: LINE,
-    paddingTop: 18,
-    paddingBottom: 10,
+    paddingTop: 28,
+    paddingBottom: 14,
     marginBottom: 4,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  sectionRule: {
+    width: 22,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#2D6A4F',
+  },
   sectionTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: TEXT_MUTED,
-    letterSpacing: 1.3,
+    fontSize: 11,
+    fontWeight: '800',
+    color: TEXT_DARK,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
-    marginBottom: 10,
   },
   item: {
     flexDirection: 'row',
