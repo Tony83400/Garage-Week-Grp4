@@ -1,3 +1,8 @@
+"""
+Façade pour l'accès aux données.
+Centralise l'utilisation des différents dépôts (repositories).
+"""
+
 from .db_core import DatabaseCore
 from .repo_utilisateurs import UtilisateurRepository
 from .repo_clients import ClientRepository
@@ -5,6 +10,8 @@ from .repo_ressources import RessourceRepository
 from .repo_tournees import TourneeRepository
 
 class DatabaseManager:
+    """Orchestrateur des dépôts de données pour l'ensemble du serveur."""
+
     def __init__(self, db_name='ma_base.db', reset_db=False):
         self.db_core = DatabaseCore(db_name, reset_db)
         self.repo_utilisateurs = UtilisateurRepository(self.db_core)
@@ -12,12 +19,15 @@ class DatabaseManager:
         self.repo_ressources = RessourceRepository(self.db_core)
         self.repo_tournees = TourneeRepository(self.db_core)
 
-    # 1. UTILISATEURS ET CLIENTS
+    # --- Authentification et Utilisateurs ---
+
     def verifier_login(self, email, mdp):
         return self.repo_utilisateurs.verifier_login(email, mdp)
 
     def ajouter_utilisateur(self, email, mdp, role='chauffeur'):
         return self.repo_utilisateurs.ajouter_utilisateur(email, mdp, role)
+
+    # --- Gestion des Clients ---
 
     def ajouter_client(self, client):
         return self.repo_clients.ajouter_client(client)
@@ -34,7 +44,8 @@ class DatabaseManager:
     def get_disponibilites_client(self, client_id):
         return self.repo_clients.get_disponibilites_client(client_id)
 
-    # 2. GESTION DES RESSOURCES
+    # --- Gestion des Ressources (Camions/Chauffeurs) ---
+
     def ajouter_camion(self, immatriculation, charge_max_kg, bacs_max):
         return self.repo_ressources.ajouter_camion(immatriculation, charge_max_kg, bacs_max)
 
@@ -53,7 +64,8 @@ class DatabaseManager:
     def remplacer_disponibilites_chauffeur(self, chauffeur_id, disponibilites):
         return self.repo_ressources.remplacer_disponibilites_chauffeur(chauffeur_id, disponibilites)
 
-    # 3. CONTRAINTES ET PLANIFICATION
+    # --- Planification et Tournées ---
+
     def recuperer_depot_principal(self):
         return self.repo_tournees.recuperer_depot_principal()
 
@@ -66,15 +78,13 @@ class DatabaseManager:
     def recuperer_taches_du_jour(self, date_jour):
         return self.repo_tournees.recuperer_taches_du_jour(date_jour)
     
-    def remettre_imprevu_en_attente(self,tache_id):
+    def remettre_imprevu_en_attente(self, tache_id):
         return self.repo_tournees.remettre_imprevu_en_attente(tache_id)
 
     def preparer_donnees_ortools(self, date_jour, depot_lat, depot_lon):
         return self.repo_tournees.preparer_donnees_ortools(date_jour, depot_lat, depot_lon)
 
-    # 4. RETOUR TERRAIN
-    def valider_collecte(self, tache_id, bacs_reels):
-        return self.repo_tournees.valider_collecte(tache_id, bacs_reels)
+    # --- Suivi et Terrain ---
 
     def recuperer_tournee_chauffeur(self, chauffeur_id, date_jour):
         return self.repo_tournees.recuperer_tournee_chauffeur(chauffeur_id, date_jour)
@@ -88,7 +98,8 @@ class DatabaseManager:
     def recuperer_imprevus(self, date_jour):
         return self.repo_tournees.recuperer_imprevus(date_jour)
     
-    # 5. ENDPOINTS POUR LE FRONT-END
+    # --- Statistiques et Dashboards ---
+
     def get_dashboard_stats(self, date_jour):
         return self.repo_tournees.get_dashboard_stats(date_jour)
 
@@ -101,8 +112,16 @@ class DatabaseManager:
     def get_planning_preview(self, date_jour):
         return self.repo_tournees.get_planning_preview(date_jour)
 
+    # --- Moteur d'Optimisation ---
+
     def generer_brouillons_jour(self, date_jour):
         return self.repo_tournees.generer_brouillons_jour(date_jour)
         
     def sauvegarder_resultat_optimisation(self, date_jour, resultats_ia, data_ortools):
         return self.repo_tournees.sauvegarder_resultat_optimisation(date_jour, resultats_ia, data_ortools)
+
+    def preparer_donnees_recalcul_dynamique(self, tournee_id, imprevu_tache_id):
+        return self.repo_tournees.preparer_donnees_recalcul_dynamique(tournee_id, imprevu_tache_id)
+
+    def sauvegarder_fusion_dynamique(self, tournee_id, sequence_noeuds, tache_ids):
+        return self.repo_tournees.sauvegarder_fusion_dynamique(tournee_id, sequence_noeuds, tache_ids)

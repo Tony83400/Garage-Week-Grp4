@@ -1,72 +1,110 @@
-import csv
+"""
+Moteur d'optimisation utilisant Google OR-Tools pour résoudre le problème de tournées de véhicules (VRPTW).
+Gère les contraintes de capacité (poids/volume), les fenêtres horaires et le multi-trip.
+"""
+
 import math
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
 def minutes_en_heure(minutes):
-    """Convertit 480 minutes en '08:00'"""
+    """
+    Convertit un nombre de minutes depuis minuit en format HH:MM.
+    Exemple: 480 -> '08:00'
+    """
     h = int(minutes // 60)
     m = int(minutes % 60)
     return f"{h:02d}:{m:02d}"
 
 def resoudre_et_exporter(data):
-    """Configuration et exécution du solveur OR-Tools"""
+    """
+    Configure et exécute le solveur OR-Tools pour le planning de collecte.
     
-    print("Initialisation du Routing Model...")
+    Args:
+        data (dict): Dictionnaire contenant les matrices de distance/temps, 
+                     les capacités des véhicules et les demandes clients.
     
-    # NOUVEAUTÉ : Gestion des départs/arrivées multiples (Re-routage Real-Time)
+    Returns:
+        dict: Résultats de l'optimisation (routes, distances, temps) ou None en cas d'échec.
+    """
+    
+    # --- Initialisation du modèle de routage ---
+    
+    # Gestion des points de départ et d'arrivée multiples (pour le reroutage temps réel)
     if 'starts' in data and 'ends' in data:
-        manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), 
-                                               data['num_vehicles'], 
-                                               data['starts'], 
-                                               data['ends'])
+        manager = pywrapcp.RoutingIndexManager(
+            len(data['distance_matrix']), 
+            data['num_vehicles'], 
+            data['starts'], 
+            data['ends']
+        )
     else:
-        # Mode classique (tout le monde part du dépôt)
-        manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), 
-                                               data['num_vehicles'], 
-                                               data['depot'])
+        # Mode standard : départ et retour au dépôt principal
+        manager = pywrapcp.RoutingIndexManager(
+            len(data['distance_matrix']), 
+            data['num_vehicles'], 
+            data['depot']
+        )
     
     routing = pywrapcp.RoutingModel(manager)
 
-    # 1. CONTRAINTE DE DISTANCE
+    # --- 1. Gestion des distances (Coût de l'arc) ---
+
     def distance_callback(from_index, to_index):
+        """Retourne la distance entre deux points (utilisée pour le coût total)."""
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        # On divise par 10 pour que la distance pèse moins lourd que le coût fixe de démarrage
+        # On divise par 10 pour équilibrer avec les coûts fixes de démarrage des véhicules
         return int(data['distance_matrix'][from_node][to_node] // 10)
 
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
-    # 2. CONTRAINTE DE CAPACITÉ (VOLUME & POIDS)
+    # --- 2. Contraintes de Capacité (Volume & Poids) ---
+
     def demand_callback(from_index):
+        """Retourne la demande en nombre de bacs pour un point donné."""
         from_node = manager.IndexToNode(from_index)
-        # On utilise math.ceil pour ne jamais sous-estimer la charge (OR-Tools veut des int)
         return int(math.ceil(data['demands'][from_node]))
 
     demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
-    routing.AddDimensionWithVehicleCapacity(demand_callback_index, 0, data['vehicle_capacities'], True, 'Capacity_Bacs')
+    routing.AddDimensionWithVehicleCapacity(
+        demand_callback_index, 
+        0, # Pas de cumul de charge au départ
+        data['vehicle_capacities'], 
+        True, # Fixer la charge à zéro à la fin de la route
+        'Capacity_Bacs'
+    )
 
     def weight_callback(from_index):
+        """Retourne la demande en poids (kg) pour un point donné."""
         from_node = manager.IndexToNode(from_index)
-        # On utilise math.ceil pour ne jamais sous-estimer la charge (OR-Tools veut des int)
         return int(math.ceil(data['weight_demands'][from_node]))
 
     weight_callback_index = routing.RegisterUnaryTransitCallback(weight_callback)
-    routing.AddDimensionWithVehicleCapacity(weight_callback_index, 0, data['vehicle_weights'], True, 'Capacity_Weight')
+    routing.AddDimensionWithVehicleCapacity(
+        weight_callback_index, 
+        0, 
+        data['vehicle_weights'], 
+        True, 
+        'Capacity_Weight'
+    )
 
-    # 3. CONTRAINTES DE TEMPS
+    # --- 3. Contraintes Temporelles (Fenêtres Horaires) ---
+
     def time_callback(from_index, to_index):
+        """Calcule le temps total (service + trajet) entre deux points."""
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        # 15 mins de service par arrêt client, 0 au dépôt
+        
+        # Temps de service fixe de 15 minutes par arrêt (hors dépôt)
         temps_service = 15 if from_node != data['depot'] else 0
         temps_trajet = data['time_matrix'][from_node][to_node]
         return int(temps_service + temps_trajet)
 
     time_callback_index = routing.RegisterTransitCallback(time_callback)
     
-    # On met le slack global très haut (1440) pour permettre l'attente AU DEPOT (entre les multi-trips)
+    # Dimension temporelle avec un slack élevé pour permettre l'attente au dépôt
     routing.AddDimension(time_callback_index, 1440, 1440, False, 'Time')
     time_dimension = routing.GetDimensionOrDie('Time')
 
@@ -76,32 +114,27 @@ def resoudre_et_exporter(data):
             continue
             
         index = manager.NodeToIndex(location_idx)
-        
-        # Le client doit être visité dans sa fenêtre horaire
         time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
-        
-        # NOUVEAUTÉ : Le camion ne peut pas attendre plus de 5 minutes chez ce client
-        # time_dimension.SlackVar(index).SetMax(5)
     
-    # Fenêtres horaires des chauffeurs (Strictes)
+    # Fenêtres horaires des véhicules (shifts chauffeurs)
     for vehicle_id in range(data['num_vehicles']):
         start_index = routing.Start(vehicle_id)
         end_index = routing.End(vehicle_id)
         h_start, h_end = data['vehicle_time_windows'][vehicle_id]
         
-        # SÉCURITÉ : S'assurer que h_start <= h_end pour éviter un crash du solveur
+        # Sécurité pour garantir que l'intervalle est valide
         h_end_safe = max(h_start, h_end)
         
-        # Le conducteur ne peut pas partir avant son heure et doit être rentré avant la fin
         time_dimension.CumulVar(start_index).SetRange(h_start, h_end_safe)
         time_dimension.CumulVar(end_index).SetRange(h_start, h_end_safe)
 
-    # 4. GESTION DU MULTI-TRIP (Séquencement des trips virtuels)
+    # --- 4. Gestion du Multi-Trip (Enchaînement des tournées) ---
+
     if 'groupes_vehicules' in data:
         groupes = data['groupes_vehicules']
-        DUREE_VIDAGE = 30 # minutes entre deux trips
+        DUREE_VIDAGE = 30 # Temps de déchargement au dépôt entre deux trips
         
-        # On regroupe les index de véhicules par groupe (chauffeur)
+        # Regroupement des véhicules virtuels par chauffeur réel
         vehicules_par_groupe = {}
         for v in range(data['num_vehicles']):
             g = groupes[v]
@@ -109,7 +142,7 @@ def resoudre_et_exporter(data):
                 vehicules_par_groupe[g] = []
             vehicules_par_groupe[g].append(v)
             
-        # Pour chaque chauffeur, on impose que le trip N+1 commence après le trip N
+        # Contrainte d'ordre : le trip N+1 commence après le retour du trip N (plus buffer)
         for g, v_indices in vehicules_par_groupe.items():
             for i in range(len(v_indices) - 1):
                 v_courant = v_indices[i]
@@ -119,38 +152,43 @@ def resoudre_et_exporter(data):
                     time_dimension.CumulVar(routing.End(v_courant)) + DUREE_VIDAGE
                 )
 
-    # 5. PÉNALITÉS ET COUTS FIXES
-    # Coût fixe réduit à 50 000 pour équilibrer avec les distances 
+    # --- 5. Paramètres Économiques et Pénalités ---
+
+    # Coût fixe par véhicule utilisé
     routing.SetFixedCostOfAllVehicles(50000) 
     
-    # Pénalité pour point non visité (doit rester très haute)
+    # Pénalité élevée pour les points non visités (disjonctions)
     penalty = 1000000 
     for node in range(1, len(data['distance_matrix'])):
-        # SÉCURITÉ : On n'ajoute de disjonction que sur les tâches réelles (avec un ID)
-        # On évite d'en ajouter sur les points de départ (starts) pour ne pas perturber le solveur
         if node < len(data['tache_ids']) and data['tache_ids'][node] is not None:
             routing.AddDisjunction([manager.NodeToIndex(node)], penalty)
 
-    # 6. PARAMÈTRES DE RECHERCHE
+    # --- 6. Paramètres de Recherche ---
+
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     
-    # Reviens sur PATH_CHEAPEST_ARC, beaucoup plus robuste avec des horaires stricts !
-    search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+    # Stratégie de première solution robuste pour les contraintes horaires
+    search_parameters.first_solution_strategy = (
+        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+    )
     
-    search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+    # Métaheuristique pour sortir des minima locaux
+    search_parameters.local_search_metaheuristic = (
+        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+    )
     
     search_parameters.time_limit.seconds = 5
     search_parameters.log_search = False
 
-
+    # Résolution du problème
     solution = routing.SolveWithParameters(search_parameters)
 
-    # 7. EXTRACTION DES RESULTATS
+    # --- 7. Extraction et Formatage des résultats ---
+
     if solution:
         resultat = {"routes": {}, "distances": {}, "times": {}, "dropped_nodes": []}
-        
-        # Identification des points non-affectés
         visited_nodes = set()
+
         for vehicle_id in range(data['num_vehicles']):
             index = routing.Start(vehicle_id)
             route = []
@@ -161,37 +199,45 @@ def resoudre_et_exporter(data):
                 node_index = manager.IndexToNode(index)
                 visited_nodes.add(node_index)
                 t_var = time_dimension.CumulVar(index)
-                route.append({"node_index": node_index, "heure_estimee": minutes_en_heure(solution.Min(t_var))})
+                route.append({
+                    "node_index": node_index, 
+                    "heure_estimee": minutes_en_heure(solution.Min(t_var))
+                })
                 prev_index = index
                 index = solution.Value(routing.NextVar(index))
                 route_distance += routing.GetArcCostForVehicle(prev_index, index, vehicle_id)
             
             t_end = solution.Min(time_dimension.CumulVar(index))
-            route.append({"node_index": manager.IndexToNode(index), "heure_estimee": minutes_en_heure(t_end)})
+            route.append({
+                "node_index": manager.IndexToNode(index), 
+                "heure_estimee": minutes_en_heure(t_end)
+            })
             
+            # On ne conserve que les routes ayant au moins un client
             if len(route) > 2:
                 resultat["routes"][vehicle_id] = route
                 resultat["distances"][vehicle_id] = round(route_distance / 1000, 1)
-                resultat["times"][vehicle_id] = {"depart": minutes_en_heure(t_start), "retour": minutes_en_heure(t_end)}
+                resultat["times"][vehicle_id] = {
+                    "depart": minutes_en_heure(t_start), 
+                    "retour": minutes_en_heure(t_end)
+                }
 
-        # Analyse des points abandonnés
+        # Identification des points impossibles à servir
         for node_idx in range(1, len(data['demands'])):
             if node_idx not in visited_nodes:
-                # Diagnostic rapide
-                reason = "Inconnu"
                 tw = data['time_windows'][node_idx]
-                if tw[1] - tw[0] < 60: # Fenêtre de moins d'une heure
-                    reason = "Fenêtre horaire trop étroite"
-                else:
-                    reason = "Conflit d'horaire ou Capacité saturée"
+                raison = "Conflit d'horaire ou Capacité saturée"
+                if tw[1] - tw[0] < 60:
+                    raison = "Fenêtre horaire trop étroite"
                 
                 resultat["dropped_nodes"].append({
                     "node_index": node_idx,
                     "tache_id": data['tache_ids'][node_idx],
-                    "raison": reason,
+                    "raison": raison,
                     "client_nom": data['infos_geo'][node_idx]['nom'],
                     "window": f"{minutes_en_heure(tw[0])}-{minutes_en_heure(tw[1])}"
                 })
         
         return resultat
+
     return None
