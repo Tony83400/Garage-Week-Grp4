@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Svg, { Path } from 'react-native-svg';
 import {
   View,
   Text,
@@ -19,7 +20,8 @@ import MobileDrawer from '../components/MobileDrawer';
 import { getDashboardStats, getActiviteRecente, type DashboardStats, type Activite } from '../services/dashboard';
 import { useRouter } from 'expo-router';
 
-const DATE_DEMO = new Date().toISOString().split('T')[0];
+const DATE_DEMO  = new Date().toISOString().split('T')[0];
+const DATE_LABEL = new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
 
 const CREAM        = '#F5EEDF';
 const TEXT_DARK    = '#0C3A34';
@@ -138,8 +140,6 @@ const hero = StyleSheet.create({
     minHeight: 460,
     overflow: 'hidden',
     backgroundColor: CREAM,
-    borderBottomWidth: 1,
-    borderBottomColor: PANEL_BORDER,
   },
   copy: {
     width: '56%',
@@ -404,26 +404,39 @@ export default function DashboardScreen() {
 
       {/* Topbar */}
       <View style={styles.topbar}>
-        <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuBtn}>
-          <Ionicons name="menu-outline" size={26} color="#fff8e9" />
-        </TouchableOpacity>
-        <Text style={styles.topbarTitle}>AlchiRoute</Text>
-        <TouchableOpacity
-          style={[styles.notifBtn, hasAlerts && styles.notifBtnAlert]}
-          onPress={() => hasAlerts ? router.push('/imprevus') : showOkToast()}
-          activeOpacity={0.75}
-        >
-          <Ionicons
-            name="notifications-outline"
-            size={20}
-            color={hasAlerts ? '#CC1F1F' : '#fff8e9'}
-          />
-          {hasAlerts && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>{stats!.alertes}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* Gauche : hamburger + titre */}
+        <View style={styles.topbarLeft}>
+          <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.menuBtn}>
+            <Ionicons name="menu-outline" size={26} color="#fff8e9" />
+          </TouchableOpacity>
+          <Text style={styles.topbarTitle} numberOfLines={1}>Tableau de bord</Text>
+        </View>
+
+        {/* Centre : date */}
+        <Text style={styles.topbarDate} numberOfLines={1}>{DATE_LABEL}</Text>
+
+        {/* Droite : cloche + admin */}
+        <View style={styles.topbarRight}>
+          <TouchableOpacity
+            style={[styles.notifBtn, hasAlerts && styles.notifBtnAlert]}
+            onPress={() => hasAlerts ? router.push('/imprevus') : showOkToast()}
+            activeOpacity={0.75}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={20}
+              color={hasAlerts ? '#CC1F1F' : '#fff8e9'}
+            />
+            {hasAlerts && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{stats!.alertes}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View style={styles.adminTag}>
+            <Text style={styles.adminTagText}>Admin</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView
@@ -449,87 +462,83 @@ export default function DashboardScreen() {
             />
           )}
 
-          {/* ── À faire maintenant + Accès rapides côte à côte ── */}
-          <View style={styles.panelRow}>
+          {/* ── À faire + Accès — côte à côte, sans cards ── */}
+          <View style={flat.row}>
 
-            {/* À faire — informatif (planning non-cliquable, imprévus cliquable) */}
-            <View style={[panel.box, styles.panelFlex]}>
-              <View style={panel.header}>
-                <Text style={panel.headerTitle}>À faire</Text>
-                <View style={panel.headerLine} />
-              </View>
+            {/* Colonne gauche — À faire */}
+            <View style={flat.col}>
+              <Text style={flat.sectionTitle}>À FAIRE</Text>
 
-              {/* Planning — non-cliquable, juste un rappel contextuel */}
-              <View style={panel.task}>
-                <View style={[panel.tile, { backgroundColor: '#DFE7CC' }]}>
-                  <Ionicons name="calendar-outline" size={18} color={TEXT_DARK} />
-                </View>
-                <View style={panel.taskBody}>
-                  <Text style={panel.taskTitle} numberOfLines={2}>
-                    {isGenerated ? 'Superviser les tournées' : 'Préparer les tournées'}
+              <View style={flat.item}>
+                <View style={[flat.accent, { backgroundColor: '#5D8A6F' }]} />
+                <Ionicons name="calendar-outline" size={16} color={TEXT_DARK} />
+                <View style={flat.itemBody}>
+                  <Text style={flat.itemTitle} numberOfLines={2}>
+                    {isGenerated ? 'Superviser' : 'Préparer les tournées'}
                   </Text>
-                  <Text style={panel.taskSub} numberOfLines={2}>
-                    {isGenerated ? 'Suivez l\'avancement.' : 'Lancez la génération.'}
+                  <Text style={flat.itemSub} numberOfLines={2}>
+                    {isGenerated ? "Suivez l'avancement." : 'Lancez la génération.'}
                   </Text>
                 </View>
               </View>
 
-              {/* Imprévus — cliquable, urgent */}
+              <View style={flat.divider} />
+
               {hasAlerts ? (
-                <TouchableOpacity style={[panel.task, panel.taskLast]} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
-                  <View style={[panel.tile, { backgroundColor: '#F0DFBE' }]}>
-                    <Ionicons name="warning-outline" size={18} color="#C43B25" />
-                  </View>
-                  <View style={panel.taskBody}>
-                    <Text style={[panel.taskTitle, { color: '#C43B25' }]} numberOfLines={2}>
-                      {stats!.alertes} imprév{stats!.alertes > 1 ? 'us' : 'u'} actifs
+                <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
+                  <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
+                  <Ionicons name="warning-outline" size={16} color="#C43B25" />
+                  <View style={flat.itemBody}>
+                    <Text style={[flat.itemTitle, { color: '#C43B25' }]} numberOfLines={1}>
+                      {stats!.alertes} imprév{stats!.alertes > 1 ? 'us' : 'u'}
                     </Text>
-                    <Text style={panel.taskSub} numberOfLines={2}>Action requise.</Text>
+                    <Text style={flat.itemSub}>Action requise.</Text>
                   </View>
-                  <Text style={[panel.chevron, { color: '#C43B25' }]}>›</Text>
+                  <Ionicons name="chevron-forward" size={13} color="#C43B25" />
                 </TouchableOpacity>
               ) : (
-                <View style={[panel.task, panel.taskLast]}>
-                  <View style={[panel.tile, { backgroundColor: '#E8F5EE' }]}>
-                    <Ionicons name="checkmark-circle-outline" size={18} color="#2D6A4F" />
-                  </View>
-                  <View style={panel.taskBody}>
-                    <Text style={[panel.taskTitle, { color: '#2D6A4F' }]} numberOfLines={2}>Aucun imprévu</Text>
-                    <Text style={panel.taskSub} numberOfLines={2}>Tout roule.</Text>
+                <View style={flat.item}>
+                  <View style={[flat.accent, { backgroundColor: '#2D6A4F' }]} />
+                  <Ionicons name="checkmark-circle-outline" size={16} color="#2D6A4F" />
+                  <View style={flat.itemBody}>
+                    <Text style={[flat.itemTitle, { color: '#2D6A4F' }]} numberOfLines={1}>Aucun imprévu</Text>
+                    <Text style={flat.itemSub}>Tout roule.</Text>
                   </View>
                 </View>
               )}
             </View>
 
-            {/* Accès rapides — 3 tuiles en grille */}
-            <View style={[panel.box, styles.panelFlex]}>
-              <View style={panel.header}>
-                <Text style={panel.headerTitle}>Accès</Text>
-                <View style={panel.headerLine} />
-              </View>
+            {/* Séparateur vertical */}
+            <View style={flat.vline} />
 
-              <View style={quick.triGrid}>
-                <TouchableOpacity style={quick.triItem} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
-                  <View style={[quick.triIcon, { backgroundColor: '#F0DFBE' }]}>
-                    <Ionicons name="warning-outline" size={18} color="#C43B25" />
-                  </View>
-                  <Text style={quick.triLabel}>Imprévus</Text>
-                </TouchableOpacity>
+            {/* Colonne droite — Accès rapides */}
+            <View style={flat.col}>
+              <Text style={flat.sectionTitle}>ACCÈS</Text>
 
-                <TouchableOpacity style={quick.triItem} onPress={() => router.push('/sites')} activeOpacity={0.75}>
-                  <View style={[quick.triIcon, { backgroundColor: '#DFE7CC' }]}>
-                    <Ionicons name="location-outline" size={18} color={TEXT_DARK} />
-                  </View>
-                  <Text style={quick.triLabel}>Sites</Text>
-                </TouchableOpacity>
+              <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
+                <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
+                <Ionicons name="warning-outline" size={16} color="#C43B25" />
+                <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Imprévus</Text>
+                <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
+              </TouchableOpacity>
 
-                <TouchableOpacity style={quick.triItem} onPress={() => router.push('/ressources')} activeOpacity={0.75}>
-                  <View style={[quick.triIcon, { backgroundColor: '#DCE5CD' }]}>
-                    <Ionicons name="document-text-outline" size={18} color={TEXT_DARK} />
-                  </View>
-                  <Text style={quick.triLabel}>Ressources</Text>
-                </TouchableOpacity>
-              </View>
+              <View style={flat.divider} />
+
+              <TouchableOpacity style={flat.item} onPress={() => router.push('/sites')} activeOpacity={0.75}>
+                <View style={[flat.accent, { backgroundColor: '#2D6A4F' }]} />
+                <Ionicons name="location-outline" size={16} color={TEXT_DARK} />
+                <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Sites</Text>
+                <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
+              </TouchableOpacity>
+
+              <View style={flat.divider} />
+
+              <TouchableOpacity style={flat.item} onPress={() => router.push('/ressources')} activeOpacity={0.75}>
+                <View style={[flat.accent, { backgroundColor: TEXT_MUTED }]} />
+                <Ionicons name="document-text-outline" size={16} color={TEXT_DARK} />
+                <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Ressources</Text>
+                <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
+              </TouchableOpacity>
             </View>
 
           </View>
@@ -590,6 +599,28 @@ export default function DashboardScreen() {
               </>
             );
           })()}
+
+          {/* ── Footer décoratif ── */}
+          <View style={styles.footer}>
+            <View style={styles.footerSep} />
+            <Svg width={38} height={38} viewBox="0 0 38 38" fill="none">
+              <Path
+                d="M19 34 C19 34 19 17 19 11 C19 11 11 5 5 9 C5 9 9 21 19 23"
+                stroke="#C8B99A"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <Path
+                d="M19 11 C19 11 27 5 33 9 C33 9 29 21 19 23"
+                stroke="#C8B99A"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+            <Text style={styles.footerText}>· LES ALCHIMISTES · VAR 83 ·</Text>
+          </View>
 
         </View>
       </ScrollView>
@@ -730,6 +761,75 @@ const quick = StyleSheet.create({
   },
 });
 
+// ── Flat section styles (Option A — sans cards) ───────────────────────────────
+
+const flat = StyleSheet.create({
+  row: {
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    flexDirection: 'row',
+    paddingTop: 18,
+    paddingBottom: 10,
+    marginBottom: 4,
+  },
+  col: {
+    flex: 1,
+  },
+  vline: {
+    width: 1,
+    backgroundColor: LINE,
+    marginHorizontal: 10,
+  },
+  section: {
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    paddingTop: 18,
+    paddingBottom: 10,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 54,
+    gap: 12,
+  },
+  accent: {
+    width: 3,
+    height: 28,
+    borderRadius: 2,
+    flexShrink: 0,
+  },
+  itemBody: {
+    flex: 1,
+  },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    flex: 1,
+  },
+  itemSub: {
+    fontSize: 12,
+    color: TEXT_MUTED,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: LINE,
+    marginVertical: 2,
+    marginLeft: 31,
+  },
+});
+
 // ── Screen styles ─────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -739,7 +839,7 @@ const styles = StyleSheet.create({
   },
   topbar: {
     backgroundColor: '#063D34',
-    height: 64,
+    height: 76,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -753,12 +853,47 @@ const styles = StyleSheet.create({
     marginRight: 10,
     padding: 4,
   },
-  topbarTitle: {
+  topbarLeft: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  topbarTitle: {
     fontFamily: SERIF,
-    fontSize: 22,
+    fontSize: 18,
     color: '#fff8e9',
-    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  topbarDate: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#fff8e9',
+    letterSpacing: -0.2,
+  },
+  topbarRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  adminTag: {
+    height: 26,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,248,233,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,248,233,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,248,233,0.7)',
+    letterSpacing: 0.4,
   },
   notifBtn: {
     width: 40,
@@ -791,10 +926,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 48 },
+  scrollContent: { paddingBottom: 24 },
+  footer: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingBottom: 20,
+    gap: 10,
+  },
+  footerSep: {
+    width: 36,
+    height: 1,
+    backgroundColor: LINE,
+    marginBottom: 4,
+  },
+  footerText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: TEXT_MUTED,
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    opacity: 0.6,
+  },
   body: {
     padding: 16,
-    paddingTop: 48,
+    paddingTop: 16,
   },
   panelRow: {
     flexDirection: 'row',
