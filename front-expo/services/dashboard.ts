@@ -1,7 +1,16 @@
 import { api } from './api';
 
+export interface FlotteVehicule {
+  chauffeur: string;
+  dernier_point: string;
+  termine: boolean;
+  erreurs: number;
+  nom_vl?: string;   // TODO back: ex "VL1", "VL2"…
+  km?: number;       // TODO back: km parcourus par ce VL
+  km_prevu?: number; // TODO back: km prévus par ce VL
+}
+
 // Correspond à GET /api/dashboard/stats?date=YYYY-MM-DD
-// Champs exacts retournés par repo_tournees.get_dashboard_stats()
 export interface DashboardStats {
   poids_prevu_kg: number;
   poids_collecte_kg: number;
@@ -9,15 +18,18 @@ export interface DashboardStats {
   collectes_validees: number;
   alertes: number;
   km_total: number;
-  flotte: { chauffeur: string; dernier_point: string; termine: boolean; erreurs: number }[];
+  flotte: FlotteVehicule[];
 }
 
 // Correspond à GET /api/dashboard/activite?date=YYYY-MM-DD
-// Champs exacts retournés par repo_tournees.get_activite_recente()
 export interface Activite {
   statut: 'terminee' | 'erreur';
   client: string;
   coordonnees: { lat: number; lon: number };
+  heure?: string;      // TODO back: ex "09:58"
+  action?: string;     // TODO back: ex "Collecte validée", "Imprévu signalé", "Départ du dépôt"
+  detail?: string;     // TODO back: texte secondaire (chauffeur · site)
+  categorie?: 'tournee' | 'imprevue' | 'validation'; // TODO back
 }
 
 export function getDashboardStats(date?: string) {

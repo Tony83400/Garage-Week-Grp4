@@ -37,12 +37,14 @@ function HeroSection({
   stats,
   loading,
   hasAlerts,
+  lastUpdate,
   onGoPlanning,
   onGoImprevus,
 }: {
   stats: DashboardStats | null;
   loading: boolean;
   hasAlerts: boolean;
+  lastUpdate: string | null;
   onGoPlanning: () => void;
   onGoImprevus: () => void;
 }) {
@@ -59,13 +61,13 @@ function HeroSection({
     ? 'Aucune tournée générée \npour cette date\n'
     : isDone
     ? `Journée terminée ✓`
-    : `Tournées en cours`;
+    : `Collecte\nen cours`;
 
   const desc = !isGenerated
     ? '\nLa journée n\'est pas encore préparée. \nOuvrez Planning pour vérifier les données\net lancer la génération.\n'
     : isDone
     ? `${stats!.collectes_total} collectes · ${stats!.poids_collecte_kg.toLocaleString('fr-FR')} kg collectés · ${stats!.km_total} km parcourus`
-    : `${stats!.collectes_validees}/${stats!.collectes_total} collectes validées · ${stats!.poids_collecte_kg.toLocaleString('fr-FR')} kg collectés`;
+    : 'Les équipes sont sur le terrain.';
 
   return (
     <ImageBackground
@@ -99,6 +101,24 @@ function HeroSection({
 
           <Text style={hero.title}>{title}</Text>
           <Text style={hero.desc}>{desc}</Text>
+
+          {isGenerated && !isDone && lastUpdate && (
+            <View style={hero.updateRow}>
+              <Ionicons name="time-outline" size={12} color={TEXT_MUTED} />
+              <Text style={hero.updateText}>Mise à jour : {lastUpdate}</Text>
+            </View>
+          )}
+
+          {isGenerated && !isDone && (
+            <View style={hero.ratioBox}>
+              <Text style={hero.ratioVal}>
+                {stats!.collectes_validees}
+                <Text style={hero.ratioSlash}> / </Text>
+                {stats!.collectes_total}
+              </Text>
+              <Text style={hero.ratioSub}>collectes validées</Text>
+            </View>
+          )}
 
           {!isGenerated && (
             <View style={hero.actions}>
@@ -226,137 +246,166 @@ const hero = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
+  ratioBox: {
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  ratioVal: {
+    fontFamily: SERIF,
+    fontSize: 38,
+    lineHeight: 42,
+    color: TEXT_DARK,
+  },
+  ratioSlash: {
+    fontSize: 28,
+    color: TEXT_MUTED,
+  },
+  ratioSub: {
+    fontSize: 13,
+    color: TEXT_MUTED,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    marginTop: 2,
+  },
+  updateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 14,
+  },
+  updateText: {
+    fontSize: 12,
+    color: TEXT_MUTED,
+    fontWeight: '500',
+  },
 });
 
-// ── JourneeCard (données de progression) ─────────────────────────────────────
 
-function JourneeCard({ stats, onGoImprevus }: {
-  stats: DashboardStats;
-  onGoImprevus: () => void;
-}) {
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const isDone = stats.collectes_validees === stats.collectes_total;
-  const pct = stats.poids_prevu_kg > 0
+// ── MetricsRow (état actif — 3 métriques plates) ─────────────────────────────
+
+function MetricsRow({ stats }: { stats: DashboardStats }) {
+  const kgAnim = useRef(new Animated.Value(0)).current;
+  const colAnim = useRef(new Animated.Value(0)).current;
+
+  const kgPct = stats.poids_prevu_kg > 0
     ? Math.min(stats.poids_collecte_kg / stats.poids_prevu_kg, 1)
     : 0;
-  const hasAlert = stats.alertes > 0 && !isDone;
+  const colPct = stats.collectes_total > 0
+    ? Math.min(stats.collectes_validees / stats.collectes_total, 1)
+    : 0;
 
   useEffect(() => {
-    progressAnim.setValue(0);
-    Animated.timing(progressAnim, {
-      toValue: pct,
-      duration: 900,
-      delay: 150,
-      useNativeDriver: false,
-    }).start();
-  }, [pct]);
+    Animated.parallel([
+      Animated.timing(kgAnim, { toValue: kgPct, duration: 900, delay: 100, useNativeDriver: false }),
+      Animated.timing(colAnim, { toValue: colPct, duration: 900, delay: 200, useNativeDriver: false }),
+    ]).start();
+  }, [kgPct, colPct]);
 
-  const RED = { bg: '#FEE2E2', border: '#F87171', fg: '#CC1F1F', iconBg: '#FECACA' };
-  const statusColor  = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.status.en_cours.fg;
-  const statusBg     = isDone ? colors.status.terminee.bg : hasAlert ? RED.bg : colors.status.en_cours.bg;
-  const statusBorder = isDone ? colors.status.terminee.border : hasAlert ? RED.border : colors.status.en_cours.border;
-  const statusIconBg = isDone ? '#C8E8D4' : hasAlert ? RED.iconBg : '#F5D9A0';
-  const statusIcon   = isDone ? 'checkmark-circle' : hasAlert ? 'alert-circle' : 'car-outline';
-  const statusText   = isDone
-    ? `Journée terminée · ${stats.km_total} km parcourus`
-    : hasAlert
-    ? `Imprévus détectés · ${stats.km_total} km planifiés`
-    : `Tournées en cours · ${stats.km_total} km planifiés`;
-  const progressColor = isDone ? colors.status.terminee.fg : hasAlert ? RED.fg : colors.accent;
-
-  const enCoursVrai = Math.max(0, stats.collectes_total - stats.collectes_validees - stats.alertes);
-  const bottomSuffix = (() => {
-    if (stats.alertes === 0 && enCoursVrai === 0) return ' · tout validé';
-    const parts: string[] = [];
-    if (enCoursVrai > 0) parts.push(`${enCoursVrai} en cours`);
-    if (stats.alertes > 0) parts.push(`${stats.alertes} imprévu${stats.alertes > 1 ? 's' : ''}`);
-    return ' · ' + parts.join(' · ');
-  })();
+  const pctLabel = Math.round(colPct * 100);
 
   return (
-    <View style={[jc.card, { backgroundColor: statusBg, borderColor: statusBorder }]}>
-      <View style={jc.statusRow}>
-        <View style={[jc.iconBox, { backgroundColor: statusIconBg }]}>
-          <Ionicons name={statusIcon as any} size={18} color={statusColor} />
-        </View>
-        <Text style={[jc.statusLabel, { color: statusColor }]} numberOfLines={1}>{statusText}</Text>
-      </View>
-
-      <View style={[jc.sep, hasAlert && { backgroundColor: 'rgba(204,31,31,0.12)' }]} />
-
-      <View style={jc.metricRow}>
-        <Ionicons name="leaf-outline" size={14} color={colors.primaryLight} style={{ marginTop: 1 }} />
-        <View style={{ flex: 1, gap: 6 }}>
-          <View style={jc.metricTop}>
-            <Text style={jc.metricValue}>
-              {stats.poids_collecte_kg.toLocaleString('fr-FR')}
-              <Text style={jc.metricUnit}> kg</Text>
-            </Text>
-            <Text style={jc.metricRight}>sur {stats.poids_prevu_kg.toLocaleString('fr-FR')} kg prévus</Text>
-          </View>
-          <View style={jc.progressTrack}>
-            <Animated.View
-              style={[jc.progressFill, {
-                width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-                backgroundColor: progressColor,
-              }]}
-            />
-          </View>
-        </View>
-      </View>
-
-      <View style={jc.bottomRow}>
-        <Ionicons name="checkmark-circle-outline" size={14} color={colors.secondary} />
-        <Text style={jc.bottomText}>
-          <Text style={jc.bottomBold}>{stats.collectes_validees}/{stats.collectes_total}</Text>
-          {' '}collectes validées{bottomSuffix}
+    <View style={met.row}>
+      <View style={met.col}>
+        <Text style={met.label}>BIODÉCHETS</Text>
+        <Text style={met.value}>
+          {stats.poids_collecte_kg.toLocaleString('fr-FR')}
+          <Text style={met.unit}> kg</Text>
         </Text>
+        <View style={met.track}>
+          <Animated.View style={[met.fill, {
+            width: kgAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+            backgroundColor: '#2D6A4F',
+          }]} />
+        </View>
+        <Text style={met.sub}>sur {stats.poids_prevu_kg.toLocaleString('fr-FR')} kg</Text>
       </View>
 
-      {hasAlert && (
-        <TouchableOpacity onPress={onGoImprevus} activeOpacity={0.75} style={jc.alertFooter}>
-          <Ionicons name="alert-circle-outline" size={14} color={RED.fg} />
-          <Text style={[jc.alertFooterText, { color: RED.fg }]}>
-            {stats.alertes} impr{stats.alertes > 1 ? 'évus' : 'évu'} à traiter
-          </Text>
-          <Ionicons name="chevron-forward" size={13} color={RED.fg} />
-        </TouchableOpacity>
-      )}
+      <View style={met.vline} />
+
+      <View style={met.col}>
+        <Text style={met.label}>COLLECTES</Text>
+        <Text style={met.value}>
+          {stats.collectes_validees}
+          <Text style={met.unit}>/{stats.collectes_total}</Text>
+        </Text>
+        <View style={met.track}>
+          <Animated.View style={[met.fill, {
+            width: colAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+            backgroundColor: '#1A759F',
+          }]} />
+        </View>
+        <Text style={met.sub}>validées · {pctLabel} %</Text>
+      </View>
+
+      <View style={met.vline} />
+
+      <View style={met.col}>
+        <Text style={met.label}>DISTANCE</Text>
+        <Text style={met.value}>
+          {stats.km_total}
+          <Text style={met.unit}> km</Text>
+        </Text>
+        <View style={met.track}>
+          <Animated.View style={[met.fill, { width: '100%', backgroundColor: TEXT_MUTED }]} />
+        </View>
+        <Text style={met.sub}>planifiés</Text>
+      </View>
     </View>
   );
 }
 
-const jc = StyleSheet.create({
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 18,
-    shadowColor: '#0C3A34',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
+const met = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    paddingTop: 16,
+    paddingBottom: 12,
+    marginBottom: 4,
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  statusLabel: { fontSize: 14, fontWeight: '700', flex: 1 },
-  iconBox: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  sep: { height: 1, backgroundColor: 'rgba(0,0,0,0.06)', marginBottom: 14 },
-  metricRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
-  metricTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  metricValue: { fontSize: 20, fontWeight: '800', color: TEXT_DARK, letterSpacing: -0.3 },
-  metricUnit: { fontSize: 14, fontWeight: '600', color: TEXT_MUTED },
-  metricRight: { fontSize: 12, color: TEXT_MUTED, fontWeight: '500' },
-  progressTrack: { height: 4, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 2 },
-  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  bottomText: { fontSize: 13, color: TEXT_MUTED, fontWeight: '500', flex: 1 },
-  bottomBold: { fontWeight: '700', color: TEXT_DARK },
-  alertFooter: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: 10, paddingTop: 10,
-    borderTopWidth: 1, borderTopColor: 'rgba(231,111,81,0.2)',
+  col: {
+    flex: 1,
+    gap: 6,
   },
-  alertFooterText: { flex: 1, fontSize: 13, fontWeight: '700' },
+  vline: {
+    width: 1,
+    backgroundColor: LINE,
+    marginHorizontal: 8,
+  },
+  label: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: TEXT_MUTED,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 1,
+  },
+  value: {
+    fontFamily: SERIF,
+    fontSize: 22,
+    color: TEXT_DARK,
+    lineHeight: 26,
+  },
+  unit: {
+    fontFamily: SERIF,
+    fontSize: 14,
+    color: TEXT_MUTED,
+  },
+  track: {
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  sub: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    fontWeight: '500',
+  },
 });
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -367,6 +416,7 @@ export default function DashboardScreen() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activites, setActivites] = useState<Activite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
 
   const isGenerated = !!stats && stats.collectes_total > 0;
@@ -389,6 +439,8 @@ export default function DashboardScreen() {
         ]);
         setStats(s);
         setActivites(a);
+        const now = new Date();
+        setLastUpdate(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
       } catch (e) {
         console.warn('Dashboard fetch error:', e);
       } finally {
@@ -449,102 +501,182 @@ export default function DashboardScreen() {
           stats={stats}
           loading={loading}
           hasAlerts={hasAlerts}
+          lastUpdate={lastUpdate}
           onGoPlanning={() => router.push('/planning')}
           onGoImprevus={() => router.push('/imprevus')}
         />
 
         <View style={styles.body}>
-          {/* Données de progression — visible seulement si tournées générées */}
-          {!loading && isGenerated && (
-            <JourneeCard
-              stats={stats!}
-              onGoImprevus={() => router.push('/imprevus')}
-            />
-          )}
+          {/* Métriques plates — visible seulement si tournées générées */}
+          {!loading && isGenerated && <MetricsRow stats={stats!} />}
 
           {/* ── À faire + Accès — côte à côte, sans cards ── */}
           <View style={flat.row}>
 
-            {/* Colonne gauche — À faire */}
+            {/* Colonne gauche — À faire / Priorités */}
             <View style={flat.col}>
-              <Text style={flat.sectionTitle}>À FAIRE</Text>
+              <Text style={flat.sectionTitle}>{isGenerated ? 'PRIORITÉS' : 'À FAIRE'}</Text>
 
-              <View style={flat.item}>
-                <View style={[flat.accent, { backgroundColor: '#5D8A6F' }]} />
-                <Ionicons name="calendar-outline" size={16} color={TEXT_DARK} />
-                <View style={flat.itemBody}>
-                  <Text style={flat.itemTitle} numberOfLines={2}>
-                    {isGenerated ? 'Superviser' : 'Préparer les tournées'}
-                  </Text>
-                  <Text style={flat.itemSub} numberOfLines={2}>
-                    {isGenerated ? "Suivez l'avancement." : 'Lancez la génération.'}
-                  </Text>
-                </View>
-              </View>
+              {/* Imprévus en premier quand actif */}
+              {isGenerated && (
+                <>
+                  {hasAlerts ? (
+                    <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
+                      <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
+                      <Ionicons name="warning-outline" size={16} color="#C43B25" />
+                      <View style={flat.itemBody}>
+                        <Text style={[flat.itemTitle, { color: '#C43B25' }]} numberOfLines={1}>
+                          {stats!.alertes} imprév{stats!.alertes > 1 ? 'us' : 'u'}
+                        </Text>
+                        <Text style={flat.itemSub}>Action requise.</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={13} color="#C43B25" />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={flat.item}>
+                      <View style={[flat.accent, { backgroundColor: '#2D6A4F' }]} />
+                      <Ionicons name="checkmark-circle-outline" size={16} color="#2D6A4F" />
+                      <View style={flat.itemBody}>
+                        <Text style={[flat.itemTitle, { color: '#2D6A4F' }]} numberOfLines={1}>Aucun imprévu</Text>
+                        <Text style={flat.itemSub}>Tout roule.</Text>
+                      </View>
+                    </View>
+                  )}
 
-              <View style={flat.divider} />
+                  <View style={flat.divider} />
 
-              {hasAlerts ? (
-                <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
-                  <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
-                  <Ionicons name="warning-outline" size={16} color="#C43B25" />
-                  <View style={flat.itemBody}>
-                    <Text style={[flat.itemTitle, { color: '#C43B25' }]} numberOfLines={1}>
-                      {stats!.alertes} imprév{stats!.alertes > 1 ? 'us' : 'u'}
-                    </Text>
-                    <Text style={flat.itemSub}>Action requise.</Text>
+                  <TouchableOpacity style={flat.item} onPress={() => router.push('/planning')} activeOpacity={0.75}>
+                    <View style={[flat.accent, { backgroundColor: '#5D8A6F' }]} />
+                    <Ionicons name="calendar-outline" size={16} color={TEXT_DARK} />
+                    <View style={flat.itemBody}>
+                      <Text style={flat.itemTitle} numberOfLines={1}>Superviser</Text>
+                      <Text style={flat.itemSub}>Suivez l'avancement.</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {/* Affichage non-actif */}
+              {!isGenerated && (
+                <>
+                  <View style={flat.item}>
+                    <View style={[flat.accent, { backgroundColor: '#5D8A6F' }]} />
+                    <Ionicons name="calendar-outline" size={16} color={TEXT_DARK} />
+                    <View style={flat.itemBody}>
+                      <Text style={flat.itemTitle} numberOfLines={2}>Préparer les tournées</Text>
+                      <Text style={flat.itemSub}>Lancez la génération.</Text>
+                    </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={13} color="#C43B25" />
-                </TouchableOpacity>
-              ) : (
-                <View style={flat.item}>
-                  <View style={[flat.accent, { backgroundColor: '#2D6A4F' }]} />
-                  <Ionicons name="checkmark-circle-outline" size={16} color="#2D6A4F" />
-                  <View style={flat.itemBody}>
-                    <Text style={[flat.itemTitle, { color: '#2D6A4F' }]} numberOfLines={1}>Aucun imprévu</Text>
-                    <Text style={flat.itemSub}>Tout roule.</Text>
-                  </View>
-                </View>
+
+                  <View style={flat.divider} />
+
+                  {hasAlerts ? (
+                    <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
+                      <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
+                      <Ionicons name="warning-outline" size={16} color="#C43B25" />
+                      <View style={flat.itemBody}>
+                        <Text style={[flat.itemTitle, { color: '#C43B25' }]} numberOfLines={1}>
+                          {stats!.alertes} imprév{stats!.alertes > 1 ? 'us' : 'u'}
+                        </Text>
+                        <Text style={flat.itemSub}>Action requise.</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={13} color="#C43B25" />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={flat.item}>
+                      <View style={[flat.accent, { backgroundColor: '#2D6A4F' }]} />
+                      <Ionicons name="checkmark-circle-outline" size={16} color="#2D6A4F" />
+                      <View style={flat.itemBody}>
+                        <Text style={[flat.itemTitle, { color: '#2D6A4F' }]} numberOfLines={1}>Aucun imprévu</Text>
+                        <Text style={flat.itemSub}>Tout roule.</Text>
+                      </View>
+                    </View>
+                  )}
+                </>
               )}
             </View>
 
             {/* Séparateur vertical */}
             <View style={flat.vline} />
 
-            {/* Colonne droite — Accès rapides */}
+            {/* Colonne droite — Répartition km (actif) / Accès rapides (inactif) */}
             <View style={flat.col}>
-              <Text style={flat.sectionTitle}>ACCÈS</Text>
+              {isGenerated ? (
+                <>
+                  <Text style={flat.sectionTitle}>RÉPARTITION KM</Text>
+                  {stats!.flotte.map((f, i) => {
+                    const nomVl = f.nom_vl ?? `VL${i + 1}`;
+                    const dotColor = f.termine ? '#2D6A4F' : f.erreurs > 0 ? '#C43B25' : '#D4820A';
+                    const pct = f.km != null && stats!.km_total > 0
+                      ? Math.min(f.km / stats!.km_total, 1)
+                      : null;
+                    return (
+                      <View key={i}>
+                        {i > 0 && <View style={flat.divider} />}
+                        <View style={km.row}>
+                          <View style={[km.dot, { backgroundColor: dotColor }]} />
+                          <View style={km.body}>
+                            <Text style={km.vl}>{nomVl}</Text>
+                            <Text style={km.driver} numberOfLines={1}>
+                              {f.chauffeur.split(' ')[0]}
+                            </Text>
+                          </View>
+                          <Text style={km.val}>
+                            {f.km != null ? `${f.km} km` : '—'}
+                          </Text>
+                        </View>
+                        {pct !== null && (
+                          <View style={km.track}>
+                            <View style={[km.fill, {
+                              width: `${Math.round(pct * 100)}%`,
+                              backgroundColor: dotColor,
+                            }]} />
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                  {stats!.km_total > 0 && (
+                    <Text style={km.note}>Total : {stats!.km_total} km</Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={flat.sectionTitle}>ACCÈS</Text>
 
-              <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
-                <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
-                <Ionicons name="warning-outline" size={16} color="#C43B25" />
-                <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Imprévus</Text>
-                <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
-              </TouchableOpacity>
+                  <TouchableOpacity style={flat.item} onPress={() => router.push('/imprevus')} activeOpacity={0.75}>
+                    <View style={[flat.accent, { backgroundColor: '#C43B25' }]} />
+                    <Ionicons name="warning-outline" size={16} color="#C43B25" />
+                    <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Imprévus</Text>
+                    <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
+                  </TouchableOpacity>
 
-              <View style={flat.divider} />
+                  <View style={flat.divider} />
 
-              <TouchableOpacity style={flat.item} onPress={() => router.push('/sites')} activeOpacity={0.75}>
-                <View style={[flat.accent, { backgroundColor: '#2D6A4F' }]} />
-                <Ionicons name="location-outline" size={16} color={TEXT_DARK} />
-                <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Sites</Text>
-                <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
-              </TouchableOpacity>
+                  <TouchableOpacity style={flat.item} onPress={() => router.push('/sites')} activeOpacity={0.75}>
+                    <View style={[flat.accent, { backgroundColor: '#2D6A4F' }]} />
+                    <Ionicons name="location-outline" size={16} color={TEXT_DARK} />
+                    <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Sites</Text>
+                    <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
+                  </TouchableOpacity>
 
-              <View style={flat.divider} />
+                  <View style={flat.divider} />
 
-              <TouchableOpacity style={flat.item} onPress={() => router.push('/ressources')} activeOpacity={0.75}>
-                <View style={[flat.accent, { backgroundColor: TEXT_MUTED }]} />
-                <Ionicons name="document-text-outline" size={16} color={TEXT_DARK} />
-                <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Ressources</Text>
-                <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
-              </TouchableOpacity>
+                  <TouchableOpacity style={flat.item} onPress={() => router.push('/ressources')} activeOpacity={0.75}>
+                    <View style={[flat.accent, { backgroundColor: TEXT_MUTED }]} />
+                    <Ionicons name="document-text-outline" size={16} color={TEXT_DARK} />
+                    <Text style={[flat.itemTitle, { flex: 1 }]} numberOfLines={1}>Ressources</Text>
+                    <Ionicons name="chevron-forward" size={13} color={TEXT_MUTED} />
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
 
           </View>
 
-          {/* ── Flotte en temps réel ── */}
-          {!loading && stats && stats.flotte.length > 0 && (() => {
+          {/* ── Flotte en temps réel (seulement si pas actif — sinon dans la colonne km) ── */}
+          {!loading && !isGenerated && stats && stats.flotte.length > 0 && (() => {
             const allDone  = stats.flotte.every(f => f.termine);
             const anyError = stats.flotte.some(f => f.erreurs > 0);
             const badgeBg  = !allDone ? colors.status.en_cours.bg : anyError ? colors.coralLight : colors.status.terminee.bg;
@@ -590,6 +722,54 @@ export default function DashboardScreen() {
                           </View>
                           <View style={[styles.fleetBadge, { backgroundColor: fBadgeBg }]}>
                             <Text style={[styles.fleetBadgeText, { color: fBadgeFg }]}>{fLabel}</Text>
+                          </View>
+                        </View>
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
+              </>
+            );
+          })()}
+
+          {/* ── Activité récente ── */}
+          {!loading && activites.length > 0 && (() => {
+            const shown = activites.slice(0, 5);
+            const CAT_COLORS = {
+              tournee:    { bg: '#E3EEF7', fg: '#1A759F', label: 'Tournée' },
+              imprevue:   { bg: '#FDE8E3', fg: '#C43B25', label: 'Imprévu' },
+              validation: { bg: '#E0F0E9', fg: '#2D6A4F', label: 'Validation' },
+            } as const;
+            return (
+              <>
+                <View style={act.section}>
+                  <Text style={flat.sectionTitle}>ACTIVITÉ RÉCENTE</Text>
+                  {shown.map((a, i) => {
+                    const isOk = a.statut === 'terminee';
+                    const cat = a.categorie ?? (isOk ? 'validation' : 'imprevue');
+                    const c   = CAT_COLORS[cat];
+                    const stateSymbol = cat === 'tournee' ? '○' : isOk ? '✓' : '!';
+                    const stateColor  = cat === 'tournee' ? '#1A759F' : isOk ? '#2D6A4F' : '#C43B25';
+                    const actionLabel = a.action ?? (isOk ? 'Collecte validée' : 'Imprévu signalé');
+                    const detailLabel = a.detail ?? a.client;
+                    return (
+                      <React.Fragment key={i}>
+                        {i > 0 && <View style={flat.divider} />}
+                        <View style={act.row}>
+                          <View style={[act.state, { backgroundColor: stateColor }]}>
+                            <Text style={act.stateText}>{stateSymbol}</Text>
+                          </View>
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <View style={act.topLine}>
+                              {a.heure ? (
+                                <Text style={act.heure}>{a.heure}</Text>
+                              ) : null}
+                              <Text style={act.action} numberOfLines={1}>{actionLabel}</Text>
+                            </View>
+                            <Text style={act.detail} numberOfLines={1}>{detailLabel}</Text>
+                          </View>
+                          <View style={[act.tag, { backgroundColor: c.bg }]}>
+                            <Text style={[act.tagText, { color: c.fg }]}>{c.label}</Text>
                           </View>
                         </View>
                       </React.Fragment>
@@ -648,116 +828,121 @@ export default function DashboardScreen() {
   );
 }
 
-// ── Panel styles ──────────────────────────────────────────────────────────────
 
-const panel = StyleSheet.create({
-  box: {
-    backgroundColor: 'rgba(252,247,235,0.9)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: PANEL_BORDER,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 8,
-    marginBottom: 16,
-    shadowColor: '#4a3218',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+// ── Activité récente styles ───────────────────────────────────────────────────
+
+const act = StyleSheet.create({
+  section: {
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    paddingTop: 18,
+    paddingBottom: 10,
+    marginBottom: 4,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 14,
-  },
-  headerTitle: {
-    fontFamily: SERIF,
-    fontSize: 19,
-    color: TEXT_DARK,
-    lineHeight: 22,
-  },
-  headerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: LINE,
-  },
-  task: {
-    minHeight: 56,
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E3D7C0',
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
-  taskLast: {
-    borderBottomWidth: 0,
-    marginBottom: 4,
-  },
-  tile: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+  state: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  taskBody: {
-    flex: 1,
+  stateText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
   },
-  taskTitle: {
+  topLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heure: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    flexShrink: 0,
+  },
+  action: {
     fontSize: 13,
     fontWeight: '700',
     color: TEXT_DARK,
-    lineHeight: 17,
     flex: 1,
   },
-  taskSub: {
+  detail: {
     fontSize: 12,
     color: TEXT_MUTED,
-    marginTop: 2,
-    lineHeight: 16,
+    fontWeight: '400',
   },
-  chevron: {
-    fontSize: 20,
-    color: TEXT_MUTED,
-    lineHeight: 24,
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     flexShrink: 0,
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 
-const quick = StyleSheet.create({
-  triGrid: {
+const km = StyleSheet.create({
+  row: {
     flexDirection: 'row',
-    gap: 6,
-    paddingBottom: 8,
-    paddingTop: 2,
-  },
-  triItem: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 14,
     gap: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(223,231,204,0.28)',
-    borderWidth: 1,
-    borderColor: '#E3D7C0',
+    paddingVertical: 5,
   },
-  triIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    flexShrink: 0,
   },
-  triLabel: {
-    fontSize: 10,
+  body: {
+    flex: 1,
+  },
+  vl: {
+    fontSize: 12,
     fontWeight: '800',
     color: TEXT_DARK,
-    textAlign: 'center',
-    letterSpacing: 0.4,
+    lineHeight: 15,
+  },
+  driver: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    lineHeight: 14,
+  },
+  val: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    flexShrink: 0,
+  },
+  track: {
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 2,
+    marginLeft: 16,
+  },
+  fill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  note: {
+    fontSize: 10,
+    color: TEXT_MUTED,
+    fontWeight: '500',
+    marginTop: 8,
+    letterSpacing: 0.2,
   },
 });
 
@@ -951,15 +1136,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 16,
   },
-  panelRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  panelFlex: {
-    flex: 1,
-    marginBottom: 0,
-  },
   // fleet
   sectionLabel: {
     flexDirection: 'row',
@@ -1028,32 +1204,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginVertical: 16,
   },
-  daySepLine: { flex: 1, height: 1, backgroundColor: '#D8E0CC' },
-  daySepText: { fontSize: 11, fontWeight: '600', color: TEXT_MUTED, letterSpacing: 0.4 },
-  actAllGood: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
-  },
-  actAllGoodText: { fontSize: 13, fontWeight: '600', color: colors.status.terminee.fg, flex: 1 },
-  actErrorList: {
-    backgroundColor: '#FAF5EB',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: PANEL_BORDER,
-    overflow: 'hidden',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  actErrorDivider: { height: 1, backgroundColor: CREAM, marginLeft: 15 },
-  actErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
-  actErrorAccent: { width: 3, height: 36, borderRadius: 2, backgroundColor: colors.coral, flexShrink: 0 },
-  actErrorInfo: { flex: 1, gap: 2 },
-  actErrorName: { fontSize: 14, fontWeight: '700', color: TEXT_DARK },
-  actErrorDetail: { fontSize: 12, color: colors.coral, fontWeight: '500' },
-  actErrorBadge: { backgroundColor: colors.coralLight, borderRadius: 20, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0 },
-  actErrorBadgeText: { fontSize: 11, fontWeight: '700', color: colors.coral },
   // toast
   toast: {
     position: 'absolute',
