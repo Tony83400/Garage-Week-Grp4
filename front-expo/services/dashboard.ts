@@ -2,12 +2,12 @@ import { api } from './api';
 
 export interface FlotteVehicule {
   chauffeur: string;
-  dernier_point: string;
-  termine: boolean;
+  nb_tournees: number;
+  km: number;
+  arrets_total: number;
+  arrets_done: number;
   erreurs: number;
-  nom_vl?: string;   // TODO back: ex "VL1", "VL2"…
-  km?: number;       // TODO back: km parcourus par ce VL
-  km_prevu?: number; // TODO back: km prévus par ce VL
+  termine: boolean;
 }
 
 // Correspond à GET /api/dashboard/stats?date=YYYY-MM-DD

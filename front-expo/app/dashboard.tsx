@@ -612,34 +612,39 @@ export default function DashboardScreen() {
                     <Text style={flat.sectionTitle}>RÉPARTITION KM</Text>
                   </View>
                   {stats!.flotte.map((f, i) => {
-                    const nomVl = f.nom_vl ?? `VL${i + 1}`;
                     const dotColor = f.termine ? '#2D6A4F' : f.erreurs > 0 ? '#C43B25' : '#D4820A';
-                    const pct = f.km != null && stats!.km_total > 0
+                    const pct = stats!.km_total > 0
                       ? Math.min(f.km / stats!.km_total, 1)
-                      : null;
+                      : 0;
                     return (
                       <View key={i}>
                         {i > 0 && <View style={flat.divider} />}
                         <View style={km.row}>
                           <View style={[km.dot, { backgroundColor: dotColor }]} />
                           <View style={km.body}>
-                            <Text style={km.vl}>{nomVl}</Text>
-                            <Text style={km.driver} numberOfLines={1}>
-                              {f.chauffeur.split(' ')[0]}
+                            <View style={km.nameRow}>
+                              <Text style={km.vl} numberOfLines={1}>{f.chauffeur}</Text>
+                              {f.nb_tournees > 1 && (
+                                <View style={km.tourneeBadge}>
+                                  <Text style={km.tourneeBadgeText}>{f.nb_tournees} T</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={km.driver}>
+                              {f.arrets_done}/{f.arrets_total} arrêts
+                              {f.erreurs > 0 ? ` · ${f.erreurs} err.` : ''}
                             </Text>
                           </View>
-                          <Text style={km.val}>
-                            {f.km != null ? `${f.km} km` : '—'}
+                          <Text style={[km.val, { color: dotColor }]}>
+                            {f.km} km
                           </Text>
                         </View>
-                        {pct !== null && (
-                          <View style={km.track}>
-                            <View style={[km.fill, {
-                              width: `${Math.round(pct * 100)}%`,
-                              backgroundColor: dotColor,
-                            }]} />
-                          </View>
-                        )}
+                        <View style={km.track}>
+                          <View style={[km.fill, {
+                            width: `${Math.round(pct * 100)}%` as any,
+                            backgroundColor: dotColor,
+                          }]} />
+                        </View>
                       </View>
                     );
                   })}
@@ -920,11 +925,27 @@ const km = StyleSheet.create({
   body: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   vl: {
     fontSize: 12,
     fontWeight: '800',
     color: TEXT_DARK,
     lineHeight: 15,
+  },
+  tourneeBadge: {
+    backgroundColor: '#E8F5EE',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  tourneeBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#2D6A4F',
   },
   driver: {
     fontSize: 11,

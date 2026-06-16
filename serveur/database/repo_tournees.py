@@ -190,10 +190,34 @@ class TourneeRepository:
             alertes = cursor.fetchone()[0] or 0
             cursor.execute('SELECT SUM(distance_km) FROM tournees_jour WHERE date_tournee = ?', (date_jour,))
             km_total = cursor.fetchone()[0] or 0
-            cursor.execute("SELECT ch.prenom, c.nom_entreprise, COUNT(CASE WHEN t.type_tache = 'collecte' THEN 1 END), COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'terminee' THEN 1 END), COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'erreur' THEN 1 END) FROM tournees_jour tj JOIN chauffeurs ch ON tj.chauffeur_id = ch.id JOIN taches_collecte t ON tj.id = t.tournee_id LEFT JOIN clients c ON t.client_id = c.id AND t.statut = 'terminee' AND t.ordre_passage = (SELECT MAX(t2.ordre_passage) FROM taches_collecte t2 WHERE t2.tournee_id = tj.id AND t2.statut = 'terminee' AND t2.type_tache = 'collecte') WHERE tj.date_tournee = ? GROUP BY tj.id, ch.prenom", (date_jour,))
+            cursor.execute("""
+                SELECT
+                  ch.prenom || ' ' || SUBSTR(ch.nom, 1, 1) || '.',
+                  COUNT(DISTINCT tj.id),
+                  ROUND(SUM(tj.distance_km), 1),
+                  COUNT(CASE WHEN t.type_tache = 'collecte' THEN 1 END),
+                  COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'terminee' THEN 1 END),
+                  COUNT(CASE WHEN t.type_tache = 'collecte' AND t.statut = 'erreur' THEN 1 END)
+                FROM tournees_jour tj
+                JOIN chauffeurs ch ON tj.chauffeur_id = ch.id
+                LEFT JOIN taches_collecte t ON tj.id = t.tournee_id
+                WHERE tj.date_tournee = ?
+                GROUP BY tj.chauffeur_id, ch.prenom, ch.nom
+            """, (date_jour,))
             flotte = []
-            for prenom, dernier_client, total, done, erreurs in cursor.fetchall():
-                flotte.append({'chauffeur': prenom, 'dernier_point': 'Retour dépôt · La Farlède' if (total or 0) > 0 and (done or 0) + (erreurs or 0) >= total else dernier_client or 'En route', 'termine': total > 0 and done + erreurs >= total, 'erreurs': erreurs})
+            for chauffeur, nb_tournees, km, total, done, erreurs in cursor.fetchall():
+                total = total or 0
+                done = done or 0
+                erreurs = erreurs or 0
+                flotte.append({
+                    'chauffeur': chauffeur,
+                    'nb_tournees': nb_tournees,
+                    'km': km or 0,
+                    'arrets_total': total,
+                    'arrets_done': done,
+                    'erreurs': erreurs,
+                    'termine': total > 0 and done + erreurs >= total,
+                })
             return {'poids_prevu_kg': p_total, 'poids_collecte_kg': p_coll, 'collectes_total': t_coll, 'collectes_validees': c_val, 'alertes': alertes, 'km_total': round(km_total, 1), 'flotte': flotte}
 
     def get_activite_recente(self, date_jour, limite=5):
