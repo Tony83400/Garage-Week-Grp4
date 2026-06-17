@@ -473,6 +473,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   kav: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -539,12 +540,12 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   form: {
-    flexGrow: 0,
+    flex: 1,
   },
   formContent: {
     paddingHorizontal: 24,
     paddingTop: 20,
-    paddingBottom: 8,
+    paddingBottom: 40,
     gap: 14,
   },
 

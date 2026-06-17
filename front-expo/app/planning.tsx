@@ -212,7 +212,7 @@ export default function PlanningScreen() {
     }));
   }, [vehicles, selectedTournee]);
 
-  const totalArrets = vehicles.reduce((acc, v) => acc + v.arrets.length, 0);
+  const totalArrets = vehicles.reduce((acc, v) => acc + v.arrets.length-2, 0);
   const validees = stats?.collectes_validees ?? 0;
   const totalCollectes = stats?.collectes_total ?? 0;
   const isToday = selectedDate === todayISO();
